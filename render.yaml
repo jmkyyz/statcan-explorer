@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: statcan-explorer
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python proxy.py
+    envVars:
+      - key: PORT
+        value: 10000

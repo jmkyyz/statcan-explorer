@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StatCan Data Explorer</title>
+<!-- ── PROXY CONFIG ──────────────────────────────────────────
+     Change PROXY_URL if you host the proxy elsewhere.
+     Default: http://localhost:5001  (run proxy.py locally)
+─────────────────────────────────────────────────────────── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap');
+
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2330;
+    --border: #2a3441;
+    --accent: #e8c547;
+    --accent2: #4fc3f7;
+    --accent3: #ef5350;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --success: #3fb950;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'DM Mono', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 13px;
+  }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 18px 28px;
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    background: var(--surface);
+  }
+  header h1 {
+    font-family: 'Fraunces', serif;
+    font-size: 21px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: -0.5px;
+  }
+  header span { color: var(--muted); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+  .maple { margin-left: auto; font-size: 20px; opacity: 0.5; }
+
+  .app {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    min-height: calc(100vh - 61px);
+  }
+
+  .sidebar {
+    border-right: 1px solid var(--border);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+    overflow-y: auto;
+    background: var(--surface);
+  }
+
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .selected-series { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
+  .series-chip {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 6px 9px;
+    border: 1px solid var(--accent2);
+    border-radius: 5px;
+    background: rgba(79,195,247,0.07);
+  }
+  .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .chip-name {
+    font-size: 11px; line-height: 1.3; color: var(--text); flex: 1; min-width: 0;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    position: relative;
+  }
+  .chip-name::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: calc(100% + 7px);
+    left: 0;
+    background: #0d1117;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 9px;
+    font-size: 11px;
+    line-height: 1.4;
+    white-space: normal;
+    width: max-content;
+    max-width: 240px;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.1s;
+    z-index: 10;
+  }
+  .chip-name:hover::after { opacity: 1; }
+  .chip-remove { cursor: pointer; color: var(--muted); font-size: 15px; line-height: 1;
+                 flex-shrink: 0; transition: color 0.15s; padding: 0 1px; }
+  .chip-remove:hover { color: var(--accent3); }
+
+  .cansim-link {
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 10px;
+    flex-shrink: 0;
+    padding: 1px 4px;
+    border-radius: 3px;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .cansim-link:hover { color: var(--accent2); border-color: var(--accent2); }
+
+  .control-group { display: flex; flex-direction: column; gap: 6px; }
+  label { font-size: 11px; color: var(--muted); }
+
+  select, input[type="number"] {
+    width: 100%;
+    padding: 7px 9px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+    -webkit-appearance: none;
+  }
+  /* Custom chevron for all <select> elements */
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237d8590' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+    cursor: pointer;
+  }
+  select:focus, input:focus { border-color: var(--accent2); }
+  select option { background: var(--surface2); }
+
+  .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .date-inputs { display: flex; gap: 5px; }
+  .date-inputs select { flex: 1; min-width: 0; }
+
+  /* Year stepper: [−] 2015 [+] */
+  .year-stepper {
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    overflow: hidden;
+    flex-shrink: 0;
+    transition: border-color 0.15s;
+  }
+  .year-stepper:focus-within { border-color: var(--accent2); }
+  .year-stepper input {
+    width: 42px;
+    border: none;
+    border-radius: 0;
+    text-align: center;
+    padding: 7px 2px;
+    font-size: 12px;
+    -webkit-appearance: none;
+  }
+  .year-stepper input::-webkit-inner-spin-button,
+  .year-stepper input::-webkit-outer-spin-button { -webkit-appearance: none; }
+  .year-stepper input:focus { border-color: transparent; outline: none; }
+  .step-btn {
+    background: var(--surface);
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0 7px;
+    font-size: 16px;
+    line-height: 1;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+    user-select: none;
+  }
+  .step-btn:first-child { border-right: 1px solid var(--border); }
+  .step-btn:last-child  { border-left:  1px solid var(--border); }
+  .step-btn:hover { background: var(--surface2); color: var(--accent); }
+
+  .transform-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip {
+    padding: 5px 9px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 11px;
+    transition: all 0.15s;
+    color: var(--muted);
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.active { border-color: var(--accent); background: rgba(232,197,71,0.1); color: var(--accent); }
+
+  .btn {
+    padding: 9px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.15s;
+    letter-spacing: 0.4px;
+  }
+  .btn-primary { background: var(--accent); color: #0d1117; flex: 1; }
+  .btn-primary:hover { background: #f0d060; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-secondary { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--accent3); color: var(--accent3); }
+  .btn-export { background: var(--success); color: #0d1117; display: flex; align-items: center; gap: 6px; }
+  .btn-export:hover { background: #56d364; }
+  .btn-row { display: flex; gap: 8px; }
+
+  .main { display: flex; flex-direction: column; background: var(--bg); min-width: 0; overflow: hidden; }
+
+  .toolbar {
+    border-bottom: 1px solid var(--border);
+    padding: 12px 22px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface);
+    flex-wrap: wrap;
+  }
+  .toolbar-left { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 3px; }
+  .toolbar-title {
+    font-family: 'Fraunces', serif;
+    font-size: 14px;
+    color: var(--text);
+  }
+  .toolbar-sources { font-size: 10px; color: var(--muted); }
+  .toolbar-sources a { color: var(--accent2); text-decoration: none; }
+  .toolbar-sources a:hover { text-decoration: underline; }
+
+  .chart-tabs { display: flex; gap: 4px; }
+  .tab {
+    padding: 5px 11px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 11px;
+    color: var(--muted);
+    background: var(--surface2);
+    transition: all 0.15s;
+  }
+  .tab:hover { color: var(--text); border-color: var(--muted); }
+  .tab.active { border-color: var(--accent2); color: var(--accent2); background: rgba(79,195,247,0.07); }
+
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .status-dot.loaded { background: var(--success); }
+  .status-dot.loading { background: var(--accent); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  .chart-area { flex: 1; padding: 14px 20px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .chart-container {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px;
+    flex: 1;
+    min-height: 240px;
+  }
+  .chart-empty {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 10px; color: var(--muted);
+  }
+  .chart-empty .icon { font-size: 36px; opacity: 0.25; }
+  .chart-empty p { font-size: 12px; }
+
+  .data-table-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    max-height: 210px;
+    overflow-y: auto;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  thead { position: sticky; top: 0; background: var(--surface2); }
+  th {
+    padding: 7px 11px;
+    text-align: left;
+    color: var(--muted);
+    font-weight: 400;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-size: 10px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td { padding: 5px 11px; border-bottom: 1px solid rgba(42,52,65,0.5); color: var(--text); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.pos { color: var(--success); }
+  td.neg { color: var(--accent3); }
+
+  .toast {
+    position: fixed; bottom: 22px; right: 22px;
+    padding: 11px 16px; border-radius: 6px;
+    font-size: 12px; z-index: 999;
+    animation: slideIn 0.18s ease; max-width: 300px;
+  }
+  .toast.error   { background: var(--accent3); color: #fff; }
+  .toast.success { background: var(--success);  color: #0d1117; }
+  .toast.info    { background: var(--accent2);  color: #0d1117; }
+  @keyframes slideIn { from{transform:translateY(8px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+  .spinner {
+    display: inline-block; width: 13px; height: 13px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+    vertical-align: middle; margin-right: 5px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>StatCan Explorer</h1>
+  <span>Statistics Canada · Data Workbench</span>
+  <div class="maple">🍁</div>
+</header>
+
+<div class="app">
+
+  <aside class="sidebar">
+
+    <div>
+      <div class="section-label">Category</div>
+      <div class="control-group">
+        <select id="categorySelect" onchange="selectCategory(this.value)">
+          <option value="gdp_exp">GDP (expenditure based)</option>
+          <option value="gdp_inc">GDP (income based)</option>
+          <option value="labour">Labour market</option>
+          <option value="prices">Prices</option>
+          <option value="sales">Sales, trade, housing and households</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">
+        Series
+        <span id="seriesCount" style="color:var(--muted);font-size:9px;text-transform:none;letter-spacing:0;margin-left:4px;">0 / 5</span>
+      </div>
+      <div class="control-group">
+        <select id="seriesDropdown" onchange="addSeries(this.value)">
+          <option value="">— select to add —</option>
+        </select>
+      </div>
+      <div class="selected-series" id="selectedSeries"></div>
+    </div>
+
+    <div>
+      <div class="section-label">Date Range</div>
+      <div class="date-row">
+        <div class="control-group">
+          <label>From</label>
+          <div class="date-inputs">
+            <select id="fromMonth">
+              <option value="1">Jan</option><option value="2">Feb</option>
+              <option value="3">Mar</option><option value="4">Apr</option>
+              <option value="5">May</option><option value="6">Jun</option>
+              <option value="7">Jul</option><option value="8">Aug</option>
+              <option value="9">Sep</option><option value="10">Oct</option>
+              <option value="11">Nov</option><option value="12">Dec</option>
+            </select>
+            <div class="year-stepper">
+              <button class="step-btn" onclick="stepYear('fromYear',-1)">−</button>
+              <input type="number" id="fromYear" value="2015" min="1981" max="2030">
+              <button class="step-btn" onclick="stepYear('fromYear', 1)">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="control-group">
+          <label>To</label>
+          <div class="date-inputs">
+            <select id="toMonth">
+              <option value="1">Jan</option><option value="2">Feb</option>
+              <option value="3">Mar</option><option value="4">Apr</option>
+              <option value="5">May</option><option value="6">Jun</option>
+              <option value="7">Jul</option><option value="8">Aug</option>
+              <option value="9">Sep</option><option value="10">Oct</option>
+              <option value="11">Nov</option><option value="12" selected>Dec</option>
+            </select>
+            <div class="year-stepper">
+              <button class="step-btn" onclick="stepYear('toYear',-1)">−</button>
+              <input type="number" id="toYear" value="2025" min="1981" max="2030">
+              <button class="step-btn" onclick="stepYear('toYear', 1)">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Output</div>
+      <div class="control-group">
+        <select id="freqSelect">
+          <option value="original">Original (as reported)</option>
+          <option value="monthly_sum">Convert to monthly (sum)</option>
+          <option value="quarterly_sum">Convert to quarterly (sum)</option>
+          <option value="quarterly_avg">Convert to quarterly (average)</option>
+          <option value="annual_sum">Convert to annual (sum)</option>
+          <option value="annual_avg">Convert to annual (average)</option>
+        </select>
+      </div>
+    </div>
+
+    <div>
+      <div class="section-label">Transform</div>
+      <div class="transform-chips">
+        <div class="chip active" data-t="level" onclick="selectTransform('level')">Level</div>
+        <div class="chip"        data-t="pop"   onclick="selectTransform('pop')">Period % Chg</div>
+        <div class="chip"        data-t="yoy"   onclick="selectTransform('yoy')">YoY % Chg</div>
+        <div class="chip"        data-t="index" onclick="selectTransform('index')">Index (start=100)</div>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="clearChart()" title="Clear chart and selections">✕ Clear</button>
+      <button class="btn btn-primary" id="fetchBtn" onclick="fetchData()">
+        <span id="fetchBtnText">↓ Fetch Data</span>
+      </button>
+    </div>
+
+  </aside>
+
+  <main class="main">
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <div class="toolbar-title" id="chartTitle">Select a category and series to begin</div>
+        <div class="toolbar-sources" id="toolbarSources" style="display:none;"></div>
+      </div>
+      <div class="chart-tabs">
+        <div class="tab active" data-chart="line"    onclick="switchChart('line')">Line</div>
+        <div class="tab"        data-chart="bar"     onclick="switchChart('bar')">Bar</div>
+        <div class="tab"        data-chart="stacked" onclick="switchChart('stacked')">Stacked</div>
+        <div class="tab"        data-chart="area"    onclick="switchChart('area')">Area</div>
+      </div>
+      <div class="status-dot" id="statusDot"></div>
+      <button class="btn btn-export" id="exportBtn" onclick="exportXlsx()" style="display:none;">
+        ↓ Export XLSX
+      </button>
+    </div>
+
+    <div class="chart-area">
+      <div class="chart-container">
+        <div class="chart-empty" id="chartEmpty">
+          <div class="icon">📊</div>
+          <p>Select a category, choose series, then click Fetch Data</p>
+        </div>
+        <canvas id="myChart" style="display:none;"></canvas>
+      </div>
+      <div class="data-table-wrap" id="tableWrap" style="display:none;">
+        <table>
+          <thead id="tableHead"></thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════
+// When served by the Flask proxy (deployed on Render or run locally via `python proxy.py`),
+// API calls are relative (empty string). When opened as a raw file, fall back to localhost:5001.
+const PROXY_URL = window.location.protocol === "file:" ? "http://localhost:5001" : "";
+
+// ═══════════════════════════════════════════════════════════
+// DATA SERIES
+// ─────────────────────────────────────────────────────────
+// To add/remove/rename a series: edit the CATEGORIES object below.
+// tableId is used to build the CANSIM URL; format: XX-XX-XXXX-XX
+// vectorId digits only (no leading "v").
+// sourceFreq: 'quarterly' or 'monthly' (affects period calculation & date snapping).
+// ═══════════════════════════════════════════════════════════
+const CATEGORIES = {
+  gdp_exp: {
+    label: 'GDP (expenditure based)',
+    sourceFreq: 'quarterly',
+    series: [
+      { id:'gdp_exp_real',       name:'GDP at market prices, 2017$ SAAR',                                  vectorId:'62305752',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_nom',        name:'GDP at market prices, current$ SAAR',                               vectorId:'62305783',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_hhcons',     name:'Household final consumption expenditure, current$ SAAR',             vectorId:'62305755',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_govcons',    name:'General government final consumption expenditure, current$ SAAR',    vectorId:'62305762',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_gfcf',       name:'Gross fixed capital formation, current$ SAAR',                      vectorId:'62305763',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_bizgfcf',    name:'Business gross fixed capital formation, current$ SAAR',             vectorId:'62305764',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_resstruct',  name:'Business GFCF residential structures, current$ SAAR',               vectorId:'62305765',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_nonstruct',  name:'Business GFCF non-residential structures, current$ SAAR',           vectorId:'62305767',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_mach',       name:'Business GFCF machinery and equipment, current$ SAAR',              vectorId:'62305768',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_ip',         name:'Business GFCF intellectual property products, current$ SAAR',       vectorId:'62305769',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_exports',    name:'Exports of goods and services, current$ SAAR',                      vectorId:'62305776',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_expgoods',   name:'Exports of goods, current$ SAAR',                                   vectorId:'62305777',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_expservs',   name:'Exports of services, current$ SAAR',                                vectorId:'62305778',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_imports',    name:'Imports of goods and services, current$ SAAR',                      vectorId:'62305779',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_impgoods',   name:'Imports of goods, current$ SAAR',                                   vectorId:'62305780',   tableId:'36-10-0104-01' },
+      { id:'gdp_exp_impservs',   name:'Imports of services, current$ SAAR',                                vectorId:'62305781',   tableId:'36-10-0104-01' },
+    ]
+  },
+
+  gdp_inc: {
+    label: 'GDP (income based)',
+    sourceFreq: 'monthly',
+    series: [
+      { id:'gdp_inc_all', name:'GDP all industries, 2017$ SAAR',          vectorId:'65201210', tableId:'36-10-0434-01' },
+      { id:'gdp_inc_biz', name:'GDP business sector industries, 2017$ SAAR', vectorId:'65201213', tableId:'36-10-0434-01' },
+      { id:'gdp_inc_pub', name:'GDP public sector, 2017$ SAAR',           vectorId:'65201227', tableId:'36-10-0434-01' },
+    ]
+  },
+
+  labour: {
+    label: 'Labour market',
+    sourceFreq: 'monthly',
+    series: [
+      { id:'lab_lfs_emp_nsa',  name:'LFS employment, NSA',          vectorId:'2091072',    tableId:'14-10-0287-01' },
+      { id:'lab_lfs_emp_sa',   name:'LFS employment, SA',           vectorId:'2062811',    tableId:'14-10-0287-01' },
+      { id:'lab_lfs_ft_sa',    name:'LFS full-time employment, SA', vectorId:'2062812',    tableId:'14-10-0287-01' },
+      { id:'lab_lfs_pt_sa',    name:'LFS part-time employment, SA', vectorId:'2062813',    tableId:'14-10-0287-01' },
+      { id:'lab_lfs_emprate',  name:'LFS employment rate, SA',      vectorId:'2062817',    tableId:'14-10-0287-01' },
+      { id:'lab_lfs_urate',    name:'LFS unemployment rate, SA',    vectorId:'2062815',    tableId:'14-10-0287-01' },
+      { id:'lab_seph_emp_nsa', name:'SEPH employment, NSA',         vectorId:'1556538',    tableId:'14-10-0190-01' },
+      { id:'lab_seph_emp_sa',  name:'SEPH employment, SA',          vectorId:'54026324',   tableId:'14-10-0190-01' },
+      { id:'lab_vacancies',    name:'SEPH job vacancies SA',        vectorId:'1446283287', tableId:'14-10-0325-01' },
+      { id:'lab_vacrate',      name:'SEPH job vacancy rate SA',     vectorId:'1446283289', tableId:'14-10-0325-01' },
+    ]
+  },
+
+  prices: {
+    label: 'Prices',
+    sourceFreq: 'monthly',
+    series: [
+      { id:'prc_cpi_nsa',        name:'CPI, NSA',                          vectorId:'41690973',  tableId:'18-10-0004-01' },
+      { id:'prc_cpi_food_nsa',   name:'CPI food, NSA',                     vectorId:'41690974',  tableId:'18-10-0004-01' },
+      { id:'prc_cpi_foodstores', name:'CPI food purchased from stores, NSA', vectorId:'41690975', tableId:'18-10-0004-01' },
+      { id:'prc_cpi_exfood_nsa', name:'CPI excl. food, NSA',               vectorId:'41691232',  tableId:'18-10-0004-01' },
+      { id:'prc_cpi_core_nsa',   name:'CPI excl. food and energy, NSA',    vectorId:'41691233',  tableId:'18-10-0004-01' },
+      { id:'prc_cpi_sa',         name:'CPI, SA',                           vectorId:'41690914',  tableId:'18-10-0004-01' },
+      { id:'prc_cpi_exfood_sa',  name:'CPI excl. food, SA',                vectorId:'41690923',  tableId:'18-10-0004-01' },
+      { id:'prc_cpi_core_sa',    name:'CPI excl. food and energy, SA',     vectorId:'41690924',  tableId:'18-10-0004-01' },
+      { id:'prc_cpi_median',     name:'CPI core weighted median',           vectorId:'108785714', tableId:'18-10-0004-01' },
+      { id:'prc_cpi_trimmed',    name:'CPI core trimmed mean',              vectorId:'108785715', tableId:'18-10-0004-01' },
+    ]
+  },
+
+  sales: {
+    label: 'Sales, trade, housing and households',
+    sourceFreq: 'monthly',
+    series: [
+      { id:'sal_retail_nsa',    name:'Retail sales NSA',                                                  vectorId:'1446859481', tableId:'20-10-0063-01' },
+      { id:'sal_retail_sa',     name:'Retail sales SA',                                                   vectorId:'1446859483', tableId:'20-10-0063-01' },
+      { id:'sal_retail_vol',    name:'Retail sales, chained Fisher volume index',                         vectorId:'1446870181', tableId:'20-10-0063-01' },
+      { id:'sal_mfg_nom',       name:'Manufacturing sales, current$ NSA',                                 vectorId:'800025',     tableId:'16-10-0047-01' },
+      { id:'sal_mfg_real',      name:'Manufacturing sales, 2017$',                                        vectorId:'123263908',  tableId:'16-10-0048-01' },
+      { id:'sal_exports',       name:'Merchandise exports, BoP basis, current$ SA',                      vectorId:'87008955',   tableId:'12-10-0011-01' },
+      { id:'sal_imports',       name:'Merchandise imports, BoP basis, current$ SA',                      vectorId:'87008839',   tableId:'12-10-0011-01' },
+      { id:'sal_trdbal',        name:'Merchandise trade balance, BoP basis, current$ SA',                vectorId:'87008984',   tableId:'12-10-0011-01' },
+      { id:'sal_exp_us',        name:'Merchandise exports to U.S., BoP basis, current$ SA',              vectorId:'87008956',   tableId:'12-10-0011-01' },
+      { id:'sal_imp_us',        name:'Merchandise imports from U.S., BoP basis, current$ SA',            vectorId:'87008840',   tableId:'12-10-0011-01' },
+      { id:'sal_bal_us',        name:'Merchandise trade balance with U.S., BoP basis, current$ SA',      vectorId:'87008985',   tableId:'12-10-0011-01' },
+      { id:'sal_exports_real',  name:'Merchandise exports, 2017$',                                        vectorId:'1566912717', tableId:'12-10-0011-01' },
+      { id:'sal_imports_real',  name:'Merchandise imports, 2017$',                                        vectorId:'1566912703', tableId:'12-10-0011-01' },
+      { id:'sal_exp_energy',    name:'Merchandise exports of energy products, BoP basis, current$ SA',   vectorId:'1566911351', tableId:'12-10-0011-01' },
+      { id:'sal_exp_gold',      name:'Merchandise exports of unwrought gold etc, BoP basis, current$ SA', vectorId:'1566911383', tableId:'12-10-0011-01' },
+      { id:'sal_exp_vehicles',  name:'Merchandise exports of vehicles and parts, BoP basis, current$ SA', vectorId:'1566911442', tableId:'12-10-0011-01' },
+      { id:'trv_car_lead',      name:'Canadian residents returning from the U.S. by car (leading indicator)', vectorId:'1545910054', tableId:'24-10-0054-01' },
+      { id:'trv_air_lead',      name:'Canadian residents returning from the U.S. by air (leading indicator)', vectorId:'1324883057', tableId:'24-10-0054-01' },
+      { id:'trv_us_final',      name:'Canadian residents returning from the U.S. (final)',                vectorId:'1296956586', tableId:'24-10-0054-01' },
+      { id:'trv_nonus_final',   name:'Canadian residents returning to Canada from non-U.S. countries (final)', vectorId:'1296956631', tableId:'24-10-0054-01' },
+      { id:'trv_us_in',         name:'U.S. residents entering Canada (final)',                            vectorId:'1296956469', tableId:'24-10-0054-01' },
+      { id:'trv_nonus_in',      name:'Residents from non-U.S. countries entering Canada (final)',        vectorId:'1296956514', tableId:'24-10-0054-01' },
+    ]
+  }
+};
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+const state = {
+  category: 'gdp_exp',
+  activeSeries: [],
+  fromYear: 2015, fromMonth: 1,
+  toYear: 2025,   toMonth: 12,
+  frequency: 'original',
+  transform: 'level',
+  chartType: 'line',
+  rawData: {},       // seriesId -> [{label, date, value}]
+  processedData: {}, // seriesId -> [{label, value}]
+};
+let chartInst = null;
+
+// ═══════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════
+function cansimUrl(tableId) {
+  return `https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=${tableId.replace(/-/g, '')}`;
+}
+
+function findSeries(sid) {
+  for (const cat of Object.values(CATEGORIES)) {
+    const s = cat.series.find(x => x.id === sid);
+    if (s) return s;
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════
+// UI
+// ═══════════════════════════════════════════════════════════
+function selectCategory(cat) {
+  state.category = cat;
+  state.activeSeries = [];
+  state.rawData = {};
+  state.processedData = {};
+  renderSeriesList();
+}
+
+function renderSeriesList() {
+  const cat = CATEGORIES[state.category];
+  const dropdown  = document.getElementById('seriesDropdown');
+  const chipsEl   = document.getElementById('selectedSeries');
+  const countEl   = document.getElementById('seriesCount');
+  const maxSeries = 5;
+
+  countEl.textContent = `${state.activeSeries.length} / ${maxSeries}`;
+
+  // Dropdown: only show series not yet selected
+  const available = cat.series.filter(s => !state.activeSeries.includes(s.id));
+  dropdown.disabled = state.activeSeries.length >= maxSeries;
+  dropdown.innerHTML = `<option value="">${dropdown.disabled ? '— max reached —' : '— select to add —'}</option>`
+    + available.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+
+  // Chips: one per selected series
+  chipsEl.innerHTML = state.activeSeries.map((sid, i) => {
+    const s = cat.series.find(x => x.id === sid);
+    if (!s) return '';
+    const color = PALETTE[i % PALETTE.length];
+    return `<div class="series-chip">
+      <div class="chip-dot" style="background:${color};"></div>
+      <span class="chip-name" data-tooltip="${s.name}">${s.name}</span>
+      <a href="${cansimUrl(s.tableId)}" target="_blank" class="cansim-link"
+         onclick="event.stopPropagation()" title="View table ${s.tableId} on StatCan">↗</a>
+      <span class="chip-remove" onclick="removeSeries('${s.id}')" title="Remove">×</span>
+    </div>`;
+  }).join('');
+}
+
+function addSeries(id) {
+  if (!id) return;
+  const maxSeries = 5;
+  if (state.activeSeries.length >= maxSeries) { toast(`Max ${maxSeries} series at once`, 'error'); return; }
+  if (!state.activeSeries.includes(id)) state.activeSeries.push(id);
+  document.getElementById('seriesDropdown').value = '';
+  renderSeriesList();
+}
+
+function removeSeries(id) {
+  state.activeSeries = state.activeSeries.filter(x => x !== id);
+  renderSeriesList();
+}
+
+function selectTransform(t) {
+  state.transform = t;
+  document.querySelectorAll('.chip').forEach(el => el.classList.toggle('active', el.dataset.t === t));
+  if (Object.keys(state.rawData).length) applyAndRender();
+}
+
+function clearChart() {
+  state.activeSeries = [];
+  state.rawData = {};
+  state.processedData = {};
+  renderSeriesList();
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  document.getElementById('chartEmpty').style.display = 'flex';
+  document.getElementById('myChart').style.display = 'none';
+  document.getElementById('tableWrap').style.display = 'none';
+  document.getElementById('exportBtn').style.display = 'none';
+  document.getElementById('toolbarSources').style.display = 'none';
+  document.getElementById('chartTitle').textContent = 'Select a category and series to begin';
+  document.getElementById('statusDot').className = 'status-dot';
+}
+
+function switchChart(type) {
+  state.chartType = type;
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.chart === type));
+  if (Object.keys(state.processedData).length) renderChart();
+}
+
+// ═══════════════════════════════════════════════════════════
+// DATE RANGE — compute snapped ISO dates for the proxy
+// For quarterly source data, snap to completed quarter boundaries.
+// ═══════════════════════════════════════════════════════════
+function computeDateRange() {
+  const srcFreq = CATEGORIES[state.category].sourceFreq;
+  let fromDate, toDate;
+
+  if (srcFreq === 'quarterly') {
+    // Start: beginning of the quarter that contains fromMonth
+    const fromQStartMonth = (Math.ceil(state.fromMonth / 3) - 1) * 3 + 1;
+    fromDate = `${state.fromYear}-${String(fromQStartMonth).padStart(2, '0')}-01`;
+
+    // End: last day of the most recent complete quarter before toMonth
+    // e.g. April → Q1 ends Mar 31; July → Q2 ends Jun 30
+    if      (state.toMonth <= 3)  toDate = `${state.toYear - 1}-12-31`;
+    else if (state.toMonth <= 6)  toDate = `${state.toYear}-03-31`;
+    else if (state.toMonth <= 9)  toDate = `${state.toYear}-06-30`;
+    else                          toDate = `${state.toYear}-09-30`;
+  } else {
+    // Monthly/daily: exact month boundaries
+    fromDate = `${state.fromYear}-${String(state.fromMonth).padStart(2, '0')}-01`;
+    const lastDay = new Date(state.toYear, state.toMonth, 0).getDate();
+    toDate = `${state.toYear}-${String(state.toMonth).padStart(2, '0')}-${lastDay}`;
+  }
+
+  return { fromDate, toDate };
+}
+
+// ═══════════════════════════════════════════════════════════
+// FETCH — calls the proxy, which calls StatCan WDS
+// ═══════════════════════════════════════════════════════════
+async function fetchData() {
+  state.fromYear  = parseInt(document.getElementById('fromYear').value);
+  state.fromMonth = parseInt(document.getElementById('fromMonth').value);
+  state.toYear    = parseInt(document.getElementById('toYear').value);
+  state.toMonth   = parseInt(document.getElementById('toMonth').value);
+  state.frequency = document.getElementById('freqSelect').value;
+
+  if (!state.activeSeries.length) { toast('Select at least one series', 'error'); return; }
+
+  // Validate date order
+  const fromTs = new Date(state.fromYear, state.fromMonth - 1, 1);
+  const toTs   = new Date(state.toYear,   state.toMonth   - 1, 1);
+  if (fromTs >= toTs) { toast('From date must be before To date', 'error'); return; }
+
+  const { fromDate, toDate } = computeDateRange();
+
+  // Build vector list for selected series
+  const seriesMeta = state.activeSeries
+    .map(sid => CATEGORIES[state.category].series.find(s => s.id === sid))
+    .filter(Boolean);
+  const vectors = seriesMeta.map(s => s.vectorId).join(',');
+
+  // Calculate how many periods to request (with buffer)
+  const yearSpan = state.toYear - state.fromYear + 1;
+  const srcFreq  = CATEGORIES[state.category].sourceFreq;
+  const periods  = Math.ceil(yearSpan * (srcFreq === 'quarterly' ? 4 : 12) * 1.3) + 24;
+
+  setLoading(true);
+  toast('Fetching from Statistics Canada…', 'info');
+
+  try {
+    const url = `${PROXY_URL}/api/series?vectors=${encodeURIComponent(vectors)}`
+              + `&fromDate=${fromDate}&toDate=${toDate}&periods=${periods}`;
+
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const json = await resp.json();
+
+    state.rawData = {};
+    json.series.forEach((s, i) => {
+      const sid = seriesMeta[i]?.id;
+      if (!sid) return;
+      if (s.error) { toast(`Vector ${s.vectorId}: ${s.error}`, 'error'); return; }
+      state.rawData[sid] = s.data; // [{label, date, value}]
+    });
+
+    if (!Object.keys(state.rawData).length) throw new Error('No data returned');
+    setLoading(false);
+    toast('Data loaded ✓', 'success');
+    applyAndRender();
+
+  } catch (err) {
+    setLoading(false);
+    toast(`Error: ${err.message}`, 'error');
+    console.error(err);
+  }
+}
+
+function setLoading(on) {
+  document.getElementById('fetchBtnText').innerHTML =
+    on ? '<span class="spinner"></span>Fetching…' : '↓ Fetch Data';
+  document.getElementById('fetchBtn').disabled = on;
+  document.getElementById('statusDot').className = 'status-dot ' + (on ? 'loading' : 'loaded');
+}
+
+// ═══════════════════════════════════════════════════════════
+// AGGREGATION
+// rawData points from proxy: { label: "2023-01", date: "2023-01-01", value: 123 }
+// ═══════════════════════════════════════════════════════════
+const sum = arr => arr.reduce((a, b) => a + b, 0);
+const avg = arr => sum(arr) / arr.length;
+
+function toMonthly(pts, mode = 'sum') {
+  // Groups daily/weekly data into monthly buckets
+  const map = {};
+  for (const p of pts) {
+    const key = (p.date || p.label).slice(0, 7); // YYYY-MM
+    if (!map[key]) map[key] = [];
+    map[key].push(p.value);
+  }
+  return Object.entries(map)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, vals]) => ({ label, value: mode === 'sum' ? sum(vals) : avg(vals) }));
+}
+
+function toQuarterly(pts, srcFreq, mode = 'avg') {
+  if (srcFreq === 'quarterly') {
+    // Already quarterly — pass through unchanged
+    return pts.map(p => ({ label: p.label, value: p.value }));
+  }
+  const map = {};
+  for (const p of pts) {
+    const d = p.date || p.label;
+    const year  = parseInt(d.slice(0, 4));
+    const month = parseInt(d.slice(5, 7)) || 1;
+    const k = `${year} Q${Math.ceil(month / 3)}`;
+    if (!map[k]) map[k] = [];
+    map[k].push(p.value);
+  }
+  return Object.entries(map)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([label, vals]) => ({ label, value: mode === 'sum' ? sum(vals) : avg(vals) }));
+}
+
+function toAnnual(pts, mode = 'avg') {
+  const map = {};
+  for (const p of pts) {
+    const year = (p.date || p.label).slice(0, 4);
+    if (!map[year]) map[year] = [];
+    map[year].push(p.value);
+  }
+  return Object.entries(map)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([y, vals]) => ({ label: String(y), value: mode === 'sum' ? sum(vals) : avg(vals) }));
+}
+
+// ═══════════════════════════════════════════════════════════
+// TRANSFORMS
+// ═══════════════════════════════════════════════════════════
+function applyTransform(pts, transform) {
+  if (transform === 'level') return pts;
+
+  if (transform === 'pop') {
+    return pts.slice(1).map((p, i) => ({
+      label: p.label,
+      value: +(((p.value - pts[i].value) / pts[i].value) * 100).toFixed(3)
+    }));
+  }
+
+  if (transform === 'yoy') {
+    const sample = pts[0]?.label || '';
+    let step;
+    if      (sample.includes('Q'))               step = 4;   // quarterly
+    else if (/^\d{4}$/.test(sample))             step = 1;   // annual
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(sample)) step = 365; // daily
+    else                                          step = 12;  // monthly
+    if (pts.length <= step) return [];
+    return pts.slice(step).map((p, i) => ({
+      label: p.label,
+      value: +(((p.value - pts[i].value) / pts[i].value) * 100).toFixed(3)
+    }));
+  }
+
+  if (transform === 'index') {
+    if (!pts.length) return pts;
+    const baseVal = pts[0].value;
+    if (baseVal === 0) { toast('Cannot index: first data point is zero', 'error'); return pts; }
+    return pts.map(p => ({ label: p.label, value: +((p.value / baseVal) * 100).toFixed(3) }));
+  }
+
+  return pts;
+}
+
+// ═══════════════════════════════════════════════════════════
+// FREQUENCY LABELS (for display)
+// ═══════════════════════════════════════════════════════════
+const FREQ_LABELS = {
+  original:      'Original',
+  monthly_sum:   'Monthly (sum)',
+  quarterly_sum: 'Quarterly (sum)',
+  quarterly_avg: 'Quarterly (avg)',
+  annual_sum:    'Annual (sum)',
+  annual_avg:    'Annual (avg)',
+};
+
+// ═══════════════════════════════════════════════════════════
+// APPLY + RENDER
+// ═══════════════════════════════════════════════════════════
+function applyAndRender() {
+  const srcFreq = CATEGORIES[state.category].sourceFreq;
+  state.processedData = {};
+
+  for (const sid of state.activeSeries) {
+    let pts = state.rawData[sid] || [];
+    if (!pts.length) continue;
+
+    let norm;
+    switch (state.frequency) {
+      case 'monthly_sum':    norm = toMonthly(pts, 'sum');            break;
+      case 'quarterly_sum':  norm = toQuarterly(pts, srcFreq, 'sum'); break;
+      case 'quarterly_avg':  norm = toQuarterly(pts, srcFreq, 'avg'); break;
+      case 'annual_sum':     norm = toAnnual(pts, 'sum');             break;
+      case 'annual_avg':     norm = toAnnual(pts, 'avg');             break;
+      default:               norm = pts.map(p => ({ label: p.label, value: p.value }));
+    }
+
+    norm = applyTransform(norm, state.transform);
+    state.processedData[sid] = norm;
+  }
+
+  const tLabel = { level: 'Level', pop: 'Period-over-Period % Change', yoy: 'Year-over-Year % Change', index: 'Index (start = 100)' }[state.transform] || 'Level';
+  const fLabel = FREQ_LABELS[state.frequency] || state.frequency;
+
+  document.getElementById('chartTitle').textContent =
+    `${CATEGORIES[state.category].label} — ${tLabel} (${fLabel})`;
+
+  // Source table links in toolbar
+  const tables = [...new Set(
+    state.activeSeries
+      .map(sid => CATEGORIES[state.category].series.find(s => s.id === sid)?.tableId)
+      .filter(Boolean)
+  )];
+  const srcEl = document.getElementById('toolbarSources');
+  if (tables.length) {
+    srcEl.style.display = '';
+    srcEl.innerHTML = 'Source: ' + tables
+      .map(t => `<a href="${cansimUrl(t)}" target="_blank">CANSIM ${t} ↗</a>`)
+      .join(' · ');
+  } else {
+    srcEl.style.display = 'none';
+  }
+
+  renderChart();
+  renderTable();
+  document.getElementById('exportBtn').style.display = '';
+}
+
+// ═══════════════════════════════════════════════════════════
+// CHART
+// ═══════════════════════════════════════════════════════════
+const PALETTE = ['#e8c547', '#4fc3f7', '#ef5350', '#a5d6a7'];
+
+function renderChart() {
+  const empty  = document.getElementById('chartEmpty');
+  const canvas = document.getElementById('myChart');
+  const sids   = state.activeSeries.filter(s => state.processedData[s]?.length);
+
+  if (!sids.length) { empty.style.display = 'flex'; canvas.style.display = 'none'; return; }
+  empty.style.display = 'none';
+  canvas.style.display = '';
+
+  const allLabels = [...new Set(
+    sids.flatMap(s => state.processedData[s].map(p => p.label))
+  )].sort();
+
+  const isPct     = state.transform === 'pop' || state.transform === 'yoy';
+  const isIdx     = state.transform === 'index';
+  const isBar     = state.chartType === 'bar';
+  const isStacked = state.chartType === 'stacked';
+  const isArea    = state.chartType === 'area';
+
+  const datasets = sids.map((sid, i) => {
+    const meta  = CATEGORIES[state.category].series.find(s => s.id === sid);
+    const dmap  = Object.fromEntries(state.processedData[sid].map(p => [p.label, p.value]));
+    const data  = allLabels.map(l => dmap[l] ?? null);
+    const color = PALETTE[i % PALETTE.length];
+
+    return {
+      type:             (isBar || isStacked) ? 'bar' : 'line',
+      label:            meta?.name || sid,
+      data,
+      borderColor:      color,
+      backgroundColor:  (isBar || isStacked) ? color + 'cc' : isArea ? color + '28' : 'transparent',
+      fill:             isArea,
+      tension:          0.35,
+      pointRadius:      allLabels.length > 80 ? 0 : 2,
+      pointHoverRadius: 4,
+      borderWidth:      (isBar || isStacked) ? 1 : 2,
+    };
+  });
+
+  const maxShow = 16;
+  const step = Math.max(1, Math.ceil(allLabels.length / maxShow));
+  const xLabels = allLabels.map((l, i) => i % step === 0 ? l : '');
+
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(canvas, {
+    data: { labels: allLabels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: {
+            color: '#e6edf3',
+            font: { family: 'DM Mono', size: 11 },
+            boxWidth: 12, padding: 14
+          }
+        },
+        tooltip: {
+          backgroundColor: '#1c2330',
+          borderColor: '#2a3441',
+          borderWidth: 1,
+          titleColor: '#7d8590',
+          bodyColor: '#e6edf3',
+          titleFont: { family: 'DM Mono', size: 11 },
+          bodyFont: { family: 'DM Mono', size: 11 },
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed.y;
+              if (v == null) return null;
+              const fmt = v.toLocaleString('en-CA', { maximumFractionDigits: 2 });
+              const sfx = isPct ? '%' : isIdx ? '' : '';
+              return ` ${ctx.dataset.label}: ${isPct && v > 0 ? '+' : ''}${fmt}${sfx}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: isStacked,
+          ticks: {
+            color: '#7d8590',
+            font: { family: 'DM Mono', size: 9 },
+            maxRotation: 45,
+            callback: (_, i) => xLabels[i]
+          },
+          grid: { color: 'rgba(42,52,65,0.4)' }
+        },
+        y: {
+          stacked: isStacked,
+          ticks: {
+            color: '#7d8590',
+            font: { family: 'DM Mono', size: 10 },
+            callback: v => {
+              const sfx = isPct ? '%' : '';
+              if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'M' + sfx;
+              if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'K' + sfx;
+              return v.toFixed(1) + sfx;
+            }
+          },
+          grid: { color: 'rgba(42,52,65,0.4)' }
+        }
+      }
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// TABLE
+// ═══════════════════════════════════════════════════════════
+function renderTable() {
+  const wrap = document.getElementById('tableWrap');
+  const sids = state.activeSeries.filter(s => state.processedData[s]?.length);
+  if (!sids.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+
+  const allLabels = [...new Set(
+    sids.flatMap(s => state.processedData[s].map(p => p.label))
+  )].sort();
+
+  const isPct    = state.transform === 'pop' || state.transform === 'yoy';
+  const isIndex  = state.transform === 'index';
+  const suffix   = isPct ? ' (%)' : isIndex ? ' (start=100)' : '';
+  const names    = sids.map(sid =>
+    CATEGORIES[state.category].series.find(s => s.id === sid)?.name || sid);
+
+  document.getElementById('tableHead').innerHTML =
+    `<tr><th>Period</th>${names.map(n => `<th>${n}${suffix}</th>`).join('')}</tr>`;
+
+  document.getElementById('tableBody').innerHTML =
+    allLabels.slice(-60).map(label => {
+      const cells = sids.map(sid => {
+        const dmap = Object.fromEntries(state.processedData[sid].map(p => [p.label, p.value]));
+        const v = dmap[label];
+        if (v == null) return '<td class="num">—</td>';
+        const cls  = isPct ? (v > 0 ? 'pos' : v < 0 ? 'neg' : '') : '';
+        const sign = isPct && v > 0 ? '+' : '';
+        return `<td class="num ${cls}">${sign}${v.toLocaleString('en-CA', { maximumFractionDigits: 2 })}</td>`;
+      }).join('');
+      return `<tr><td>${label}</td>${cells}</tr>`;
+    }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════════════════
+function exportXlsx() {
+  const sids = state.activeSeries.filter(s => state.processedData[s]?.length);
+  if (!sids.length) return;
+
+  const allLabels = [...new Set(
+    sids.flatMap(s => state.processedData[s].map(p => p.label))
+  )].sort();
+
+  const tLabel = { level: 'Level', pop: 'Period-over-Period % Change', yoy: 'Year-over-Year % Change', index: 'Index (start = 100)' }[state.transform] || 'Level';
+  const fLabel = FREQ_LABELS[state.frequency] || state.frequency;
+  const isPct  = state.transform === 'pop' || state.transform === 'yoy';
+  const suffix = isPct ? ' (%)' : '';
+  const catMeta = CATEGORIES[state.category];
+  const names   = sids.map(sid => catMeta.series.find(s => s.id === sid)?.name || sid);
+
+  const rows = allLabels.map(label => {
+    const row = [label];
+    for (const sid of sids) {
+      const dmap = Object.fromEntries(state.processedData[sid].map(p => [p.label, p.value]));
+      row.push(dmap[label] ?? '');
+    }
+    return row;
+  });
+
+  const tables = [...new Set(sids.map(sid => catMeta.series.find(s => s.id === sid)?.tableId).filter(Boolean))];
+  const cansimUrls = tables.map(t => `${t}: ${cansimUrl(t)}`).join('; ');
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Data
+  const wsData = XLSX.utils.aoa_to_sheet([
+    [`Statistics Canada — ${catMeta.label}`],
+    [`Transform: ${tLabel}`, `Output Frequency: ${fLabel}`, `Exported: ${new Date().toLocaleDateString('en-CA')}`],
+    [`From: ${state.fromYear}-${String(state.fromMonth).padStart(2,'0')}`, `To: ${state.toYear}-${String(state.toMonth).padStart(2,'0')}`],
+    [],
+    ['Period', ...names.map(n => `${n}${suffix}`)],
+    ...rows
+  ]);
+  wsData['!cols'] = [{ wch: 14 }, ...sids.map(() => ({ wch: 38 }))];
+  XLSX.utils.book_append_sheet(wb, wsData, 'Data');
+
+  // Sheet 2: Metadata
+  const wsMeta = XLSX.utils.aoa_to_sheet([
+    ['Field', 'Value'],
+    ['Category',         catMeta.label],
+    ['Transform',        tLabel],
+    ['Output Frequency', fLabel],
+    ['Source Frequency', catMeta.sourceFreq],
+    ['From',             `${state.fromYear}-${String(state.fromMonth).padStart(2,'0')}`],
+    ['To',               `${state.toYear}-${String(state.toMonth).padStart(2,'0')}`],
+    ['Series',           names.join('; ')],
+    ['CANSIM URLs',      cansimUrls],
+    ['Source',           'Statistics Canada'],
+    ['Exported',         new Date().toISOString()],
+  ]);
+  wsMeta['!cols'] = [{ wch: 18 }, { wch: 80 }];
+  XLSX.utils.book_append_sheet(wb, wsMeta, 'Metadata');
+
+  const safeLabel = tLabel.replace(/[^a-z0-9]/gi, '_');
+  const fname = `statcan_${state.category}_${safeLabel}_${state.fromYear}${String(state.fromMonth).padStart(2,'0')}-${state.toYear}${String(state.toMonth).padStart(2,'0')}.xlsx`;
+  XLSX.writeFile(wb, fname);
+  toast('Spreadsheet exported ✓', 'success');
+}
+
+// ═══════════════════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════════════════
+let toastTimer;
+function toast(msg, type = 'info') {
+  document.querySelector('.toast')?.remove();
+  clearTimeout(toastTimer);
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.textContent = msg;
+  document.body.appendChild(el);
+  toastTimer = setTimeout(() => el.remove(), 3000);
+}
+
+// ═══════════════════════════════════════════════════════════
+// YEAR STEPPER
+// ═══════════════════════════════════════════════════════════
+function stepYear(id, delta) {
+  const el = document.getElementById(id);
+  const val = parseInt(el.value) || new Date().getFullYear();
+  el.value = Math.max(parseInt(el.min), Math.min(parseInt(el.max), val + delta));
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+renderSeriesList();
+</script>
+
+<footer style="
+  text-align: center;
+  padding: 18px 24px;
+  font-size: 11px;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  line-height: 1.7;
+  flex-shrink: 0;
+">
+  Data from Statistics Canada WDS – <a href="https://www.statcan.gc.ca" target="_blank" rel="noopener" style="color: var(--accent); text-decoration: none;">Statcan.gc.ca</a><br>
+  StatCan Data Explorer was created by Claude under direction from Jason Kirby
+</footer>
+
+</body>
+</html>
