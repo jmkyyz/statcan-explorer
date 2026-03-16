@@ -117,7 +117,8 @@ def get_series():
         return jsonify({"error": "No valid vector IDs"}), 400
 
     # Clamp n_periods to something reasonable
-    n_periods = min(max(n_periods, 1), 1200)
+    # Daily series can require up to 3650+ periods for a 10-year range
+    n_periods = min(max(n_periods, 1), 4000)
 
     # ------------------------------------------------------------------
     # Step 1: Fetch data from StatCan

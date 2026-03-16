@@ -14,16 +14,16 @@
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap');
 
   :root {
-    --bg: #0d1117;
-    --surface: #161b22;
-    --surface2: #1c2330;
-    --border: #2a3441;
-    --accent: #e8c547;
-    --accent2: #4fc3f7;
-    --accent3: #ef5350;
-    --text: #e6edf3;
-    --muted: #7d8590;
-    --success: #3fb950;
+    --bg: #f7f8fa;
+    --surface: #ffffff;
+    --surface2: #f0f2f5;
+    --border: #e1e4e8;
+    --accent: #2563eb;
+    --accent2: #1d4ed8;
+    --accent3: #dc2626;
+    --text: #111827;
+    --muted: #6b7280;
+    --success: #16a34a;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -90,9 +90,9 @@
     align-items: center;
     gap: 7px;
     padding: 6px 9px;
-    border: 1px solid var(--accent2);
+    border: 1px solid var(--border);
     border-radius: 5px;
-    background: rgba(79,195,247,0.07);
+    background: rgba(37,99,235,0.06);
   }
   .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .chip-name {
@@ -105,7 +105,7 @@
     position: absolute;
     bottom: calc(100% + 7px);
     left: 0;
-    background: #0d1117;
+    background: var(--surface);
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: 5px;
@@ -115,7 +115,7 @@
     white-space: normal;
     width: max-content;
     max-width: 240px;
-    box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.1s;
@@ -156,7 +156,7 @@
   }
   /* Custom chevron for all <select> elements */
   select {
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%237d8590' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 10px center;
     padding-right: 28px;
@@ -166,8 +166,8 @@
   select option { background: var(--surface2); }
 
   .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-  .date-inputs { display: flex; gap: 5px; }
-  .date-inputs select { flex: 1; min-width: 0; }
+  .date-inputs { display: flex; flex-direction: column; gap: 5px; }
+  .date-inputs select { width: 100%; }
 
   /* Year stepper: [−] 2015 [+] */
   .year-stepper {
@@ -181,12 +181,13 @@
   }
   .year-stepper:focus-within { border-color: var(--accent2); }
   .year-stepper input {
-    width: 42px;
+    flex: 1;
     border: none;
     border-radius: 0;
     text-align: center;
     padding: 7px 2px;
     font-size: 12px;
+    min-width: 0;
     -webkit-appearance: none;
   }
   .year-stepper input::-webkit-inner-spin-button,
@@ -219,7 +220,7 @@
     color: var(--muted);
   }
   .chip:hover { border-color: var(--accent); color: var(--accent); }
-  .chip.active { border-color: var(--accent); background: rgba(232,197,71,0.1); color: var(--accent); }
+  .chip.active { border-color: var(--accent); background: rgba(37,99,235,0.1); color: var(--accent); }
 
   .btn {
     padding: 9px 16px;
@@ -232,13 +233,13 @@
     transition: all 0.15s;
     letter-spacing: 0.4px;
   }
-  .btn-primary { background: var(--accent); color: #0d1117; flex: 1; }
+  .btn-primary { background: var(--accent); color: #ffffff; flex: 1; }
   .btn-primary:hover { background: #f0d060; }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-secondary { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
   .btn-secondary:hover { border-color: var(--accent3); color: var(--accent3); }
-  .btn-export { background: var(--success); color: #0d1117; display: flex; align-items: center; gap: 6px; }
-  .btn-export:hover { background: #56d364; }
+  .btn-export { background: var(--success); color: #ffffff; display: flex; align-items: center; gap: 6px; }
+  .btn-export:hover { background: #15803d; }
   .btn-row { display: flex; gap: 8px; }
 
   .main { display: flex; flex-direction: column; background: var(--bg); min-width: 0; overflow: hidden; }
@@ -274,7 +275,7 @@
     transition: all 0.15s;
   }
   .tab:hover { color: var(--text); border-color: var(--muted); }
-  .tab.active { border-color: var(--accent2); color: var(--accent2); background: rgba(79,195,247,0.07); }
+  .tab.active { border-color: var(--accent2); color: var(--accent2); background: rgba(37,99,235,0.08); }
 
   .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
   .status-dot.loaded { background: var(--success); }
@@ -321,9 +322,9 @@
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
   }
-  td { padding: 5px 11px; border-bottom: 1px solid rgba(42,52,65,0.5); color: var(--text); }
+  td { padding: 5px 11px; border-bottom: 1px solid rgba(0,0,0,0.07); color: var(--text); }
   tr:last-child td { border-bottom: none; }
-  tr:hover td { background: rgba(255,255,255,0.02); }
+  tr:hover td { background: rgba(0,0,0,0.02); }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   td.pos { color: var(--success); }
   td.neg { color: var(--accent3); }
@@ -335,8 +336,8 @@
     animation: slideIn 0.18s ease; max-width: 300px;
   }
   .toast.error   { background: var(--accent3); color: #fff; }
-  .toast.success { background: var(--success);  color: #0d1117; }
-  .toast.info    { background: var(--accent2);  color: #0d1117; }
+  .toast.success { background: var(--success);  color: #fff; }
+  .toast.info    { background: var(--accent2);  color: #fff; }
   @keyframes slideIn { from{transform:translateY(8px);opacity:0} to{transform:translateY(0);opacity:1} }
 
   .spinner {
@@ -407,7 +408,7 @@
             </select>
             <div class="year-stepper">
               <button class="step-btn" onclick="stepYear('fromYear',-1)">−</button>
-              <input type="number" id="fromYear" value="2015" min="1981" max="2030">
+              <input type="number" id="fromYear" value="2015" min="1946" max="2030">
               <button class="step-btn" onclick="stepYear('fromYear', 1)">+</button>
             </div>
           </div>
@@ -425,7 +426,7 @@
             </select>
             <div class="year-stepper">
               <button class="step-btn" onclick="stepYear('toYear',-1)">−</button>
-              <input type="number" id="toYear" value="2025" min="1981" max="2030">
+              <input type="number" id="toYear" value="2026" min="1946" max="2030">
               <button class="step-btn" onclick="stepYear('toYear', 1)">+</button>
             </div>
           </div>
@@ -590,9 +591,9 @@ const CATEGORIES = {
     label: 'Sales, trade, housing and households',
     sourceFreq: 'monthly',
     series: [
-      { id:'sal_retail_nsa',    name:'Retail sales NSA',                                                  vectorId:'1446859481', tableId:'20-10-0063-01' },
-      { id:'sal_retail_sa',     name:'Retail sales SA',                                                   vectorId:'1446859483', tableId:'20-10-0063-01' },
-      { id:'sal_retail_vol',    name:'Retail sales, chained Fisher volume index',                         vectorId:'1446870181', tableId:'20-10-0063-01' },
+      { id:'sal_retail_nsa',    name:'Retail sales NSA',                                                  vectorId:'1446859481', tableId:'20-10-0056-01' },
+      { id:'sal_retail_sa',     name:'Retail sales SA',                                                   vectorId:'1446859483', tableId:'20-10-0056-01' },
+      { id:'sal_retail_vol',    name:'Retail sales, chained Fisher volume index',                         vectorId:'1446870181', tableId:'20-10-0056-01' },
       { id:'sal_mfg_nom',       name:'Manufacturing sales, current$ NSA',                                 vectorId:'800025',     tableId:'16-10-0047-01' },
       { id:'sal_mfg_real',      name:'Manufacturing sales, 2017$',                                        vectorId:'123263908',  tableId:'16-10-0048-01' },
       { id:'sal_exports',       name:'Merchandise exports, BoP basis, current$ SA',                      vectorId:'87008955',   tableId:'12-10-0011-01' },
@@ -606,8 +607,8 @@ const CATEGORIES = {
       { id:'sal_exp_energy',    name:'Merchandise exports of energy products, BoP basis, current$ SA',   vectorId:'1566911351', tableId:'12-10-0011-01' },
       { id:'sal_exp_gold',      name:'Merchandise exports of unwrought gold etc, BoP basis, current$ SA', vectorId:'1566911383', tableId:'12-10-0011-01' },
       { id:'sal_exp_vehicles',  name:'Merchandise exports of vehicles and parts, BoP basis, current$ SA', vectorId:'1566911442', tableId:'12-10-0011-01' },
-      { id:'trv_car_lead',      name:'Canadian residents returning from the U.S. by car (leading indicator)', vectorId:'1545910054', tableId:'24-10-0054-01' },
-      { id:'trv_air_lead',      name:'Canadian residents returning from the U.S. by air (leading indicator)', vectorId:'1324883057', tableId:'24-10-0054-01' },
+      { id:'trv_car_lead',      name:'Canadian residents returning from the U.S. by car (leading indicator)', vectorId:'1545910054', tableId:'24-10-0054-01', sourceFreq:'daily' },
+      { id:'trv_air_lead',      name:'Canadian residents returning from the U.S. by air (leading indicator)', vectorId:'1324883057', tableId:'24-10-0054-01', sourceFreq:'daily' },
       { id:'trv_us_final',      name:'Canadian residents returning from the U.S. (final)',                vectorId:'1296956586', tableId:'24-10-0054-01' },
       { id:'trv_nonus_final',   name:'Canadian residents returning to Canada from non-U.S. countries (final)', vectorId:'1296956631', tableId:'24-10-0054-01' },
       { id:'trv_us_in',         name:'U.S. residents entering Canada (final)',                            vectorId:'1296956469', tableId:'24-10-0054-01' },
@@ -623,7 +624,7 @@ const state = {
   category: 'gdp_exp',
   activeSeries: [],
   fromYear: 2015, fromMonth: 1,
-  toYear: 2025,   toMonth: 12,
+  toYear: 2026,   toMonth: 12,
   frequency: 'original',
   transform: 'level',
   chartType: 'line',
@@ -784,9 +785,13 @@ async function fetchData() {
   const vectors = seriesMeta.map(s => s.vectorId).join(',');
 
   // Calculate how many periods to request (with buffer)
+  // Daily series need ~365× more periods than monthly; detect and scale up.
   const yearSpan = state.toYear - state.fromYear + 1;
   const srcFreq  = CATEGORIES[state.category].sourceFreq;
-  const periods  = Math.ceil(yearSpan * (srcFreq === 'quarterly' ? 4 : 12) * 1.3) + 24;
+  const hasDailySeries = seriesMeta.some(s => s.sourceFreq === 'daily');
+  const periods  = hasDailySeries
+    ? Math.min(Math.ceil(yearSpan * 365 * 1.1) + 90, 3900)
+    : Math.ceil(yearSpan * (srcFreq === 'quarterly' ? 4 : 12) * 1.3) + 24;
 
   setLoading(true);
   toast('Fetching from Statistics Canada…', 'info');
@@ -984,7 +989,7 @@ function applyAndRender() {
 // ═══════════════════════════════════════════════════════════
 // CHART
 // ═══════════════════════════════════════════════════════════
-const PALETTE = ['#e8c547', '#4fc3f7', '#ef5350', '#a5d6a7'];
+const PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed'];
 
 function renderChart() {
   const empty  = document.getElementById('chartEmpty');
@@ -1039,17 +1044,17 @@ function renderChart() {
       plugins: {
         legend: {
           labels: {
-            color: '#e6edf3',
+            color: '#111827',
             font: { family: 'DM Mono', size: 11 },
             boxWidth: 12, padding: 14
           }
         },
         tooltip: {
-          backgroundColor: '#1c2330',
-          borderColor: '#2a3441',
+          backgroundColor: '#ffffff',
+          borderColor: '#e1e4e8',
           borderWidth: 1,
-          titleColor: '#7d8590',
-          bodyColor: '#e6edf3',
+          titleColor: '#6b7280',
+          bodyColor: '#111827',
           titleFont: { family: 'DM Mono', size: 11 },
           bodyFont: { family: 'DM Mono', size: 11 },
           callbacks: {
@@ -1067,17 +1072,17 @@ function renderChart() {
         x: {
           stacked: isStacked,
           ticks: {
-            color: '#7d8590',
+            color: '#6b7280',
             font: { family: 'DM Mono', size: 9 },
             maxRotation: 45,
             callback: (_, i) => xLabels[i]
           },
-          grid: { color: 'rgba(42,52,65,0.4)' }
+          grid: { color: 'rgba(0,0,0,0.07)' }
         },
         y: {
           stacked: isStacked,
           ticks: {
-            color: '#7d8590',
+            color: '#6b7280',
             font: { family: 'DM Mono', size: 10 },
             callback: v => {
               const sfx = isPct ? '%' : '';
@@ -1086,7 +1091,7 @@ function renderChart() {
               return v.toFixed(1) + sfx;
             }
           },
-          grid: { color: 'rgba(42,52,65,0.4)' }
+          grid: { color: 'rgba(0,0,0,0.07)' }
         }
       }
     }
