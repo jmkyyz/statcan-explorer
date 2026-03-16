@@ -15,6 +15,7 @@ The server will listen on http://localhost:5001
 
 import os
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, date
 
 import requests
@@ -60,6 +61,7 @@ UOM_INFO = {
     0:   ("",                    1),
     9:   ("number",              1),
     14:  ("persons",         1_000),      # reported as thousands of persons
+    17:  ("index",               1),      # index (e.g. CPI 2002=100)
     18:  ("percent",             1),
     20:  ("index",               1),
     21:  ("index",               1),
@@ -74,6 +76,7 @@ UOM_INFO = {
     246: ("dollars", 1_000_000_000),      # billions of dollars  → dollars
     300: ("ppts",                1),
     301: ("percent",             1),
+    428: ("persons",             1),      # persons (scalar handles scale)
 }
 
 # Frequency code -> human label
@@ -147,30 +150,67 @@ def get_series():
     n_periods = min(max(n_periods, 1), 4000)
 
     # ------------------------------------------------------------------
-    # Step 1: Fetch data from StatCan
-    # We use getDataFromVectorsAndLatestNPeriods.
-    # If from/to are given we request enough periods to cover the range,
-    # then filter client-side.
+    # Steps 1+2: Fire both StatCan requests in parallel.
+    #   • getSeriesInfoFromVector     → memberUomCode + scalarFactorCode
+    #   • getDataFromVectorsAndLatestNPeriods → actual data points
+    # The data endpoint returns scalarFactorCode=None at the series level
+    # (it lives per data-point there), so we must rely on the info endpoint.
     # ------------------------------------------------------------------
-    payload = [{"vectorId": int(v), "latestN": n_periods} for v in vector_ids]
+    info_payload = [{"vectorId": int(v)} for v in vector_ids]
+    data_payload = [{"vectorId": int(v), "latestN": n_periods} for v in vector_ids]
 
-    try:
-        resp = requests.post(
-            f"{STATCAN_BASE}/getDataFromVectorsAndLatestNPeriods",
-            json=payload,
-            timeout=30,
+    info_result = {}   # will hold the raw JSON from getSeriesInfoFromVector
+    data_result = {}   # will hold the raw JSON from getDataFromVectorsAndLatestNPeriods
+    data_error  = None
+
+    def _fetch_info():
+        r = requests.post(
+            f"{STATCAN_BASE}/getSeriesInfoFromVector",
+            json=info_payload, timeout=25,
             headers={"Content-Type": "application/json"},
         )
-        resp.raise_for_status()
-    except requests.exceptions.Timeout:
-        return jsonify({"error": "StatCan API timed out – try fewer periods or try again later"}), 504
-    except requests.exceptions.RequestException as exc:
-        return jsonify({"error": f"StatCan API error: {exc}"}), 502
+        r.raise_for_status()
+        return r.json()
 
-    raw = resp.json()
+    def _fetch_data():
+        r = requests.post(
+            f"{STATCAN_BASE}/getDataFromVectorsAndLatestNPeriods",
+            json=data_payload, timeout=35,
+            headers={"Content-Type": "application/json"},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        fut_info = pool.submit(_fetch_info)
+        fut_data = pool.submit(_fetch_data)
+        # Data fetch is mandatory; info fetch is best-effort
+        try:
+            data_result = fut_data.result()
+        except requests.exceptions.Timeout:
+            return jsonify({"error": "StatCan API timed out – try fewer periods or try again later"}), 504
+        except requests.exceptions.RequestException as exc:
+            return jsonify({"error": f"StatCan API error: {exc}"}), 502
+        try:
+            info_result = fut_info.result()
+        except Exception:
+            info_result = []   # fallback: no UOM conversion
+
+    # Build lookup dicts from series info
+    uom_by_vector: dict[int, int] = {}
+    scalar_by_vector: dict[int, int] = {}
+    for info_item in (info_result or []):
+        if info_item.get("status") == "SUCCESS":
+            io = info_item["object"]
+            vid = io.get("vectorId")
+            if vid is not None:
+                uom_by_vector[int(vid)]    = int(io.get("memberUomCode",    0) or 0)
+                scalar_by_vector[int(vid)] = int(io.get("scalarFactorCode", 0) or 0)
+
+    raw = data_result
 
     # ------------------------------------------------------------------
-    # Step 2: Resolve date boundaries
+    # Step 3: Resolve date boundaries
     # ------------------------------------------------------------------
     start_date = None
     end_date   = None
@@ -192,7 +232,7 @@ def get_series():
         end_date = date(to_year, 12, 31)
 
     # ------------------------------------------------------------------
-    # Step 3: Parse response into clean series objects
+    # Step 4: Parse response into clean series objects
     # ------------------------------------------------------------------
     results = []
 
@@ -207,14 +247,16 @@ def get_series():
         obj = item["object"]
         vector_id    = obj.get("vectorId")
         freq_code    = None
-        scalar_code  = obj.get("scalarFactorCode", 0)
+
+        # Use scalarFactorCode and memberUomCode from the pre-fetched series
+        # info (getSeriesInfoFromVector).  The data endpoint returns
+        # scalarFactorCode = None at the series level (it's per data-point
+        # there), so we must rely on the info endpoint for correctness.
+        vid_int      = int(vector_id) if vector_id is not None else None
+        scalar_code  = scalar_by_vector.get(vid_int, 0) if vid_int else 0
         multiplier   = SCALAR.get(scalar_code, 1)
 
-        # Unit of measure: try several field names StatCan uses
-        uom_code     = (obj.get("memberUomCode")
-                        or obj.get("uomCode")
-                        or obj.get("UOM_ID")
-                        or 0)
+        uom_code     = uom_by_vector.get(vid_int, 0) if vid_int else 0
         uom_label, uom_mult = UOM_INFO.get(uom_code, ("", 1))
         total_mult   = multiplier * uom_mult   # scalar × UOM conversion
 
