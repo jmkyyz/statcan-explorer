@@ -32,7 +32,10 @@
     font-family: 'DM Mono', monospace;
     background: var(--bg);
     color: var(--text);
-    min-height: 100vh;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     font-size: 13px;
   }
 
@@ -57,7 +60,8 @@
   .app {
     display: grid;
     grid-template-columns: 300px 1fr;
-    min-height: calc(100vh - 61px);
+    flex: 1;
+    min-height: 0;
   }
 
   .sidebar {
