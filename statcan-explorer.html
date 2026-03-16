@@ -389,6 +389,12 @@
           <option value="">— select to add —</option>
         </select>
       </div>
+      <div class="control-group" id="breakdownGroup" style="display:none">
+        <div style="font-size:10px;color:var(--muted);margin-bottom:3px;letter-spacing:.04em;">BREAKDOWN</div>
+        <select id="breakdownDropdown" onchange="addBreakdown(this.value)">
+          <option value="">— select breakdown —</option>
+        </select>
+      </div>
       <div class="selected-series" id="selectedSeries"></div>
     </div>
 
@@ -547,7 +553,18 @@ const CATEGORIES = {
     label: 'GDP (income based)',
     sourceFreq: 'monthly',
     series: [
-      { id:'gdp_inc_all', name:'GDP all industries, 2017$ SAAR',          vectorId:'65201210', tableId:'36-10-0434-01' },
+      { id:'gdp_inc_all', name:'GDP all industries, 2017$ SAAR',          vectorId:'65201210', tableId:'36-10-0434-01',
+        subSeries: [
+          { id:'goods',      shortName:'Goods',      name:'Goods-producing industries',         vectorId:'65201211' },
+          { id:'services',   shortName:'Services',   name:'Services-producing industries',      vectorId:'65201212' },
+          { id:'business',   shortName:'Business',   name:'Business sector',                    vectorId:'65201213' },
+          { id:'energy',     shortName:'Energy',     name:'Energy sector',                      vectorId:'65201225' },
+          { id:'public',     shortName:'Public',     name:'Public sector',                      vectorId:'65201227' },
+          { id:'ag',         shortName:'Ag & fish',  name:'Agriculture, forestry, fishing',     vectorId:'65201229' },
+          { id:'mining',     shortName:'Mining',     name:'Mining, quarrying, oil & gas',       vectorId:'65201236' },
+          { id:'mfg_nondur', shortName:'Non-dur mfg',name:'Non-durable manufacturing',          vectorId:'65201220' },
+          { id:'mfg_dur',    shortName:'Dur mfg',    name:'Durable manufacturing',              vectorId:'65201221' },
+        ] },
       { id:'gdp_inc_biz', name:'GDP business sector industries, 2017$ SAAR', vectorId:'65201213', tableId:'36-10-0434-01' },
       { id:'gdp_inc_pub', name:'GDP public sector, 2017$ SAAR',           vectorId:'65201227', tableId:'36-10-0434-01' },
     ]
@@ -558,11 +575,47 @@ const CATEGORIES = {
     sourceFreq: 'monthly',
     series: [
       { id:'lab_lfs_emp_nsa',  name:'LFS employment, NSA',          vectorId:'2091072',    tableId:'14-10-0287-01' },
-      { id:'lab_lfs_emp_sa',   name:'LFS employment, SA',           vectorId:'2062811',    tableId:'14-10-0287-01' },
+      { id:'lab_lfs_emp_sa',   name:'LFS employment, SA',           vectorId:'2062811',    tableId:'14-10-0287-01',
+        subSeries: [
+          { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'2064512' },
+          { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'2064701' },
+          { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'2063000' },
+          { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'2063189' },
+          { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'2063378' },
+          { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'2063567' },
+          { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'2063756' },
+          { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'2063945' },
+          { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'2064134' },
+          { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'2064323' },
+        ] },
       { id:'lab_lfs_ft_sa',    name:'LFS full-time employment, SA', vectorId:'2062812',    tableId:'14-10-0287-01' },
       { id:'lab_lfs_pt_sa',    name:'LFS part-time employment, SA', vectorId:'2062813',    tableId:'14-10-0287-01' },
-      { id:'lab_lfs_emprate',  name:'LFS employment rate, SA',      vectorId:'2062817',    tableId:'14-10-0287-01' },
-      { id:'lab_lfs_urate',    name:'LFS unemployment rate, SA',    vectorId:'2062815',    tableId:'14-10-0287-01' },
+      { id:'lab_lfs_emprate',  name:'LFS employment rate, SA',      vectorId:'2062817',    tableId:'14-10-0287-01',
+        subSeries: [
+          { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'2064518' },
+          { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'2064707' },
+          { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'2063006' },
+          { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'2063195' },
+          { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'2063384' },
+          { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'2063573' },
+          { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'2063762' },
+          { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'2063951' },
+          { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'2064140' },
+          { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'2064329' },
+        ] },
+      { id:'lab_lfs_urate',    name:'LFS unemployment rate, SA',    vectorId:'2062815',    tableId:'14-10-0287-01',
+        subSeries: [
+          { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'2064516' },
+          { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'2064705' },
+          { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'2063004' },
+          { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'2063193' },
+          { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'2063382' },
+          { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'2063571' },
+          { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'2063760' },
+          { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'2063949' },
+          { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'2064138' },
+          { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'2064327' },
+        ] },
       { id:'lab_seph_emp_nsa', name:'SEPH employment, NSA',         vectorId:'1556538',    tableId:'14-10-0190-01' },
       { id:'lab_seph_emp_sa',  name:'SEPH employment, SA',          vectorId:'54026324',   tableId:'14-10-0190-01' },
       { id:'lab_vacancies',    name:'SEPH job vacancies SA',        vectorId:'1446283287', tableId:'14-10-0325-01' },
@@ -574,7 +627,44 @@ const CATEGORIES = {
     label: 'Prices',
     sourceFreq: 'monthly',
     series: [
-      { id:'prc_cpi_nsa',        name:'CPI, NSA',                          vectorId:'41690973',  tableId:'18-10-0004-01' },
+      { id:'prc_cpi_nsa',        name:'CPI, NSA',                          vectorId:'41690973',  tableId:'18-10-0004-01',
+        subSeriesGroups: [
+          { label: 'By province', series: [
+            { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'41691244' },
+            { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'41691379' },
+            { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'41691513' },
+            { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'41691648' },
+            { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'41691783' },
+            { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'41691919' },
+            { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'41692055' },
+            { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'41692191' },
+            { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'41692327' },
+            { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'41692462' },
+          ] },
+          { label: 'By city', series: [
+            { id:'toronto',   shortName:'Toronto',   name:'Toronto',          vectorId:'41692888' },
+            { id:'montreal',  shortName:'Montréal',  name:'Montréal',         vectorId:'41692876' },
+            { id:'vancouver', shortName:'Vancouver', name:'Vancouver',        vectorId:'41692930' },
+            { id:'calgary',   shortName:'Calgary',   name:'Calgary',          vectorId:'41692924' },
+            { id:'edmonton',  shortName:'Edmonton',  name:'Edmonton',         vectorId:'41692918' },
+            { id:'ottawa',    shortName:'Ottawa',    name:'Ottawa-Gatineau',  vectorId:'41692882' },
+            { id:'winnipeg',  shortName:'Winnipeg',  name:'Winnipeg',         vectorId:'41692900' },
+            { id:'halifax',   shortName:'Halifax',   name:'Halifax',          vectorId:'41692858' },
+          ] },
+          { label: 'By component', series: [
+            { id:'food',     shortName:'Food',        name:'Food',                              vectorId:'41690974' },
+            { id:'foodstr',  shortName:'Stores',      name:'Food from stores',                  vectorId:'41690975' },
+            { id:'foodrst',  shortName:'Restaurants', name:'Food from restaurants',             vectorId:'41691046' },
+            { id:'shelter',  shortName:'Shelter',     name:'Shelter',                           vectorId:'41691050' },
+            { id:'hhops',    shortName:'Household',   name:'Household ops & furnishings',       vectorId:'41691067' },
+            { id:'clothing', shortName:'Clothing',    name:'Clothing & footwear',               vectorId:'41691108' },
+            { id:'trans',    shortName:'Transport',   name:'Transportation',                    vectorId:'41691128' },
+            { id:'gas',      shortName:'Gas',         name:'Gasoline',                          vectorId:'41691136' },
+            { id:'health',   shortName:'Health',      name:'Health & personal care',            vectorId:'41691153' },
+            { id:'recr',     shortName:'Recreation',  name:'Recreation, education & reading',   vectorId:'41691170' },
+            { id:'energy',   shortName:'Energy',      name:'Energy',                            vectorId:'41691239' },
+          ] },
+        ] },
       { id:'prc_cpi_food_nsa',   name:'CPI food, NSA',                     vectorId:'41690974',  tableId:'18-10-0004-01' },
       { id:'prc_cpi_foodstores', name:'CPI food purchased from stores, NSA', vectorId:'41690975', tableId:'18-10-0004-01' },
       { id:'prc_cpi_exfood_nsa', name:'CPI excl. food, NSA',               vectorId:'41691232',  tableId:'18-10-0004-01' },
@@ -641,12 +731,50 @@ function cansimUrl(tableId) {
   return `https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=${tableId.replace(/-/g, '')}`;
 }
 
-function findSeries(sid) {
-  for (const cat of Object.values(CATEGORIES)) {
-    const s = cat.series.find(x => x.id === sid);
-    if (s) return s;
+// ═══════════════════════════════════════════════════════════
+// SERIES_MAP  –  flat lookup for all top-level + sub-series
+// ═══════════════════════════════════════════════════════════
+const SERIES_MAP = {};
+(function buildSeriesMap() {
+  for (const [, cat] of Object.entries(CATEGORIES)) {
+    for (const s of cat.series) {
+      SERIES_MAP[s.id] = s;
+      // Flatten sub-series (flat list)
+      if (s.subSeries) {
+        for (const sub of s.subSeries) {
+          const subId = `${s.id}__${sub.id}`;
+          SERIES_MAP[subId] = {
+            id: subId,
+            name:      `${s.name} – ${sub.name}`,
+            chipLabel: `${s.name.split(',')[0]} – ${sub.shortName || sub.name}`,
+            vectorId:  sub.vectorId,
+            tableId:   s.tableId,
+            sourceFreq: s.sourceFreq || null,
+          };
+        }
+      }
+      // Flatten sub-series groups
+      if (s.subSeriesGroups) {
+        for (const grp of s.subSeriesGroups) {
+          for (const sub of grp.series) {
+            const subId = `${s.id}__${sub.id}`;
+            SERIES_MAP[subId] = {
+              id: subId,
+              name:      `CPI ${sub.name}`,
+              chipLabel: `CPI – ${sub.shortName || sub.name}`,
+              vectorId:  sub.vectorId,
+              tableId:   s.tableId,
+              sourceFreq: s.sourceFreq || null,
+            };
+          }
+        }
+      }
+    }
   }
-  return null;
+})();
+
+function findSeries(sid) {
+  return SERIES_MAP[sid] || null;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -657,6 +785,7 @@ function selectCategory(cat) {
   state.activeSeries = [];
   state.rawData = {};
   state.processedData = {};
+  document.getElementById('breakdownGroup').style.display = 'none';
   renderSeriesList();
 }
 
@@ -669,22 +798,26 @@ function renderSeriesList() {
 
   countEl.textContent = `${state.activeSeries.length} / ${maxSeries}`;
 
-  // Dropdown: only show series not yet selected
+  // Dropdown: only show series not yet selected (top-level only)
   const available = cat.series.filter(s => !state.activeSeries.includes(s.id));
   dropdown.disabled = state.activeSeries.length >= maxSeries;
   dropdown.innerHTML = `<option value="">${dropdown.disabled ? '— max reached —' : '— select to add —'}</option>`
-    + available.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    + available.map(s => {
+        const hasSub = s.subSeries || s.subSeriesGroups;
+        return `<option value="${s.id}">${s.name}${hasSub ? ' ▾' : ''}</option>`;
+      }).join('');
 
   // Chips: one per selected series
   chipsEl.innerHTML = state.activeSeries.map((sid, i) => {
-    const s = cat.series.find(x => x.id === sid);
+    const s = SERIES_MAP[sid];
     if (!s) return '';
     const color = PALETTE[i % PALETTE.length];
     const uom = state.seriesUnits?.[sid]?.uom || '';
     const uomTag = uom ? `<span style="font-size:9px;color:var(--muted);flex-shrink:0;white-space:nowrap;">${uom}</span>` : '';
+    const label = s.chipLabel || s.name;
     return `<div class="series-chip">
       <div class="chip-dot" style="background:${color};"></div>
-      <span class="chip-name" data-tooltip="${s.name}">${s.name}</span>
+      <span class="chip-name" data-tooltip="${s.name}">${label}</span>
       ${uomTag}
       <a href="${cansimUrl(s.tableId)}" target="_blank" class="cansim-link"
          onclick="event.stopPropagation()" title="View table ${s.tableId} on StatCan">↗</a>
@@ -695,10 +828,49 @@ function renderSeriesList() {
 
 function addSeries(id) {
   if (!id) return;
+  const s = SERIES_MAP[id];
+  if (!s) return;
+
+  // If series has sub-series: show breakdown dropdown instead of adding directly
+  if (s.subSeries || s.subSeriesGroups) {
+    const bdGroup = document.getElementById('breakdownGroup');
+    const bd = document.getElementById('breakdownDropdown');
+    let opts = `<option value="">— select breakdown —</option>`
+             + `<option value="${id}">Canada (aggregate)</option>`;
+    if (s.subSeries) {
+      opts += s.subSeries
+        .map(sub => `<option value="${id}__${sub.id}">${sub.name}</option>`)
+        .join('');
+    } else if (s.subSeriesGroups) {
+      opts += s.subSeriesGroups
+        .map(grp =>
+          `<optgroup label="${grp.label}">`
+          + grp.series.map(sub => `<option value="${id}__${sub.id}">${sub.name}</option>`).join('')
+          + `</optgroup>`)
+        .join('');
+    }
+    bd.innerHTML = opts;
+    bd.value = '';
+    bdGroup.style.display = '';
+    document.getElementById('seriesDropdown').value = '';
+    return;
+  }
+
+  // No sub-series: add directly
   const maxSeries = 5;
   if (state.activeSeries.length >= maxSeries) { toast(`Max ${maxSeries} series at once`, 'error'); return; }
   if (!state.activeSeries.includes(id)) state.activeSeries.push(id);
   document.getElementById('seriesDropdown').value = '';
+  document.getElementById('breakdownGroup').style.display = 'none';
+  renderSeriesList();
+}
+
+function addBreakdown(id) {
+  if (!id) return;
+  const maxSeries = 5;
+  if (state.activeSeries.length >= maxSeries) { toast(`Max ${maxSeries} series at once`, 'error'); return; }
+  if (!state.activeSeries.includes(id)) state.activeSeries.push(id);
+  document.getElementById('breakdownDropdown').value = '';
   renderSeriesList();
 }
 
@@ -784,7 +956,7 @@ async function fetchData() {
 
   // Build vector list for selected series
   const seriesMeta = state.activeSeries
-    .map(sid => CATEGORIES[state.category].series.find(s => s.id === sid))
+    .map(sid => SERIES_MAP[sid])
     .filter(Boolean);
   const vectors = seriesMeta.map(s => s.vectorId).join(',');
 
