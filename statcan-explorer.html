@@ -628,8 +628,9 @@ const state = {
   frequency: 'original',
   transform: 'level',
   chartType: 'line',
-  rawData: {},       // seriesId -> [{label, date, value}]
-  processedData: {}, // seriesId -> [{label, value}]
+  rawData: {},        // seriesId -> [{label, date, value}]
+  processedData: {},  // seriesId -> [{label, value}]
+  seriesUnits: {},    // seriesId -> { uom, uomCode }
 };
 let chartInst = null;
 
@@ -679,9 +680,12 @@ function renderSeriesList() {
     const s = cat.series.find(x => x.id === sid);
     if (!s) return '';
     const color = PALETTE[i % PALETTE.length];
+    const uom = state.seriesUnits?.[sid]?.uom || '';
+    const uomTag = uom ? `<span style="font-size:9px;color:var(--muted);flex-shrink:0;white-space:nowrap;">${uom}</span>` : '';
     return `<div class="series-chip">
       <div class="chip-dot" style="background:${color};"></div>
       <span class="chip-name" data-tooltip="${s.name}">${s.name}</span>
+      ${uomTag}
       <a href="${cansimUrl(s.tableId)}" target="_blank" class="cansim-link"
          onclick="event.stopPropagation()" title="View table ${s.tableId} on StatCan">↗</a>
       <span class="chip-remove" onclick="removeSeries('${s.id}')" title="Remove">×</span>
@@ -808,11 +812,13 @@ async function fetchData() {
     const json = await resp.json();
 
     state.rawData = {};
+    state.seriesUnits = {};
     json.series.forEach((s, i) => {
       const sid = seriesMeta[i]?.id;
       if (!sid) return;
       if (s.error) { toast(`Vector ${s.vectorId}: ${s.error}`, 'error'); return; }
       state.rawData[sid] = s.data; // [{label, date, value}]
+      state.seriesUnits[sid] = { uom: s.uom || '', uomCode: s.uomCode || 0 };
     });
 
     if (!Object.keys(state.rawData).length) throw new Error('No data returned');
@@ -1010,6 +1016,12 @@ function renderChart() {
   const isStacked = state.chartType === 'stacked';
   const isArea    = state.chartType === 'area';
 
+  // Derive a unit label for the y-axis from the fetched series metadata
+  const activeUoms = [...new Set(
+    sids.map(sid => state.seriesUnits?.[sid]?.uom).filter(Boolean)
+  )];
+  const yAxisUnit = isPct ? 'percent' : isIdx ? 'index' : (activeUoms.length === 1 ? activeUoms[0] : activeUoms.length > 1 ? 'mixed units' : '');
+
   const datasets = sids.map((sid, i) => {
     const meta  = CATEGORIES[state.category].series.find(s => s.id === sid);
     const dmap  = Object.fromEntries(state.processedData[sid].map(p => [p.label, p.value]));
@@ -1081,13 +1093,22 @@ function renderChart() {
         },
         y: {
           stacked: isStacked,
+          title: {
+            display: !!yAxisUnit,
+            text: yAxisUnit,
+            color: '#6b7280',
+            font: { family: 'DM Mono', size: 10 },
+            padding: { bottom: 4 },
+          },
           ticks: {
             color: '#6b7280',
             font: { family: 'DM Mono', size: 10 },
             callback: v => {
               const sfx = isPct ? '%' : '';
-              if (Math.abs(v) >= 1e6) return (v / 1e6).toFixed(1) + 'M' + sfx;
-              if (Math.abs(v) >= 1e3) return (v / 1e3).toFixed(1) + 'K' + sfx;
+              if (Math.abs(v) >= 1e12) return (v / 1e12).toFixed(1) + 'T' + sfx;
+              if (Math.abs(v) >= 1e9)  return (v / 1e9).toFixed(1)  + 'B' + sfx;
+              if (Math.abs(v) >= 1e6)  return (v / 1e6).toFixed(1)  + 'M' + sfx;
+              if (Math.abs(v) >= 1e3)  return (v / 1e3).toFixed(1)  + 'K' + sfx;
               return v.toFixed(1) + sfx;
             }
           },

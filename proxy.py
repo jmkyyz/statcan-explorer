@@ -50,6 +50,32 @@ SCALAR = {
     9: 1_000_000_000,
 }
 
+# ---------------------------------------------------------------------------
+# Unit of Measure (UOM) codes from StatCan codeset.
+# Each entry: (base_unit_label, multiplier_to_convert_to_base_unit)
+# The multiplier is applied ON TOP of the scalar factor so that the frontend
+# always receives values in the stated base unit (dollars, persons, etc.).
+# ---------------------------------------------------------------------------
+UOM_INFO = {
+    0:   ("",                    1),
+    9:   ("number",              1),
+    14:  ("persons",         1_000),      # reported as thousands of persons
+    18:  ("percent",             1),
+    20:  ("index",               1),
+    21:  ("index",               1),
+    39:  ("persons",             1),
+    47:  ("hours",               1),
+    48:  ("hours",               1),
+    56:  ("dollars/hour",        1),
+    81:  ("dollars",             1),
+    115: ("",                1_000),      # generic thousands
+    224: ("dollars",         1_000),      # thousands of dollars → dollars
+    229: ("dollars",     1_000_000),      # millions of dollars  → dollars
+    246: ("dollars", 1_000_000_000),      # billions of dollars  → dollars
+    300: ("ppts",                1),
+    301: ("percent",             1),
+}
+
 # Frequency code -> human label
 FREQ_LABEL = {
     1: "Daily",
@@ -183,6 +209,15 @@ def get_series():
         freq_code    = None
         scalar_code  = obj.get("scalarFactorCode", 0)
         multiplier   = SCALAR.get(scalar_code, 1)
+
+        # Unit of measure: try several field names StatCan uses
+        uom_code     = (obj.get("memberUomCode")
+                        or obj.get("uomCode")
+                        or obj.get("UOM_ID")
+                        or 0)
+        uom_label, uom_mult = UOM_INFO.get(uom_code, ("", 1))
+        total_mult   = multiplier * uom_mult   # scalar × UOM conversion
+
         data_points  = []
 
         for dp in obj.get("vectorDataPoint", []):
@@ -205,9 +240,9 @@ def get_series():
                 except ValueError:
                     pass
 
-            # Apply scalar multiplier
+            # Apply scalar × UOM multiplier to convert to base unit
             try:
-                value = float(raw_value) * multiplier
+                value = float(raw_value) * total_mult
             except (TypeError, ValueError):
                 continue
 
@@ -215,12 +250,14 @@ def get_series():
             data_points.append({"label": label, "date": ref_per[:10], "value": value})
 
         results.append({
-            "vectorId":  vector_id,
-            "frequency": FREQ_LABEL.get(freq_code, "Unknown") if freq_code else "Unknown",
-            "frequencyCode": freq_code,
+            "vectorId":        vector_id,
+            "frequency":       FREQ_LABEL.get(freq_code, "Unknown") if freq_code else "Unknown",
+            "frequencyCode":   freq_code,
             "scalarFactorCode": scalar_code,
-            "multiplier": multiplier,
-            "data": data_points,
+            "uomCode":         uom_code,
+            "uom":             uom_label,   # base unit after conversion (e.g. "dollars")
+            "multiplier":      total_mult,  # scalar × UOM multiplier actually applied
+            "data":            data_points,
         })
 
     return jsonify({"series": results})
