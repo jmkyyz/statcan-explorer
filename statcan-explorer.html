@@ -509,6 +509,8 @@
         <input type="text" id="formulaInput" placeholder="e.g. 100*(A/B)"
                style="flex:1;min-width:0;font-family:'DM Mono',monospace;font-size:11px"
                oninput="updateFormula(this.value)" onkeydown="if(event.key==='Enter')applyFormula()">
+        <button onclick="applyFormula()" title="Apply formula"
+                style="flex-shrink:0;padding:0 10px;height:28px;border:1px solid var(--accent);background:var(--accent);border-radius:4px;cursor:pointer;font-size:11px;color:#fff;font-family:'DM Sans',sans-serif;font-weight:600">Apply</button>
         <button onclick="clearFormula()" title="Clear formula"
                 style="flex-shrink:0;padding:0 7px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:4px;cursor:pointer;font-size:12px;color:var(--muted)">✕</button>
       </div>
