@@ -3,11 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StatCan Data Explorer</title>
-<!-- ── PROXY CONFIG ──────────────────────────────────────────
-     Change PROXY_URL if you host the proxy elsewhere.
-     Default: http://localhost:5001  (run proxy.py locally)
-─────────────────────────────────────────────────────────── -->
+<title>StatCan Explorer — Lab</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -24,6 +20,7 @@
     --text: #111827;
     --muted: #6b7280;
     --success: #16a34a;
+    --lab: #7c3aed;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -55,6 +52,18 @@
     letter-spacing: -0.5px;
   }
   header span { color: var(--muted); font-size: 11px; letter-spacing: 0.5px; }
+  .lab-badge {
+    margin-left: 4px;
+    background: var(--lab);
+    color: #fff;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    padding: 2px 6px;
+    border-radius: 3px;
+    vertical-align: middle;
+  }
   .maple { margin-left: auto; font-size: 20px; opacity: 0.5; }
 
   .app {
@@ -157,7 +166,6 @@
     transition: border-color 0.15s;
     -webkit-appearance: none;
   }
-  /* Custom chevron for all <select> elements */
   select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
@@ -171,46 +179,6 @@
   .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .date-inputs { display: flex; flex-direction: column; gap: 5px; }
   .date-inputs select { width: 100%; }
-
-  /* Year stepper: [−] 2015 [+] */
-  .year-stepper {
-    display: flex;
-    align-items: stretch;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    overflow: hidden;
-    flex-shrink: 0;
-    transition: border-color 0.15s;
-  }
-  .year-stepper:focus-within { border-color: var(--accent2); }
-  .year-stepper input {
-    flex: 1;
-    border: none;
-    border-radius: 0;
-    text-align: center;
-    padding: 7px 2px;
-    font-size: 12px;
-    min-width: 0;
-    -webkit-appearance: none;
-  }
-  .year-stepper input::-webkit-inner-spin-button,
-  .year-stepper input::-webkit-outer-spin-button { -webkit-appearance: none; }
-  .year-stepper input:focus { border-color: transparent; outline: none; }
-  .step-btn {
-    background: var(--surface);
-    border: none;
-    color: var(--muted);
-    cursor: pointer;
-    padding: 0 7px;
-    font-size: 16px;
-    line-height: 1;
-    transition: background 0.15s, color 0.15s;
-    flex-shrink: 0;
-    user-select: none;
-  }
-  .step-btn:first-child { border-right: 1px solid var(--border); }
-  .step-btn:last-child  { border-left:  1px solid var(--border); }
-  .step-btn:hover { background: var(--surface2); color: var(--accent); }
 
   .transform-chips { display: flex; flex-wrap: wrap; gap: 5px; }
   .chip {
@@ -227,20 +195,25 @@
   .chip.active,
   .chip[aria-checked="true"] { border-color: var(--accent); background: rgba(37,99,235,0.1); color: var(--accent); }
 
+  /* Breakdown steps */
   .breakdown-step {
     margin-top: 8px;
     padding: 9px 10px;
     background: rgba(37,99,235,0.05);
     border: 1px dashed var(--accent);
     border-radius: 5px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
   }
   .breakdown-step-label {
     font-size: 11px;
     color: var(--accent);
     font-weight: 500;
-    margin-bottom: 6px;
     letter-spacing: 0.3px;
   }
+  .dim-group { display: flex; flex-direction: column; gap: 4px; }
+  .dim-label { font-size: 11px; color: var(--muted); }
 
   .btn {
     padding: 9px 16px;
@@ -330,7 +303,7 @@
     overflow-y: auto;
   }
   table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  thead { position: sticky; top: 0; background: var(--surface2); }
+  thead { position: sticky; top: 0; z-index: 1; background: var(--surface2); }
   th {
     padding: 7px 11px;
     text-align: left;
@@ -384,6 +357,38 @@
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
+  /* ── File drop zone ── */
+  .drop-zone {
+    border: 2px dashed var(--lab);
+    border-radius: 8px;
+    padding: 28px 18px;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+    background: rgba(124,58,237,0.03);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    background: rgba(124,58,237,0.08);
+    border-color: var(--accent2);
+  }
+  .drop-zone input[type="file"] { display: none; }
+  .drop-zone .dz-icon { font-size: 26px; margin-bottom: 8px; opacity: 0.5; }
+  .drop-zone p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .drop-zone strong { color: var(--lab); }
+  .loaded-file {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px;
+    background: rgba(22,163,74,0.08);
+    border: 1px solid rgba(22,163,74,0.3);
+    border-radius: 6px;
+    font-size: 11px; color: var(--success);
+  }
+  .loaded-file button {
+    margin-left: auto; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 13px; padding: 0 2px;
+  }
+  .loaded-file button:hover { color: var(--accent3); }
+
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -393,7 +398,7 @@
 <body>
 
 <header>
-  <h1>StatCan Explorer</h1>
+  <h1>StatCan Explorer <span class="lab-badge">Lab</span></h1>
   <span>Statistics Canada · Data Workbench</span>
   <div class="maple" aria-hidden="true">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--muted)" opacity="0.55" xmlns="http://www.w3.org/2000/svg">
@@ -406,21 +411,33 @@
 
   <aside class="sidebar">
 
+    <!-- ── Step 0: Load spreadsheet ── -->
     <div>
+      <h3 class="section-label">Series Configuration</h3>
+      <div id="dropZoneWrap">
+        <div class="drop-zone" id="dropZone"
+             onclick="document.getElementById('fileInput').click()"
+             ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+          <input type="file" id="fileInput" accept=".xlsx" onchange="onFileSelected(this)">
+          <div class="dz-icon">📂</div>
+          <p><strong>Drop vectors-template.xlsx here</strong><br>or click to browse</p>
+        </div>
+      </div>
+      <div id="loadedFileInfo" style="display:none"></div>
+    </div>
+
+    <!-- ── Category ── -->
+    <div id="categorySection" style="display:none">
       <h3 class="section-label">Category</h3>
       <div class="control-group">
         <select id="categorySelect" onchange="selectCategory(this.value)">
-          <option value="gdp_exp">GDP (expenditure based)</option>
-          <option value="gdp_inc">GDP (income based)</option>
-          <option value="labour">Labour market</option>
-          <option value="prices">Prices</option>
-          <option value="sales">Sales, trade, housing and households</option>
-          <option value="pop">Population</option>
+          <option value="">— load a spreadsheet first —</option>
         </select>
       </div>
     </div>
 
-    <div>
+    <!-- ── Series ── -->
+    <div id="seriesSection" style="display:none">
       <h3 class="section-label">
         Series
         <span id="seriesCount" style="color:var(--muted);font-size:11px;text-transform:none;letter-spacing:0;margin-left:4px;">0 / 5</span>
@@ -430,16 +447,31 @@
           <option value="">— select to add —</option>
         </select>
       </div>
+
+      <!-- Breakdown area: up to 2 cascading dimension dropdowns -->
       <div class="breakdown-step" id="breakdownGroup" style="display:none">
-        <div class="breakdown-step-label">↳ Step 2: Select breakdown</div>
-        <select id="breakdownDropdown" onchange="addBreakdown(this.value)">
-          <option value="">— select breakdown —</option>
-        </select>
+        <div class="breakdown-step-label" id="breakdownStepLabel">↳ Step 2: Select breakdown</div>
+
+        <div class="dim-group" id="dim1Group" style="display:none">
+          <div class="dim-label" id="dim1Label">Dimension 1</div>
+          <select id="dim1Dropdown" onchange="onDim1Change(this.value)">
+            <option value="">— select —</option>
+          </select>
+        </div>
+
+        <div class="dim-group" id="dim2Group" style="display:none">
+          <div class="dim-label" id="dim2Label">Dimension 2</div>
+          <select id="dim2Dropdown" onchange="onDim2Change(this.value)">
+            <option value="">— select —</option>
+          </select>
+        </div>
       </div>
+
       <div class="selected-series" id="selectedSeries"></div>
     </div>
 
-    <div>
+    <!-- ── Date Range ── -->
+    <div id="dateSection" style="display:none">
       <h3 class="section-label">Date Range</h3>
       <div class="date-row">
         <div class="control-group">
@@ -473,7 +505,8 @@
       </div>
     </div>
 
-    <div>
+    <!-- ── Output ── -->
+    <div id="outputSection" style="display:none">
       <h3 class="section-label">Output</h3>
       <div class="control-group">
         <select id="freqSelect">
@@ -487,7 +520,8 @@
       </div>
     </div>
 
-    <div>
+    <!-- ── Transform ── -->
+    <div id="transformSection" style="display:none">
       <h3 class="section-label">Transform</h3>
       <div class="transform-chips" role="radiogroup" aria-label="Data transform">
         <div class="chip active" role="radio" aria-checked="true"  tabindex="0" data-t="level"   onclick="selectTransform('level')"   onkeydown="if(event.key==='Enter'||event.key===' ')selectTransform('level')">Level</div>
@@ -499,7 +533,8 @@
       </div>
     </div>
 
-    <div>
+    <!-- ── Formula ── -->
+    <div id="formulaSection" style="display:none">
       <h3 class="section-label">
         Formula
         <span style="color:var(--muted);font-size:11px;text-transform:none;letter-spacing:0;margin-left:4px;">optional</span>
@@ -523,7 +558,8 @@
       </div>
     </div>
 
-    <div class="btn-row">
+    <!-- ── Buttons ── -->
+    <div id="btnSection" style="display:none" class="btn-row">
       <button class="btn btn-secondary" onclick="clearChart()" title="Clear chart and selections">✕ Clear</button>
       <button class="btn btn-primary" id="fetchBtn" onclick="fetchData()">
         <span id="fetchBtnText">↓ Fetch Data</span>
@@ -535,7 +571,7 @@
   <main class="main">
     <div class="toolbar">
       <div class="toolbar-left">
-        <div class="toolbar-title" id="chartTitle">Select a category and series to begin</div>
+        <div class="toolbar-title" id="chartTitle">Load a series configuration to begin</div>
         <div class="toolbar-sources" id="toolbarSources" style="display:none;"></div>
       </div>
       <div class="chart-tabs">
@@ -554,7 +590,7 @@
       <div class="chart-container">
         <div class="chart-empty" id="chartEmpty">
           <div class="icon">📊</div>
-          <p>Select a category, choose series, then click Fetch Data</p>
+          <p>Load a series configuration to begin</p>
         </div>
         <canvas id="myChart" style="display:none;"></canvas>
       </div>
@@ -572,290 +608,34 @@
 // ═══════════════════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════════════════
-// When served by the Flask proxy (deployed on Render or run locally via `python proxy.py`),
-// API calls are relative (empty string). When opened as a raw file, fall back to localhost:5001.
 const PROXY_URL = window.location.protocol === "file:" ? "http://localhost:5001" : "";
 
 // ═══════════════════════════════════════════════════════════
-// DATA SERIES
-// ─────────────────────────────────────────────────────────
-// To add/remove/rename a series: edit the CATEGORIES object below.
-// tableId is used to build the CANSIM URL; format: XX-XX-XXXX-XX
-// vectorId digits only (no leading "v").
-// sourceFreq: 'quarterly' or 'monthly' (affects period calculation & date snapping).
+// DATA — populated dynamically from uploaded Excel
 // ═══════════════════════════════════════════════════════════
-const CATEGORIES = {
-  gdp_exp: {
-    label: 'GDP (expenditure based)',
-    sourceFreq: 'quarterly',
-    series: [
-      { id:'gdp_exp_real',       name:'GDP at market prices, 2017$ SAAR',                                  vectorId:'62305752',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_nom',        name:'GDP at market prices, current$ SAAR',                               vectorId:'62305783',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_hhcons',     name:'Household final consumption expenditure, current$ SAAR',             vectorId:'62305755',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_govcons',    name:'General government final consumption expenditure, current$ SAAR',    vectorId:'62305762',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_gfcf',       name:'Gross fixed capital formation, current$ SAAR',                      vectorId:'62305763',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_bizgfcf',    name:'Business gross fixed capital formation, current$ SAAR',             vectorId:'62305764',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_resstruct',  name:'Business GFCF residential structures, current$ SAAR',               vectorId:'62305765',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_nonstruct',  name:'Business GFCF non-residential structures, current$ SAAR',           vectorId:'62305767',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_mach',       name:'Business GFCF machinery and equipment, current$ SAAR',              vectorId:'62305768',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_ip',         name:'Business GFCF intellectual property products, current$ SAAR',       vectorId:'62305769',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_exports',    name:'Exports of goods and services, current$ SAAR',                      vectorId:'62305776',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_expgoods',   name:'Exports of goods, current$ SAAR',                                   vectorId:'62305777',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_expservs',   name:'Exports of services, current$ SAAR',                                vectorId:'62305778',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_imports',    name:'Imports of goods and services, current$ SAAR',                      vectorId:'62305779',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_impgoods',   name:'Imports of goods, current$ SAAR',                                   vectorId:'62305780',   tableId:'36-10-0104-01' },
-      { id:'gdp_exp_impservs',   name:'Imports of services, current$ SAAR',                                vectorId:'62305781',   tableId:'36-10-0104-01' },
-    ]
-  },
-
-  gdp_inc: {
-    label: 'GDP (income based)',
-    sourceFreq: 'monthly',
-    series: [
-      { id:'gdp_inc_all', name:'GDP all industries, 2017$ SAAR',          vectorId:'65201210', tableId:'36-10-0434-01',
-        subSeries: [
-          { id:'goods',      shortName:'Goods',      name:'Goods-producing industries',         vectorId:'65201211' },
-          { id:'services',   shortName:'Services',   name:'Services-producing industries',      vectorId:'65201212' },
-          { id:'business',   shortName:'Business',   name:'Business sector',                    vectorId:'65201213' },
-          { id:'energy',     shortName:'Energy',     name:'Energy sector',                      vectorId:'65201225' },
-          { id:'public',     shortName:'Public',     name:'Public sector',                      vectorId:'65201227' },
-          { id:'ag',         shortName:'Ag & fish',  name:'Agriculture, forestry, fishing',     vectorId:'65201229' },
-          { id:'mining',     shortName:'Mining',     name:'Mining, quarrying, oil & gas',       vectorId:'65201236' },
-          { id:'mfg_nondur', shortName:'Non-dur mfg',name:'Non-durable manufacturing',          vectorId:'65201220' },
-          { id:'mfg_dur',    shortName:'Dur mfg',    name:'Durable manufacturing',              vectorId:'65201221' },
-        ] },
-      { id:'gdp_inc_biz', name:'GDP business sector industries, 2017$ SAAR', vectorId:'65201213', tableId:'36-10-0434-01' },
-      { id:'gdp_inc_pub', name:'GDP public sector, 2017$ SAAR',           vectorId:'65201227', tableId:'36-10-0434-01' },
-    ]
-  },
-
-  labour: {
-    label: 'Labour market',
-    sourceFreq: 'monthly',
-    series: [
-      { id:'lab_lfs_emp_nsa',  name:'LFS employment, NSA',          vectorId:'2091072',    tableId:'14-10-0287-01' },
-      { id:'lab_lfs_emp_sa',   name:'LFS employment, SA',           vectorId:'2062811',    tableId:'14-10-0287-01',
-        subSeries: [
-          { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'2064512' },
-          { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'2064701' },
-          { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'2063000' },
-          { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'2063189' },
-          { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'2063378' },
-          { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'2063567' },
-          { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'2063756' },
-          { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'2063945' },
-          { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'2064134' },
-          { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'2064323' },
-        ] },
-      { id:'lab_lfs_ft_sa',    name:'LFS full-time employment, SA', vectorId:'2062812',    tableId:'14-10-0287-01' },
-      { id:'lab_lfs_pt_sa',    name:'LFS part-time employment, SA', vectorId:'2062813',    tableId:'14-10-0287-01' },
-      { id:'lab_lfs_emprate',  name:'LFS employment rate, SA',      vectorId:'2062817',    tableId:'14-10-0287-01',
-        subSeries: [
-          { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'2064518' },
-          { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'2064707' },
-          { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'2063006' },
-          { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'2063195' },
-          { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'2063384' },
-          { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'2063573' },
-          { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'2063762' },
-          { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'2063951' },
-          { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'2064140' },
-          { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'2064329' },
-        ] },
-      { id:'lab_lfs_urate',    name:'LFS unemployment rate, SA',    vectorId:'2062815',    tableId:'14-10-0287-01',
-        subSeries: [
-          { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'2064516' },
-          { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'2064705' },
-          { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'2063004' },
-          { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'2063193' },
-          { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'2063382' },
-          { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'2063571' },
-          { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'2063760' },
-          { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'2063949' },
-          { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'2064138' },
-          { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'2064327' },
-        ] },
-      { id:'lab_seph_emp_nsa', name:'SEPH employment, NSA',         vectorId:'1556538',    tableId:'14-10-0190-01' },
-      { id:'lab_seph_emp_sa',  name:'SEPH employment, SA',          vectorId:'54026324',   tableId:'14-10-0190-01' },
-      { id:'lab_vacancies',    name:'SEPH job vacancies SA',        vectorId:'1446283287', tableId:'14-10-0325-01' },
-      { id:'lab_vacrate',      name:'SEPH job vacancy rate SA',     vectorId:'1446283289', tableId:'14-10-0325-01' },
-    ]
-  },
-
-  prices: {
-    label: 'Prices',
-    sourceFreq: 'monthly',
-    series: [
-      { id:'prc_cpi_nsa',        name:'CPI, NSA',                          vectorId:'41690973',  tableId:'18-10-0004-01',
-        subSeriesGroups: [
-          { label: 'By province', series: [
-            { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'41691244' },
-            { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'41691379' },
-            { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'41691513' },
-            { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'41691648' },
-            { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'41691783' },
-            { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'41691919' },
-            { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'41692055' },
-            { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'41692191' },
-            { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'41692327' },
-            { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'41692462' },
-          ] },
-          { label: 'By city', series: [
-            { id:'toronto',   shortName:'Toronto',   name:'Toronto',          vectorId:'41692888' },
-            { id:'montreal',  shortName:'Montréal',  name:'Montréal',         vectorId:'41692876' },
-            { id:'vancouver', shortName:'Vancouver', name:'Vancouver',        vectorId:'41692930' },
-            { id:'calgary',   shortName:'Calgary',   name:'Calgary',          vectorId:'41692924' },
-            { id:'edmonton',  shortName:'Edmonton',  name:'Edmonton',         vectorId:'41692918' },
-            { id:'ottawa',    shortName:'Ottawa',    name:'Ottawa-Gatineau',  vectorId:'41692882' },
-            { id:'winnipeg',  shortName:'Winnipeg',  name:'Winnipeg',         vectorId:'41692900' },
-            { id:'halifax',   shortName:'Halifax',   name:'Halifax',          vectorId:'41692858' },
-          ] },
-          { label: 'By component', series: [
-            { id:'food',     shortName:'Food',        name:'Food',                              vectorId:'41690974' },
-            { id:'foodstr',  shortName:'Stores',      name:'Food from stores',                  vectorId:'41690975' },
-            { id:'foodrst',  shortName:'Restaurants', name:'Food from restaurants',             vectorId:'41691046' },
-            { id:'shelter',  shortName:'Shelter',     name:'Shelter',                           vectorId:'41691050' },
-            { id:'hhops',    shortName:'Household',   name:'Household ops & furnishings',       vectorId:'41691067' },
-            { id:'clothing', shortName:'Clothing',    name:'Clothing & footwear',               vectorId:'41691108' },
-            { id:'trans',    shortName:'Transport',   name:'Transportation',                    vectorId:'41691128' },
-            { id:'gas',      shortName:'Gas',         name:'Gasoline',                          vectorId:'41691136' },
-            { id:'health',   shortName:'Health',      name:'Health & personal care',            vectorId:'41691153' },
-            { id:'recr',     shortName:'Recreation',  name:'Recreation, education & reading',   vectorId:'41691170' },
-            { id:'energy',   shortName:'Energy',      name:'Energy',                            vectorId:'41691239' },
-          ] },
-        ] },
-      { id:'prc_cpi_food_nsa',   name:'CPI food, NSA',                     vectorId:'41690974',  tableId:'18-10-0004-01' },
-      { id:'prc_cpi_foodstores', name:'CPI food purchased from stores, NSA', vectorId:'41690975', tableId:'18-10-0004-01' },
-      { id:'prc_cpi_exfood_nsa', name:'CPI excl. food, NSA',               vectorId:'41691232',  tableId:'18-10-0004-01' },
-      { id:'prc_cpi_core_nsa',   name:'CPI excl. food and energy, NSA',    vectorId:'41691233',  tableId:'18-10-0004-01' },
-      { id:'prc_cpi_sa',         name:'CPI, SA',                           vectorId:'41690914',  tableId:'18-10-0004-01' },
-      { id:'prc_cpi_exfood_sa',  name:'CPI excl. food, SA',                vectorId:'41690923',  tableId:'18-10-0004-01' },
-      { id:'prc_cpi_core_sa',    name:'CPI excl. food and energy, SA',     vectorId:'41690924',  tableId:'18-10-0004-01' },
-      { id:'prc_cpi_median',     name:'CPI core weighted median',           vectorId:'108785714', tableId:'18-10-0004-01' },
-      { id:'prc_cpi_trimmed',    name:'CPI core trimmed mean',              vectorId:'108785715', tableId:'18-10-0004-01' },
-    ]
-  },
-
-  sales: {
-    label: 'Sales, trade, housing and households',
-    sourceFreq: 'monthly',
-    series: [
-      { id:'sal_retail_nsa',    name:'Retail sales NSA',                                                  vectorId:'1446859481', tableId:'20-10-0056-01' },
-      { id:'sal_retail_sa',     name:'Retail sales SA',                                                   vectorId:'1446859483', tableId:'20-10-0056-01' },
-      { id:'sal_retail_vol',    name:'Retail sales, chained Fisher volume index',                         vectorId:'1446870181', tableId:'20-10-0056-01' },
-      { id:'sal_mfg_nom',       name:'Manufacturing sales, current$ NSA',                                 vectorId:'800025',     tableId:'16-10-0047-01' },
-      { id:'sal_mfg_real',      name:'Manufacturing sales, 2017$',                                        vectorId:'123263908',  tableId:'16-10-0048-01' },
-      { id:'sal_exports',       name:'Merchandise exports, BoP basis, current$ SA',                      vectorId:'87008955',   tableId:'12-10-0011-01' },
-      { id:'sal_imports',       name:'Merchandise imports, BoP basis, current$ SA',                      vectorId:'87008839',   tableId:'12-10-0011-01' },
-      { id:'sal_trdbal',        name:'Merchandise trade balance, BoP basis, current$ SA',                vectorId:'87008984',   tableId:'12-10-0011-01' },
-      { id:'sal_exp_us',        name:'Merchandise exports to U.S., BoP basis, current$ SA',              vectorId:'87008956',   tableId:'12-10-0011-01' },
-      { id:'sal_imp_us',        name:'Merchandise imports from U.S., BoP basis, current$ SA',            vectorId:'87008840',   tableId:'12-10-0011-01' },
-      { id:'sal_bal_us',        name:'Merchandise trade balance with U.S., BoP basis, current$ SA',      vectorId:'87008985',   tableId:'12-10-0011-01' },
-      { id:'sal_exports_real',  name:'Merchandise exports, 2017$',                                        vectorId:'1566912717', tableId:'12-10-0011-01' },
-      { id:'sal_imports_real',  name:'Merchandise imports, 2017$',                                        vectorId:'1566912703', tableId:'12-10-0011-01' },
-      { id:'sal_exp_energy',    name:'Merchandise exports of energy products, BoP basis, current$ SA',   vectorId:'1566911351', tableId:'12-10-0011-01' },
-      { id:'sal_exp_gold',      name:'Merchandise exports of unwrought gold etc, BoP basis, current$ SA', vectorId:'1566911383', tableId:'12-10-0011-01' },
-      { id:'sal_exp_vehicles',  name:'Merchandise exports of vehicles and parts, BoP basis, current$ SA', vectorId:'1566911442', tableId:'12-10-0011-01' },
-      { id:'trv_car_lead',      name:'Canadian residents returning from the U.S. by car (leading indicator)', vectorId:'1545910054', tableId:'24-10-0054-01', sourceFreq:'daily' },
-      { id:'trv_air_lead',      name:'Canadian residents returning from the U.S. by air (leading indicator)', vectorId:'1324883057', tableId:'24-10-0054-01', sourceFreq:'daily' },
-      { id:'trv_us_final',      name:'Canadian residents returning from the U.S. (final)',                vectorId:'1296956586', tableId:'24-10-0054-01' },
-      { id:'trv_nonus_final',   name:'Canadian residents returning to Canada from non-U.S. countries (final)', vectorId:'1296956631', tableId:'24-10-0054-01' },
-      { id:'trv_us_in',         name:'U.S. residents entering Canada (final)',                            vectorId:'1296956469', tableId:'24-10-0054-01' },
-      { id:'trv_nonus_in',      name:'Residents from non-U.S. countries entering Canada (final)',        vectorId:'1296956514', tableId:'24-10-0054-01' },
-    ]
-  },
-
-  pop: {
-    label: 'Population',
-    sourceFreq: 'quarterly',
-    series: [
-      { id:'pop_est', name:'Population estimates, Canada', vectorId:'1', tableId:'17-10-0009-01',
-        subSeries: [
-          { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'2'  },
-          { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'8'  },
-          { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'9'  },
-          { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'10' },
-          { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'11' },
-          { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'12' },
-          { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'13' },
-          { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'14' },
-          { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'15' },
-          { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'3'  },
-        ] },
-      { id:'pop_npr', name:'Non-permanent residents, Canada', vectorId:'1566927590', tableId:'17-10-0121-01',
-        subSeriesGroups: [
-          { label:'By province', series:[
-            { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'1566927601' },
-            { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'1566927612' },
-            { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'1566927623' },
-            { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'1566927634' },
-            { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'1566927645' },
-            { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'1566927656' },
-            { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'1566927667' },
-            { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'1566927678' },
-            { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'1566927689' },
-            { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'1566927700' },
-          ]},
-          { label:'By type', series:[
-            { id:'asylum',    shortName:'Asylum claimants', name:'Asylum claimants, protected persons etc.', vectorId:'1566927591' },
-            { id:'work',      shortName:'Work permits',     name:'Work permit holders only',                 vectorId:'1566927597' },
-            { id:'study',     shortName:'Study permits',    name:'Study permit holders only',                vectorId:'1566927598' },
-            { id:'workstudy', shortName:'Work+Study',       name:'Work and study permit holders',            vectorId:'1566927599' },
-          ]},
-        ] },
-      { id:'pop_births',     name:'Births, Canada',                               vectorId:'62',         tableId:'17-10-0059-01' },
-      { id:'pop_deaths',     name:'Deaths, Canada',                               vectorId:'77',         tableId:'17-10-0059-01' },
-      { id:'pop_immigrants', name:'Immigrants, Canada',                           vectorId:'29850342',   tableId:'17-10-0040-01' },
-      { id:'pop_net_npr',    name:'Net non-permanent residents, Canada',          vectorId:'29850346',   tableId:'17-10-0040-01' },
-      { id:'pop_npr_in',     name:'Non-permanent resident inflows, Canada',       vectorId:'1566834758', tableId:'17-10-0040-01' },
-      { id:'pop_npr_out',    name:'Non-permanent resident outflows, Canada',      vectorId:'1566834773', tableId:'17-10-0040-01' },
-      { id:'pop_inmig', name:'Interprovincial in-migrants, Canada', vectorId:'509037', tableId:'17-10-0020-01',
-        subSeries: [
-          { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'509038' },
-          { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'509044' },
-          { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'509045' },
-          { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'509046' },
-          { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'509047' },
-          { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'509048' },
-          { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'509049' },
-          { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'509050' },
-          { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'509051' },
-          { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'509039' },
-        ] },
-      { id:'pop_outmig', name:'Interprovincial out-migrants, Canada', vectorId:'509052', tableId:'17-10-0020-01',
-        subSeries: [
-          { id:'nl', shortName:'NL',  name:'Newfoundland and Labrador', vectorId:'509053' },
-          { id:'pe', shortName:'PEI', name:'Prince Edward Island',      vectorId:'509059' },
-          { id:'ns', shortName:'NS',  name:'Nova Scotia',               vectorId:'509060' },
-          { id:'nb', shortName:'NB',  name:'New Brunswick',             vectorId:'509061' },
-          { id:'qc', shortName:'QC',  name:'Quebec',                    vectorId:'509062' },
-          { id:'on', shortName:'ON',  name:'Ontario',                   vectorId:'509063' },
-          { id:'mb', shortName:'MB',  name:'Manitoba',                  vectorId:'509064' },
-          { id:'sk', shortName:'SK',  name:'Saskatchewan',              vectorId:'509065' },
-          { id:'ab', shortName:'AB',  name:'Alberta',                   vectorId:'509066' },
-          { id:'bc', shortName:'BC',  name:'British Columbia',          vectorId:'509054' },
-        ] },
-    ]
-  }
-};
+let CATEGORIES = {};
+let SERIES_MAP = {};
 
 // ═══════════════════════════════════════════════════════════
 // STATE
 // ═══════════════════════════════════════════════════════════
 const state = {
-  category: 'gdp_exp',
+  category: '',
   activeSeries: [],
   fromYear: 2024, fromMonth: 1,
-  toYear: 2026,   toMonth: 12,
+  toYear: new Date().getFullYear(), toMonth: 12,
   frequency: 'original',
   transform: 'level',
   chartType: 'line',
-  rawData: {},        // seriesId -> [{label, date, value}]
-  processedData: {},  // seriesId -> [{label, value}]
-  seriesUnits: {},    // seriesId -> { uom, uomCode }
-  formula: '',        // raw formula string, e.g. "100*(A-B)/B"
-  formulaResult: null, // [{label, value}] or null
-  autoUpdateTo: true  // snap "To" to latest data after next fetch (reset when series change)
+  rawData: {},
+  processedData: {},
+  seriesUnits: {},
+  formula: '',
+  formulaResult: null,
+  autoUpdateTo: true,
+  // Pending breakdown selection
+  pendingSeriesId: null,
+  pendingDim1: null,
 };
 let chartInst = null;
 
@@ -866,106 +646,261 @@ function cansimUrl(tableId) {
   return `https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=${tableId.replace(/-/g, '')}`;
 }
 
+function slugify(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
 // ═══════════════════════════════════════════════════════════
-// SERIES_MAP  –  flat lookup for all top-level + sub-series
+// EXCEL PARSER
 // ═══════════════════════════════════════════════════════════
-const SERIES_MAP = {};
-(function buildSeriesMap() {
+function parseExcel(workbook) {
+  const sheetName = workbook.SheetNames.find(n => n.toLowerCase() === 'series') || workbook.SheetNames[0];
+  const ws = workbook.Sheets[sheetName];
+  const rows = XLSX.utils.sheet_to_json(ws, { raw: false, defval: '' });
+
+  const catMap = {};
+
+  for (const row of rows) {
+    const catName  = (row['category']   || '').trim();
+    const freqRaw  = (row['freq']       || 'M').trim().toUpperCase();
+    const seriesId = (row['series_id']  || '').trim();
+    const serName  = (row['series_name']|| '').trim();
+    const tableId  = (row['table_id']   || '').trim();
+    const dim1Name = (row['dim1_name']  || '').trim();
+    const dim1Val  = (row['dim1_value'] || '').trim();
+    const dim2Name = (row['dim2_name']  || '').trim();
+    const dim2Val  = (row['dim2_value'] || '').trim();
+    const vectorId = String(row['vector'] || '').trim().replace(/^[vV]/, '');
+    const fullLbl  = (row['full_label'] || serName).trim();
+    const shortLbl = (row['short_label']|| fullLbl).trim();
+
+    if (!catName || !seriesId || !vectorId) continue;
+
+    const catId = slugify(catName);
+    const freq  = freqRaw === 'Q' ? 'quarterly' : 'monthly';
+
+    if (!catMap[catId]) {
+      catMap[catId] = { id: catId, label: catName, sourceFreq: freq, series: [] };
+    }
+
+    let series = catMap[catId].series.find(s => s.id === seriesId);
+    if (!series) {
+      const numDims = dim1Val ? (dim2Val ? 2 : 1) : 0;
+      series = {
+        id: seriesId,
+        name: serName,
+        tableId,
+        dims: numDims,
+        dim1Name: dim1Name || null,
+        dim2Name: dim2Name || null,
+        vectors: {},  // key → vectorId
+        labels: {},   // key → { full, short }
+      };
+      catMap[catId].series.push(series);
+    }
+
+    // Build lookup key
+    const key = series.dims === 2 ? `${dim1Val}__${dim2Val}`
+              : series.dims === 1 ? dim1Val
+              : seriesId;
+
+    series.vectors[key] = vectorId;
+    series.labels[key]  = { full: fullLbl, short: shortLbl };
+  }
+
+  return catMap;
+}
+
+function buildSeriesMap() {
+  SERIES_MAP = {};
   for (const [, cat] of Object.entries(CATEGORIES)) {
     for (const s of cat.series) {
-      SERIES_MAP[s.id] = s;
-      // Flatten sub-series (flat list)
-      if (s.subSeries) {
-        for (const sub of s.subSeries) {
-          const subId = `${s.id}__${sub.id}`;
-          SERIES_MAP[subId] = {
-            id: subId,
-            name:      `${s.name} – ${sub.name}`,
-            chipLabel: `${s.name.split(',')[0]} – ${sub.shortName || sub.name}`,
-            vectorId:  sub.vectorId,
-            tableId:   s.tableId,
-            sourceFreq: s.sourceFreq || null,
+      if (s.dims === 0) {
+        // No breakdown: add as direct series using vectorId from first key
+        const key = Object.keys(s.vectors)[0];
+        const vectorId = s.vectors[key];
+        const info = s.labels[key] || {};
+        SERIES_MAP[s.id] = {
+          id:         s.id,
+          name:       info.full || s.name,
+          chipLabel:  info.short || s.name,
+          vectorId,
+          tableId:    s.tableId,
+          sourceFreq: cat.sourceFreq,
+        };
+      } else {
+        // Has breakdowns: register compound IDs when breakdowns are selected
+        for (const [key, vectorId] of Object.entries(s.vectors)) {
+          const compoundId = `${s.id}__${key}`;
+          const info = s.labels[key] || {};
+          SERIES_MAP[compoundId] = {
+            id:         compoundId,
+            name:       info.full || `${s.name} — ${key}`,
+            chipLabel:  info.short || key,
+            vectorId,
+            tableId:    s.tableId,
+            sourceFreq: cat.sourceFreq,
           };
-        }
-      }
-      // Flatten sub-series groups
-      if (s.subSeriesGroups) {
-        for (const grp of s.subSeriesGroups) {
-          for (const sub of grp.series) {
-            const subId = `${s.id}__${sub.id}`;
-            SERIES_MAP[subId] = {
-              id: subId,
-              name:      `CPI ${sub.name}`,
-              chipLabel: `CPI – ${sub.shortName || sub.name}`,
-              vectorId:  sub.vectorId,
-              tableId:   s.tableId,
-              sourceFreq: s.sourceFreq || null,
-            };
-          }
         }
       }
     }
   }
-})();
+}
 
-function findSeries(sid) {
-  return SERIES_MAP[sid] || null;
+// ═══════════════════════════════════════════════════════════
+// FILE DROP / UPLOAD
+// ═══════════════════════════════════════════════════════════
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.add('drag-over');
+}
+function onDragLeave(e) {
+  document.getElementById('dropZone').classList.remove('drag-over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadFile(file);
+}
+function onFileSelected(input) {
+  if (input.files[0]) loadFile(input.files[0]);
+}
+
+function loadFile(file) {
+  if (!file.name.endsWith('.xlsx')) {
+    toast('Please upload an .xlsx file', 'error');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      CATEGORIES = parseExcel(wb);
+      buildSeriesMap();
+      const count = Object.values(CATEGORIES).reduce((n, c) => n + c.series.length, 0);
+      if (count === 0) { toast('No series found — check spreadsheet format', 'error'); return; }
+      activateUI(file.name, count);
+      toast(`Loaded ${count} series from ${file.name} ✓`, 'success');
+    } catch (err) {
+      toast(`Failed to parse file: ${err.message}`, 'error');
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function activateUI(filename, count) {
+  // Show loaded file badge
+  document.getElementById('dropZoneWrap').style.display = 'none';
+  document.getElementById('loadedFileInfo').style.display = '';
+  document.getElementById('loadedFileInfo').innerHTML = `
+    <div class="loaded-file">
+      <span>📄 ${filename}</span>
+      <span style="color:var(--muted)">${count} series</span>
+      <button onclick="resetFile()" title="Load a different file">↺</button>
+    </div>`;
+
+  // Populate category dropdown
+  const sel = document.getElementById('categorySelect');
+  sel.innerHTML = Object.values(CATEGORIES)
+    .map(c => `<option value="${c.id}">${c.label}</option>`)
+    .join('');
+
+  // Show all sidebar sections
+  ['categorySection','seriesSection','dateSection','outputSection',
+   'transformSection','formulaSection','btnSection'].forEach(id => {
+    document.getElementById(id).style.display = '';
+  });
+
+  // Init first category
+  state.category = Object.keys(CATEGORIES)[0];
+  document.getElementById('categorySelect').value = state.category;
+  updateFreqDropdown();
+  renderSeriesList();
+  updateEmptyState();
+  document.getElementById('chartTitle').textContent = 'Select a series to begin';
+}
+
+function resetFile() {
+  CATEGORIES = {};
+  SERIES_MAP = {};
+  state.category = '';
+  clearChart();
+  document.getElementById('dropZoneWrap').style.display = '';
+  document.getElementById('loadedFileInfo').style.display = 'none';
+  ['categorySection','seriesSection','dateSection','outputSection',
+   'transformSection','formulaSection','btnSection'].forEach(id => {
+    document.getElementById(id).style.display = 'none';
+  });
+  document.getElementById('chartTitle').textContent = 'Load a series configuration to begin';
+  document.getElementById('fileInput').value = '';
 }
 
 // ═══════════════════════════════════════════════════════════
 // UI
 // ═══════════════════════════════════════════════════════════
+function updateFreqDropdown() {
+  const cat = CATEGORIES[state.category];
+  if (!cat) return;
+  const srcFreq = cat.sourceFreq || 'monthly';
+  const freqSel = document.getElementById('freqSelect');
+  freqSel.querySelectorAll('option').forEach(opt => {
+    opt.hidden = (opt.value === 'monthly_sum' && srcFreq === 'monthly') ||
+                 (opt.value === 'monthly_sum' && srcFreq === 'quarterly') ||
+                 (opt.value === 'quarterly_sum' && srcFreq === 'quarterly') ||
+                 (opt.value === 'quarterly_avg' && srcFreq === 'quarterly');
+  });
+  if (freqSel.options[freqSel.selectedIndex]?.hidden) freqSel.value = 'original';
+}
+
 function selectCategory(cat) {
+  if (!CATEGORIES[cat]) return;
   if (state.activeSeries.length > 0) {
     if (!confirm('Changing category will clear your current series. Continue?')) {
       document.getElementById('categorySelect').value = state.category;
       return;
     }
   }
-  clearChart();  // tears down chart, table, resets series + state
+  clearChart();
   state.category = cat;
   document.getElementById('breakdownGroup').style.display = 'none';
-  // Update frequency dropdown: hide options not valid for this source frequency
-  const sourceFreq = CATEGORIES[cat].sourceFreq || 'monthly';
-  const freqSel = document.getElementById('freqSelect');
-  freqSel.querySelectorAll('option').forEach(opt => {
-    opt.hidden = (opt.value === 'monthly_sum' && sourceFreq === 'monthly') ||
-                 (opt.value === 'monthly_sum' && sourceFreq === 'quarterly') ||
-                 (opt.value === 'quarterly_sum' && sourceFreq === 'quarterly') ||
-                 (opt.value === 'quarterly_avg' && sourceFreq === 'quarterly');
-  });
-  if (freqSel.options[freqSel.selectedIndex]?.hidden) freqSel.value = 'original';
+  updateFreqDropdown();
   renderSeriesList();
   updateEmptyState();
 }
 
 function renderSeriesList() {
   const cat = CATEGORIES[state.category];
-  const dropdown  = document.getElementById('seriesDropdown');
-  const chipsEl   = document.getElementById('selectedSeries');
-  const countEl   = document.getElementById('seriesCount');
+  if (!cat) return;
+  const dropdown = document.getElementById('seriesDropdown');
+  const chipsEl  = document.getElementById('selectedSeries');
+  const countEl  = document.getElementById('seriesCount');
   const maxSeries = 5;
 
   countEl.textContent = `${state.activeSeries.length} / ${maxSeries}`;
 
-  // Dropdown: only show series not yet selected (top-level only)
-  const available = cat.series.filter(s => !state.activeSeries.includes(s.id));
+  // Build list of already-selected top-level series IDs
+  const selectedTopLevel = new Set(state.activeSeries.map(sid => sid.split('__')[0]));
+
   dropdown.disabled = state.activeSeries.length >= maxSeries;
   dropdown.innerHTML = `<option value="">${dropdown.disabled ? '— max reached —' : '— select to add —'}</option>`
-    + available.map(s => {
-        const hasSub = s.subSeries || s.subSeriesGroups;
-        return `<option value="${s.id}">${s.name}${hasSub ? ' ▾' : ''}</option>`;
-      }).join('');
+    + cat.series
+        .filter(s => s.dims === 0 ? !selectedTopLevel.has(s.id) : true)
+        .map(s => {
+          const hasDims = s.dims > 0;
+          return `<option value="${s.id}">${s.name}${hasDims ? ' ▾' : ''}</option>`;
+        }).join('');
 
-  // Chips: one per selected series
+  // Chips
   const LETTERS = ['A', 'B', 'C', 'D', 'E'];
   chipsEl.innerHTML = state.activeSeries.map((sid, i) => {
     const s = SERIES_MAP[sid];
     if (!s) return '';
-    const color = PALETTE[i % PALETTE.length];
-    const uom = state.seriesUnits?.[sid]?.uom || '';
+    const color  = PALETTE[i % PALETTE.length];
+    const uom    = state.seriesUnits?.[sid]?.uom || '';
     const uomTag = uom ? `<span style="font-size:11px;color:var(--muted);flex-shrink:0;white-space:nowrap;">${uom}</span>` : '';
-    const label = s.chipLabel || s.name;
+    const label  = s.chipLabel || s.name;
     const letter = LETTERS[i];
     return `<div class="series-chip" style="border-left-color:${color};">
       <div class="chip-dot" style="background:${color};"></div>
@@ -974,7 +909,7 @@ function renderSeriesList() {
       ${uomTag}
       <a href="${cansimUrl(s.tableId)}" target="_blank" class="cansim-link"
          onclick="event.stopPropagation()" title="View table ${s.tableId} on StatCan">↗</a>
-      <span class="chip-remove" onclick="removeSeries('${s.id}')" title="Remove">×</span>
+      <span class="chip-remove" onclick="removeSeries('${sid}')" title="Remove">×</span>
     </div>`;
   }).join('');
 
@@ -994,54 +929,100 @@ function renderSeriesList() {
 
 function addSeries(id) {
   if (!id) return;
-  const s = SERIES_MAP[id];
-  if (!s) return;
+  const cat    = CATEGORIES[state.category];
+  const series = cat?.series.find(s => s.id === id);
+  if (!series) return;
 
-  // If series has sub-series: show breakdown dropdown instead of adding directly
-  if (s.subSeries || s.subSeriesGroups) {
-    const bdGroup = document.getElementById('breakdownGroup');
-    const bd = document.getElementById('breakdownDropdown');
-    let opts = `<option value="">— select breakdown —</option>`
-             + `<option value="${id}">Canada (aggregate)</option>`;
-    if (s.subSeries) {
-      opts += s.subSeries
-        .map(sub => `<option value="${id}__${sub.id}">${sub.name}</option>`)
-        .join('');
-    } else if (s.subSeriesGroups) {
-      opts += s.subSeriesGroups
-        .map(grp =>
-          `<optgroup label="${grp.label}">`
-          + grp.series.map(sub => `<option value="${id}__${sub.id}">${sub.name}</option>`).join('')
-          + `</optgroup>`)
-        .join('');
-    }
-    bd.innerHTML = opts;
-    bd.value = '';
-    bdGroup.style.display = '';
-    document.getElementById('seriesDropdown').value = '';
-    // Auto-scroll so the step-2 breakdown is visible
-    setTimeout(() => bdGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
+  const bdGroup = document.getElementById('breakdownGroup');
+
+  if (series.dims === 0) {
+    // No breakdown — add directly
+    doAddSeries(id);
     return;
   }
 
-  // No sub-series: add directly
-  const maxSeries = 5;
-  if (state.activeSeries.length >= maxSeries) { toast(`Max ${maxSeries} series at once`, 'error'); return; }
-  if (!state.activeSeries.includes(id)) state.activeSeries.push(id);
-  state.autoUpdateTo = true;
+  // Has dimensions — show breakdown panel
+  state.pendingSeriesId = id;
+  state.pendingDim1 = null;
+
+  document.getElementById('breakdownStepLabel').textContent = `↳ Step 2: Select ${series.dim1Name}`;
+
+  // Populate dim1 dropdown with unique dim1 values
+  const dim1Values = [...new Set(
+    Object.keys(series.vectors).map(k => series.dims === 2 ? k.split('__')[0] : k)
+  )].sort();
+
+  const dim1Sel = document.getElementById('dim1Dropdown');
+  dim1Sel.innerHTML = `<option value="">— select ${series.dim1Name || 'option'} —</option>`
+    + dim1Values.map(v => `<option value="${v}">${v}</option>`).join('');
+  dim1Sel.value = '';
+
+  document.getElementById('dim1Label').textContent = series.dim1Name || 'Dimension 1';
+  document.getElementById('dim1Group').style.display = '';
+  document.getElementById('dim2Group').style.display = 'none';
+  bdGroup.style.display = '';
+
   document.getElementById('seriesDropdown').value = '';
-  document.getElementById('breakdownGroup').style.display = 'none';
-  renderSeriesList();
-  updateEmptyState();
+  setTimeout(() => bdGroup.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 50);
 }
 
-function addBreakdown(id) {
-  if (!id) return;
+function onDim1Change(val) {
+  if (!val) return;
+  const cat    = CATEGORIES[state.category];
+  const series = cat?.series.find(s => s.id === state.pendingSeriesId);
+  if (!series) return;
+
+  state.pendingDim1 = val;
+
+  if (series.dims === 1) {
+    // Single-dim: add immediately
+    const compoundId = `${series.id}__${val}`;
+    doAddSeries(compoundId);
+    hideDimPanel();
+  } else {
+    // Two-dim: populate dim2
+    const availDim2 = [...new Set(
+      Object.keys(series.vectors)
+        .filter(k => k.startsWith(val + '__'))
+        .map(k => k.slice(val.length + 2))
+    )].sort();
+
+    const dim2Sel = document.getElementById('dim2Dropdown');
+    dim2Sel.innerHTML = `<option value="">— select ${series.dim2Name || 'option'} —</option>`
+      + availDim2.map(v => `<option value="${v}">${v}</option>`).join('');
+    dim2Sel.value = '';
+
+    document.getElementById('dim2Label').textContent = series.dim2Name || 'Dimension 2';
+    document.getElementById('dim2Group').style.display = '';
+    document.getElementById('breakdownStepLabel').textContent =
+      `↳ Step 2: ${series.dim1Name} → ${series.dim2Name}`;
+  }
+}
+
+function onDim2Change(val) {
+  if (!val || !state.pendingDim1) return;
+  const compoundId = `${state.pendingSeriesId}__${state.pendingDim1}__${val}`;
+  doAddSeries(compoundId);
+  hideDimPanel();
+}
+
+function hideDimPanel() {
+  document.getElementById('breakdownGroup').style.display = 'none';
+  document.getElementById('dim1Group').style.display = 'none';
+  document.getElementById('dim2Group').style.display = 'none';
+  state.pendingSeriesId = null;
+  state.pendingDim1 = null;
+}
+
+function doAddSeries(id) {
   const maxSeries = 5;
   if (state.activeSeries.length >= maxSeries) { toast(`Max ${maxSeries} series at once`, 'error'); return; }
-  if (!state.activeSeries.includes(id)) state.activeSeries.push(id);
-  state.autoUpdateTo = true;
-  document.getElementById('breakdownDropdown').value = '';
+  if (!SERIES_MAP[id]) { toast(`Series not found: ${id}`, 'error'); return; }
+  if (!state.activeSeries.includes(id)) {
+    state.activeSeries.push(id);
+    state.autoUpdateTo = true;
+  }
+  document.getElementById('seriesDropdown').value = '';
   renderSeriesList();
   updateEmptyState();
 }
@@ -1056,12 +1037,14 @@ function removeSeries(id) {
 function updateEmptyState() {
   const el = document.getElementById('chartEmpty');
   if (!el) return;
-  const hasSeries  = state.activeSeries.length > 0;
-  const hasData    = Object.keys(state.rawData).length > 0;
-  if (hasData) return; // chart visible, empty state hidden
+  const hasSeries = state.activeSeries.length > 0;
+  const hasData   = Object.keys(state.rawData).length > 0;
+  if (hasData) return;
   const p = el.querySelector('p');
   if (!p) return;
-  if (!hasSeries) {
+  if (!Object.keys(CATEGORIES).length) {
+    p.textContent = 'Load a series configuration to begin';
+  } else if (!hasSeries) {
     p.textContent = 'Select a category, then choose a series to add';
   } else {
     p.textContent = `${state.activeSeries.length} series selected — click Fetch Data to load`;
@@ -1082,8 +1065,12 @@ function clearChart() {
   state.activeSeries = [];
   state.rawData = {};
   state.processedData = {};
+  state.seriesUnits = {};
+  state.formulaResult = null;
+  state.formula = '';
+  state.pendingSeriesId = null;
+  state.pendingDim1 = null;
   selectTransform('level');
-  // Reset date range to defaults
   state.fromYear = 2024; state.fromMonth = 1;
   state.toYear = new Date().getFullYear(); state.toMonth = 12;
   state.autoUpdateTo = true;
@@ -1091,6 +1078,12 @@ function clearChart() {
   document.getElementById('fromMonth').value = 1;
   document.getElementById('toYear').value    = new Date().getFullYear();
   document.getElementById('toMonth').value   = 12;
+  const inp = document.getElementById('formulaInput');
+  if (inp) inp.value = '';
+  const hint = document.getElementById('formulaHint');
+  if (hint) hint.textContent = '';
+  document.querySelectorAll('.formula-preset').forEach(b => b.classList.remove('formula-active'));
+  hideDimPanel();
   renderSeriesList();
   if (chartInst) { chartInst.destroy(); chartInst = null; }
   document.getElementById('chartEmpty').style.display = 'flex';
@@ -1098,7 +1091,11 @@ function clearChart() {
   document.getElementById('tableWrap').style.display = 'none';
   document.getElementById('exportBtn').style.display = 'none';
   document.getElementById('toolbarSources').style.display = 'none';
-  document.getElementById('chartTitle').textContent = 'Select a category and series to begin';
+  if (Object.keys(CATEGORIES).length) {
+    document.getElementById('chartTitle').textContent = 'Select a category and series to begin';
+  } else {
+    document.getElementById('chartTitle').textContent = 'Load a series configuration to begin';
+  }
   document.getElementById('statusDot').className = 'status-dot';
   updateEmptyState();
 }
@@ -1110,26 +1107,21 @@ function switchChart(type) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// DATE RANGE — compute snapped ISO dates for the proxy
-// For quarterly source data, snap to completed quarter boundaries.
+// DATE RANGE
 // ═══════════════════════════════════════════════════════════
 function computeDateRange() {
-  const srcFreq = CATEGORIES[state.category].sourceFreq;
+  const cat = CATEGORIES[state.category];
+  const srcFreq = cat?.sourceFreq || 'monthly';
   let fromDate, toDate;
 
   if (srcFreq === 'quarterly') {
-    // Start: beginning of the quarter that contains fromMonth
     const fromQStartMonth = (Math.ceil(state.fromMonth / 3) - 1) * 3 + 1;
     fromDate = `${state.fromYear}-${String(fromQStartMonth).padStart(2, '0')}-01`;
-
-    // End: last day of the most recent complete quarter before toMonth
-    // e.g. April → Q1 ends Mar 31; July → Q2 ends Jun 30
     if      (state.toMonth <= 3)  toDate = `${state.toYear - 1}-12-31`;
     else if (state.toMonth <= 6)  toDate = `${state.toYear}-03-31`;
     else if (state.toMonth <= 9)  toDate = `${state.toYear}-06-30`;
     else                          toDate = `${state.toYear}-09-30`;
   } else {
-    // Monthly/daily: exact month boundaries
     fromDate = `${state.fromYear}-${String(state.fromMonth).padStart(2, '0')}-01`;
     const lastDay = new Date(state.toYear, state.toMonth, 0).getDate();
     toDate = `${state.toYear}-${String(state.toMonth).padStart(2, '0')}-${lastDay}`;
@@ -1139,7 +1131,7 @@ function computeDateRange() {
 }
 
 // ═══════════════════════════════════════════════════════════
-// FETCH — calls the proxy, which calls StatCan WDS
+// FETCH
 // ═══════════════════════════════════════════════════════════
 async function fetchData() {
   state.fromYear  = parseInt(document.getElementById('fromYear').value);
@@ -1150,27 +1142,19 @@ async function fetchData() {
 
   if (!state.activeSeries.length) { toast('Select at least one series', 'error'); return; }
 
-  // Validate date order
   const fromTs = new Date(state.fromYear, state.fromMonth - 1, 1);
   const toTs   = new Date(state.toYear,   state.toMonth   - 1, 1);
   if (fromTs >= toTs) { toast('From date must be before To date', 'error'); return; }
 
   const { fromDate, toDate } = computeDateRange();
 
-  // Build vector list for selected series
-  const seriesMeta = state.activeSeries
-    .map(sid => SERIES_MAP[sid])
-    .filter(Boolean);
-  const vectors = seriesMeta.map(s => s.vectorId).join(',');
+  const seriesMeta = state.activeSeries.map(sid => SERIES_MAP[sid]).filter(Boolean);
+  const vectors    = seriesMeta.map(s => s.vectorId).join(',');
 
-  // Calculate how many periods to request (with buffer)
-  // Daily series need ~365× more periods than monthly; detect and scale up.
-  const yearSpan = state.toYear - state.fromYear + 1;
-  const srcFreq  = CATEGORIES[state.category].sourceFreq;
-  const hasDailySeries = seriesMeta.some(s => s.sourceFreq === 'daily');
-  const periods  = hasDailySeries
-    ? Math.min(Math.ceil(yearSpan * 365 * 1.1) + 90, 3900)
-    : Math.ceil(yearSpan * (srcFreq === 'quarterly' ? 4 : 12) * 1.3) + 24;
+  const cat       = CATEGORIES[state.category];
+  const srcFreq   = cat?.sourceFreq || 'monthly';
+  const yearSpan  = state.toYear - state.fromYear + 1;
+  const periods   = Math.ceil(yearSpan * (srcFreq === 'quarterly' ? 4 : 12) * 1.3) + 24;
 
   setLoading(true);
   toast('Fetching from Statistics Canada…', 'info');
@@ -1178,7 +1162,6 @@ async function fetchData() {
   try {
     const url = `${PROXY_URL}/api/series?vectors=${encodeURIComponent(vectors)}`
               + `&fromDate=${fromDate}&toDate=${toDate}&periods=${periods}`;
-
     const resp = await fetch(url);
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
@@ -1188,7 +1171,6 @@ async function fetchData() {
 
     state.rawData = {};
     state.seriesUnits = {};
-    // Index results by vectorId — StatCan does not guarantee response order matches request order
     const byVectorId = {};
     json.series.forEach(s => {
       if (s.vectorId != null) byVectorId[String(s.vectorId)] = s;
@@ -1204,7 +1186,6 @@ async function fetchData() {
 
     if (!Object.keys(state.rawData).length) throw new Error('No data returned');
 
-    // Auto-snap "To" date to the latest data point when series have changed
     if (state.autoUpdateTo) {
       let latestDate = null;
       for (const pts of Object.values(state.rawData)) {
@@ -1225,7 +1206,6 @@ async function fetchData() {
     setLoading(false);
     toast('Data loaded ✓', 'success');
     applyAndRender();
-
   } catch (err) {
     setLoading(false);
     toast(`Error: ${err.message}`, 'error');
@@ -1242,40 +1222,33 @@ function setLoading(on) {
 
 // ═══════════════════════════════════════════════════════════
 // AGGREGATION
-// rawData points from proxy: { label: "2023-01", date: "2023-01-01", value: 123 }
 // ═══════════════════════════════════════════════════════════
 const sum = arr => arr.reduce((a, b) => a + b, 0);
 const avg = arr => sum(arr) / arr.length;
 
 function toMonthly(pts, mode = 'sum') {
-  // Groups daily/weekly data into monthly buckets
   const map = {};
   for (const p of pts) {
-    const key = (p.date || p.label).slice(0, 7); // YYYY-MM
+    const key = (p.date || p.label).slice(0, 7);
     if (!map[key]) map[key] = [];
     map[key].push(p.value);
   }
-  return Object.entries(map)
-    .sort(([a], [b]) => a.localeCompare(b))
+  return Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
     .map(([label, vals]) => ({ label, value: mode === 'sum' ? sum(vals) : avg(vals) }));
 }
 
 function toQuarterly(pts, srcFreq, mode = 'avg') {
-  if (srcFreq === 'quarterly') {
-    // Already quarterly — pass through unchanged
-    return pts.map(p => ({ label: p.label, value: p.value }));
-  }
+  if (srcFreq === 'quarterly') return pts.map(p => ({ label: p.label, value: p.value }));
   const map = {};
   for (const p of pts) {
     const d = p.date || p.label;
-    const year  = parseInt(d.slice(0, 4));
+    const year = parseInt(d.slice(0, 4));
     const month = parseInt(d.slice(5, 7)) || 1;
     const k = `${year} Q${Math.ceil(month / 3)}`;
     if (!map[k]) map[k] = [];
     map[k].push(p.value);
   }
-  return Object.entries(map)
-    .sort(([a], [b]) => a.localeCompare(b))
+  return Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
     .map(([label, vals]) => ({ label, value: mode === 'sum' ? sum(vals) : avg(vals) }));
 }
 
@@ -1286,8 +1259,7 @@ function toAnnual(pts, mode = 'avg') {
     if (!map[year]) map[year] = [];
     map[year].push(p.value);
   }
-  return Object.entries(map)
-    .sort(([a], [b]) => a.localeCompare(b))
+  return Object.entries(map).sort(([a], [b]) => a.localeCompare(b))
     .map(([y, vals]) => ({ label: String(y), value: mode === 'sum' ? sum(vals) : avg(vals) }));
 }
 
@@ -1296,28 +1268,25 @@ function toAnnual(pts, mode = 'avg') {
 // ═══════════════════════════════════════════════════════════
 function applyTransform(pts, transform) {
   if (transform === 'level') return pts;
-
   if (transform === 'pop') {
     return pts.slice(1).map((p, i) => ({
       label: p.label,
       value: +(((p.value - pts[i].value) / pts[i].value) * 100).toFixed(3)
     }));
   }
-
   if (transform === 'pop_abs') {
     return pts.slice(1).map((p, i) => ({
       label: p.label,
       value: +(p.value - pts[i].value).toFixed(3)
     }));
   }
-
   if (transform === 'yoy' || transform === 'yoy_abs') {
     const sample = pts[0]?.label || '';
     let step;
-    if      (sample.includes('Q'))                step = 4;   // quarterly
-    else if (/^\d{4}$/.test(sample))              step = 1;   // annual
-    else if (/^\d{4}-\d{2}-\d{2}$/.test(sample)) step = 365; // daily
-    else                                           step = 12;  // monthly
+    if      (sample.includes('Q'))                step = 4;
+    else if (/^\d{4}$/.test(sample))              step = 1;
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(sample)) step = 365;
+    else                                           step = 12;
     if (pts.length <= step) return [];
     return pts.slice(step).map((p, i) => ({
       label: p.label,
@@ -1326,20 +1295,15 @@ function applyTransform(pts, transform) {
         : +(((p.value - pts[i].value) / pts[i].value) * 100).toFixed(3)
     }));
   }
-
   if (transform === 'index') {
     if (!pts.length) return pts;
     const baseVal = pts[0].value;
     if (baseVal === 0) { toast('Cannot index: first data point is zero', 'error'); return pts; }
     return pts.map(p => ({ label: p.label, value: +((p.value / baseVal) * 100).toFixed(3) }));
   }
-
   return pts;
 }
 
-// ═══════════════════════════════════════════════════════════
-// FREQUENCY LABELS (for display)
-// ═══════════════════════════════════════════════════════════
 const FREQ_LABELS = {
   original:      'Original',
   monthly_sum:   'Monthly (sum)',
@@ -1353,7 +1317,8 @@ const FREQ_LABELS = {
 // APPLY + RENDER
 // ═══════════════════════════════════════════════════════════
 function applyAndRender() {
-  const srcFreq = CATEGORIES[state.category].sourceFreq;
+  const cat = CATEGORIES[state.category];
+  const srcFreq = cat?.sourceFreq || 'monthly';
   state.processedData = {};
 
   for (const sid of state.activeSeries) {
@@ -1362,11 +1327,11 @@ function applyAndRender() {
 
     let norm;
     switch (state.frequency) {
-      case 'monthly_sum':    norm = toMonthly(pts, 'sum');            break;
-      case 'quarterly_sum':  norm = toQuarterly(pts, srcFreq, 'sum'); break;
-      case 'quarterly_avg':  norm = toQuarterly(pts, srcFreq, 'avg'); break;
-      case 'annual_sum':     norm = toAnnual(pts, 'sum');             break;
-      case 'annual_avg':     norm = toAnnual(pts, 'avg');             break;
+      case 'monthly_sum':    norm = toMonthly(pts, 'sum');              break;
+      case 'quarterly_sum':  norm = toQuarterly(pts, srcFreq, 'sum');   break;
+      case 'quarterly_avg':  norm = toQuarterly(pts, srcFreq, 'avg');   break;
+      case 'annual_sum':     norm = toAnnual(pts, 'sum');               break;
+      case 'annual_avg':     norm = toAnnual(pts, 'avg');               break;
       default:               norm = pts.map(p => ({ label: p.label, value: p.value }));
     }
 
@@ -1374,17 +1339,17 @@ function applyAndRender() {
     state.processedData[sid] = norm;
   }
 
-  const tLabel = { level: 'Level', pop: 'Period-over-Period % Change', pop_abs: 'Period-over-Period Change', yoy: 'Year-over-Year % Change', yoy_abs: 'Year-over-Year Change', index: 'Index (start = 100)' }[state.transform] || 'Level';
+  const tLabel = {
+    level: 'Level', pop: 'Period-over-Period % Change', pop_abs: 'Period-over-Period Change',
+    yoy: 'Year-over-Year % Change', yoy_abs: 'Year-over-Year Change', index: 'Index (start = 100)'
+  }[state.transform] || 'Level';
   const fLabel = FREQ_LABELS[state.frequency] || state.frequency;
 
   document.getElementById('chartTitle').textContent =
-    `${CATEGORIES[state.category].label} — ${tLabel} (${fLabel})`;
+    `${cat?.label || ''} — ${tLabel} (${fLabel})`;
 
-  // Source table links in toolbar — use SERIES_MAP so sub-series are found
   const tables = [...new Set(
-    state.activeSeries
-      .map(sid => SERIES_MAP[sid]?.tableId)
-      .filter(Boolean)
+    state.activeSeries.map(sid => SERIES_MAP[sid]?.tableId).filter(Boolean)
   )];
   const srcEl = document.getElementById('toolbarSources');
   if (tables.length) {
@@ -1412,7 +1377,9 @@ function renderChart() {
   const canvas = document.getElementById('myChart');
   const sids   = state.activeSeries.filter(s => state.processedData[s]?.length);
 
-  if (!sids.length && !state.formulaResult?.length) { empty.style.display = 'flex'; canvas.style.display = 'none'; return; }
+  if (!sids.length && !state.formulaResult?.length) {
+    empty.style.display = 'flex'; canvas.style.display = 'none'; return;
+  }
   empty.style.display = 'none';
   canvas.style.display = '';
 
@@ -1430,23 +1397,19 @@ function renderChart() {
   const isStacked = state.chartType === 'stacked';
   const isArea    = state.chartType === 'area';
 
-  // When a formula result is active, hide underlying series and show only the formula line
   const formulaActive = !!state.formulaResult?.length;
   const FORMULA_COLOR = '#9333ea';
 
-  // Derive a unit label for the y-axis
-  const activeUoms = [...new Set(
-    sids.map(sid => state.seriesUnits?.[sid]?.uom).filter(Boolean)
-  )];
-  const yAxisUnit = formulaActive ? '' : isPct ? 'percent' : isIdx ? 'index' : (activeUoms.length === 1 ? activeUoms[0] : activeUoms.length > 1 ? 'mixed units' : '');
+  const activeUoms = [...new Set(sids.map(sid => state.seriesUnits?.[sid]?.uom).filter(Boolean))];
+  const yAxisUnit  = formulaActive ? ''
+    : isPct ? 'percent' : isIdx ? 'index'
+    : (activeUoms.length === 1 ? activeUoms[0] : activeUoms.length > 1 ? 'mixed units' : '');
 
-  // Underlying series — hidden when formula is active
   const datasets = formulaActive ? [] : sids.map((sid, i) => {
     const meta  = SERIES_MAP[sid];
     const dmap  = Object.fromEntries(state.processedData[sid].map(p => [p.label, p.value]));
     const data  = allLabels.map(l => dmap[l] ?? null);
     const color = PALETTE[i % PALETTE.length];
-
     return {
       type:             (isBar || isStacked) ? 'bar' : 'line',
       label:            meta ? (meta.chipLabel || meta.name) : sid,
@@ -1461,51 +1424,37 @@ function renderChart() {
     };
   });
 
-  // Formula result: solid purple line (no dash needed when it's the only series)
   if (formulaActive) {
     const fdmap = Object.fromEntries(state.formulaResult.map(p => [p.label, p.value]));
     const fdata = allLabels.map(l => fdmap[l] ?? null);
     datasets.push({
-      type:             'line',
-      label:            formulaLabel(state.formula),
-      data:             fdata,
-      borderColor:      FORMULA_COLOR,
-      backgroundColor:  isArea ? FORMULA_COLOR + '28' : 'transparent',
-      fill:             isArea,
-      tension:          0.35,
-      pointRadius:      allLabels.length > 80 ? 0 : 3,
-      pointHoverRadius: 5,
-      borderWidth:      2.5,
+      type: 'line', label: formulaLabel(state.formula), data: fdata,
+      borderColor: FORMULA_COLOR,
+      backgroundColor: isArea ? FORMULA_COLOR + '28' : 'transparent',
+      fill: isArea, tension: 0.35,
+      pointRadius: allLabels.length > 80 ? 0 : 3,
+      pointHoverRadius: 5, borderWidth: 2.5,
     });
   }
 
   const maxShow = 16;
-  const step = Math.max(1, Math.ceil(allLabels.length / maxShow));
+  const step    = Math.max(1, Math.ceil(allLabels.length / maxShow));
   const xLabels = allLabels.map((l, i) => i % step === 0 ? l : '');
 
   if (chartInst) chartInst.destroy();
   chartInst = new Chart(canvas, {
     data: { labels: allLabels, datasets },
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: {
-          labels: {
-            color: '#111827',
-            font: { family: 'DM Sans', size: 12 },
-            boxWidth: 12, padding: 14
-          }
+          labels: { color: '#111827', font: { family: 'DM Sans', size: 12 }, boxWidth: 12, padding: 14 }
         },
         tooltip: {
-          backgroundColor: '#ffffff',
-          borderColor: '#e1e4e8',
-          borderWidth: 1,
-          titleColor: '#6b7280',
-          bodyColor: '#111827',
-          titleFont: { family: 'DM Sans', size: 12 },
-          bodyFont: { family: 'DM Sans', size: 12 },
+          backgroundColor: '#ffffff', borderColor: '#e1e4e8', borderWidth: 1,
+          titleColor: '#6b7280', bodyColor: '#111827',
+          titleFont: { family: 'DM Sans', size: 12 }, bodyFont: { family: 'DM Sans', size: 12 },
           callbacks: {
             label: ctx => {
               const v = ctx.parsed.y;
@@ -1520,32 +1469,20 @@ function renderChart() {
       scales: {
         x: {
           stacked: isStacked,
-          ticks: {
-            color: '#6b7280',
-            font: { family: 'DM Sans', size: 10 },
-            maxRotation: 45,
-            callback: (_, i) => xLabels[i]
-          },
+          ticks: { color: '#6b7280', font: { family: 'DM Sans', size: 10 }, maxRotation: 45, callback: (_, i) => xLabels[i] },
           grid: { color: 'rgba(0,0,0,0.07)' }
         },
         y: {
           stacked: isStacked,
-          title: {
-            display: !!yAxisUnit,
-            text: yAxisUnit,
-            color: '#6b7280',
-            font: { family: 'DM Sans', size: 11 },
-            padding: { bottom: 4 },
-          },
+          title: { display: !!yAxisUnit, text: yAxisUnit, color: '#6b7280', font: { family: 'DM Sans', size: 11 }, padding: { bottom: 4 } },
           ticks: {
-            color: '#6b7280',
-            font: { family: 'DM Sans', size: 11 },
+            color: '#6b7280', font: { family: 'DM Sans', size: 11 },
             callback: v => {
               const sfx = isPct ? '%' : '';
               if (!isPct && Math.abs(v) >= 1e12) return (v / 1e12).toFixed(1) + 'T';
               if (!isPct && Math.abs(v) >= 1e9)  return (v / 1e9).toFixed(1)  + 'B';
               if (!isPct && Math.abs(v) >= 1e6)  return (v / 1e6).toFixed(1)  + 'M';
-              if (Math.abs(v) >= 1e3)  return (v / 1e3).toFixed(1)  + 'K' + sfx;
+              if (Math.abs(v) >= 1e3)            return (v / 1e3).toFixed(1)  + 'K' + sfx;
               return v.toFixed(1) + sfx;
             }
           },
@@ -1572,14 +1509,13 @@ function renderTable() {
     ...formulaLabels,
   ])].sort();
 
-  const isPct    = state.transform === 'pop'     || state.transform === 'yoy';
-  const isAbs    = state.transform === 'pop_abs' || state.transform === 'yoy_abs';
-  const isChg    = isPct || isAbs;
-  const isIndex  = state.transform === 'index';
-  const suffix   = isPct ? ' (%)' : isAbs ? ' (chg)' : isIndex ? ' (start=100)' : '';
+  const isPct   = state.transform === 'pop'     || state.transform === 'yoy';
+  const isAbs   = state.transform === 'pop_abs' || state.transform === 'yoy_abs';
+  const isChg   = isPct || isAbs;
+  const isIndex = state.transform === 'index';
+  const suffix  = isPct ? ' (%)' : isAbs ? ' (chg)' : isIndex ? ' (start=100)' : '';
 
   if (hasFormula) {
-    // Formula mode: show period + formula result only
     const fdmap = Object.fromEntries(state.formulaResult.map(p => [p.label, p.value]));
     document.getElementById('tableHead').innerHTML =
       `<tr><th>Period</th><th style="color:#9333ea">${formulaLabel(state.formula)}</th></tr>`;
@@ -1587,11 +1523,10 @@ function renderTable() {
       formulaLabels.slice(-60).map(label => {
         const v = fdmap[label];
         if (v == null) return `<tr><td>${label}</td><td class="num">—</td></tr>`;
-        const cls  = v > 0 ? '' : v < 0 ? 'neg' : '';
+        const cls = v > 0 ? '' : v < 0 ? 'neg' : '';
         return `<tr><td>${label}</td><td class="num ${cls}" style="color:#9333ea">${v.toLocaleString('en-CA', { maximumFractionDigits: 4 })}</td></tr>`;
       }).join('');
   } else {
-    // Normal mode: show all active series
     const names = sids.map(sid => {
       const s = SERIES_MAP[sid];
       return s ? (s.chipLabel || s.name) : sid;
@@ -1620,30 +1555,19 @@ function exportXlsx() {
   const sids = state.activeSeries.filter(s => state.processedData[s]?.length);
   if (!sids.length) return;
 
-  const allLabels = [...new Set(
-    sids.flatMap(s => state.processedData[s].map(p => p.label))
-  )].sort();
+  const cat     = CATEGORIES[state.category];
+  const tLabel  = { level:'Level', pop:'Period-over-Period % Change', pop_abs:'Period-over-Period Change', yoy:'Year-over-Year % Change', yoy_abs:'Year-over-Year Change', index:'Index (start = 100)' }[state.transform] || 'Level';
+  const fLabel  = FREQ_LABELS[state.frequency] || state.frequency;
+  const isPct   = state.transform === 'pop'     || state.transform === 'yoy';
+  const isAbs   = state.transform === 'pop_abs' || state.transform === 'yoy_abs';
+  const suffix  = isPct ? ' (%)' : isAbs ? ' (chg)' : '';
+  const names   = sids.map(sid => { const s = SERIES_MAP[sid]; return s ? (s.chipLabel || s.name) : sid; });
 
-  const tLabel = { level: 'Level', pop: 'Period-over-Period % Change', pop_abs: 'Period-over-Period Change', yoy: 'Year-over-Year % Change', yoy_abs: 'Year-over-Year Change', index: 'Index (start = 100)' }[state.transform] || 'Level';
-  const fLabel = FREQ_LABELS[state.frequency] || state.frequency;
-  const isPct  = state.transform === 'pop'     || state.transform === 'yoy';
-  const isAbs  = state.transform === 'pop_abs' || state.transform === 'yoy_abs';
-  const suffix = isPct ? ' (%)' : isAbs ? ' (chg)' : '';
-  const catMeta = CATEGORIES[state.category];
-  const names   = sids.map(sid => {
-    const s = SERIES_MAP[sid];
-    return s ? (s.chipLabel || s.name) : sid;
-  });
-
+  const allLabels = [...new Set(sids.flatMap(s => state.processedData[s].map(p => p.label)))].sort();
   const hasFormula = !!state.formulaResult?.length;
-  const fdmapXls = hasFormula
-    ? Object.fromEntries(state.formulaResult.map(p => [p.label, p.value]))
-    : {};
+  const fdmapXls   = hasFormula ? Object.fromEntries(state.formulaResult.map(p => [p.label, p.value])) : {};
   const formulaLabels = hasFormula ? state.formulaResult.map(p => p.label) : [];
-  const allLabelsXls = [...new Set([
-    ...allLabels,
-    ...formulaLabels,
-  ])].sort();
+  const allLabelsXls  = [...new Set([...allLabels, ...formulaLabels])].sort();
 
   const rows = allLabelsXls.map(label => {
     const row = [label];
@@ -1655,44 +1579,39 @@ function exportXlsx() {
     return row;
   });
 
-  const tables = [...new Set(sids.map(sid => SERIES_MAP[sid]?.tableId).filter(Boolean))];
+  const tables     = [...new Set(sids.map(sid => SERIES_MAP[sid]?.tableId).filter(Boolean))];
   const cansimUrls = tables.map(t => `${t}: ${cansimUrl(t)}`).join('; ');
 
   const wb = XLSX.utils.book_new();
 
-  // Sheet 1: Data — formula-only when active, otherwise full series
   let wsData;
   if (hasFormula) {
-    const frowsXls = (state.formulaResult || []).map(p => [p.label, p.value]);
     wsData = XLSX.utils.aoa_to_sheet([
-      [`Statistics Canada — ${catMeta.label}`],
+      [`Statistics Canada — ${cat?.label}`],
       [`Formula: ${formulaLabel(state.formula)}`, `Output Frequency: ${fLabel}`, `Exported: ${new Date().toLocaleDateString('en-CA')}`],
       [`From: ${state.fromYear}-${String(state.fromMonth).padStart(2,'0')}`, `To: ${state.toYear}-${String(state.toMonth).padStart(2,'0')}`],
-      [],
-      ['Period', state.formula],
-      ...frowsXls
+      [], ['Period', state.formula],
+      ...(state.formulaResult || []).map(p => [p.label, p.value])
     ]);
     wsData['!cols'] = [{ wch: 14 }, { wch: 28 }];
   } else {
     wsData = XLSX.utils.aoa_to_sheet([
-      [`Statistics Canada — ${catMeta.label}`],
+      [`Statistics Canada — ${cat?.label}`],
       [`Transform: ${tLabel}`, `Output Frequency: ${fLabel}`, `Exported: ${new Date().toLocaleDateString('en-CA')}`],
       [`From: ${state.fromYear}-${String(state.fromMonth).padStart(2,'0')}`, `To: ${state.toYear}-${String(state.toMonth).padStart(2,'0')}`],
-      [],
-      ['Period', ...names.map(n => `${n}${suffix}`)],
+      [], ['Period', ...names.map(n => `${n}${suffix}`)],
       ...rows
     ]);
     wsData['!cols'] = [{ wch: 14 }, ...sids.map(() => ({ wch: 38 }))];
   }
   XLSX.utils.book_append_sheet(wb, wsData, 'Data');
 
-  // Sheet 2: Metadata
   const wsMeta = XLSX.utils.aoa_to_sheet([
     ['Field', 'Value'],
-    ['Category',         catMeta.label],
+    ['Category',         cat?.label || ''],
     ['Transform',        tLabel],
     ['Output Frequency', fLabel],
-    ['Source Frequency', catMeta.sourceFreq],
+    ['Source Frequency', cat?.sourceFreq || ''],
     ['From',             `${state.fromYear}-${String(state.fromMonth).padStart(2,'0')}`],
     ['To',               `${state.toYear}-${String(state.toMonth).padStart(2,'0')}`],
     ['Series',           names.join('; ')],
@@ -1704,8 +1623,7 @@ function exportXlsx() {
   XLSX.utils.book_append_sheet(wb, wsMeta, 'Metadata');
 
   const safeLabel = tLabel.replace(/[^a-z0-9]/gi, '_');
-  const fname = `statcan_${state.category}_${safeLabel}_${state.fromYear}${String(state.fromMonth).padStart(2,'0')}-${state.toYear}${String(state.toMonth).padStart(2,'0')}.xlsx`;
-  XLSX.writeFile(wb, fname);
+  XLSX.writeFile(wb, `statcan_lab_${safeLabel}_${state.fromYear}${String(state.fromMonth).padStart(2,'0')}-${state.toYear}${String(state.toMonth).padStart(2,'0')}.xlsx`);
   toast('Spreadsheet exported ✓', 'success');
 }
 
@@ -1724,60 +1642,35 @@ function toast(msg, type = 'info') {
 }
 
 // ═══════════════════════════════════════════════════════════
-// YEAR STEPPER
-// ═══════════════════════════════════════════════════════════
-function stepYear(id, delta) {
-  const el = document.getElementById(id);
-  const val = parseInt(el.value) || new Date().getFullYear();
-  el.value = Math.max(parseInt(el.min), Math.min(parseInt(el.max), val + delta));
-}
-
-// ═══════════════════════════════════════════════════════════
 // FORMULA PANEL
 // ═══════════════════════════════════════════════════════════
-
-/**
- * Evaluate a formula string (e.g. "100*(A-B)/B") over the processedData
- * of the active series.  Letters A, B, C, D, E map to activeSeries[0..4].
- * All series are aligned on their common labels; labels missing from any
- * series referenced in the formula are skipped.
- */
-/**
- * Replace letter references (A–E) in a formula string with the actual
- * series names, e.g. "100*(B/A)" → "100*(Gold exports/Total exports)"
- */
 function formulaLabel(expr) {
   const LETTERS = ['A', 'B', 'C', 'D', 'E'];
   return expr.toUpperCase().replace(/\b([A-E])\b/g, (_, l) => {
-    const idx   = LETTERS.indexOf(l);
-    const sid   = state.activeSeries[idx];
-    const s     = sid ? SERIES_MAP[sid] : null;
+    const idx = LETTERS.indexOf(l);
+    const sid = state.activeSeries[idx];
+    const s   = sid ? SERIES_MAP[sid] : null;
     return s ? (s.chipLabel || s.name) : l;
   });
 }
 
 function computeFormula() {
   state.formulaResult = null;
-
   const expr = state.formula.trim().toUpperCase();
   if (!expr) return;
 
-  // Determine which letter slots are referenced (A–E)
   const LETTERS = ['A', 'B', 'C', 'D', 'E'];
   const usedLetters = LETTERS.filter(l => new RegExp(`\\b${l}\\b`).test(expr));
   if (!usedLetters.length) return;
 
-  // Check that each referenced letter has a corresponding series with data
   for (const l of usedLetters) {
     const idx = LETTERS.indexOf(l);
     const sid = state.activeSeries[idx];
     if (!sid || !state.processedData[sid]?.length) {
-      toast(`Formula error: series ${l} has no data`, 'error');
-      return;
+      toast(`Formula error: series ${l} has no data`, 'error'); return;
     }
   }
 
-  // Build data maps per used letter
   const dmaps = {};
   for (const l of usedLetters) {
     const idx = LETTERS.indexOf(l);
@@ -1785,23 +1678,18 @@ function computeFormula() {
     dmaps[l] = Object.fromEntries(state.processedData[sid].map(p => [p.label, p.value]));
   }
 
-  // Labels present in ALL referenced series
-  const labelSets = usedLetters.map(l => new Set(Object.keys(dmaps[l])));
+  const labelSets    = usedLetters.map(l => new Set(Object.keys(dmaps[l])));
   const commonLabels = [...labelSets[0]].filter(lbl => labelSets.every(s => s.has(lbl))).sort();
   if (!commonLabels.length) {
-    toast('Formula: no overlapping periods between selected series', 'error');
-    return;
+    toast('Formula: no overlapping periods between selected series', 'error'); return;
   }
 
-  // Sanitize: allow only digits, letters A-E, math operators, spaces, parens, dot
   if (!/^[A-E0-9 +\-*/().^%]+$/.test(expr)) {
-    toast('Formula contains invalid characters', 'error');
-    return;
+    toast('Formula contains invalid characters', 'error'); return;
   }
 
   const results = [];
   for (const label of commonLabels) {
-    // Assign values to letter variables
     const vars = {};
     let skip = false;
     for (const l of usedLetters) {
@@ -1810,29 +1698,23 @@ function computeFormula() {
       vars[l] = v;
     }
     if (skip) continue;
-
     try {
-      // Build a function with named parameters A, B, C, D, E
       const fn = new Function('A', 'B', 'C', 'D', 'E', `"use strict"; return (${expr});`);
-      const v = fn(vars['A'] ?? 0, vars['B'] ?? 0, vars['C'] ?? 0, vars['D'] ?? 0, vars['E'] ?? 0);
+      const v  = fn(vars['A'] ?? 0, vars['B'] ?? 0, vars['C'] ?? 0, vars['D'] ?? 0, vars['E'] ?? 0);
       if (isFinite(v)) results.push({ label, value: v });
     } catch (e) {
       toast(`Formula error: ${e.message}`, 'error');
-      state.formulaResult = null;
-      return;
+      state.formulaResult = null; return;
     }
   }
-
   state.formulaResult = results.length ? results : null;
 }
 
 function updateFormula(val) {
   state.formula = val;
-  // Highlight active preset button if any matches
   document.querySelectorAll('.formula-preset').forEach(btn => {
     btn.classList.toggle('formula-active', btn.dataset.expr === val.toUpperCase());
   });
-  // Show hint prompting user to press Enter; do NOT auto-apply
   const hint = document.getElementById('formulaHint');
   if (hint) hint.textContent = val.trim() ? '↵ Press Enter to apply' : '';
 }
@@ -1875,13 +1757,10 @@ function applyFormula() {
   const fromSel = document.getElementById('fromYear');
   const toSel   = document.getElementById('toYear');
   for (let y = 1946; y <= currentYear + 2; y++) {
-    const optFrom = new Option(y, y, false, y === 2024);
-    const optTo   = new Option(y, y, false, y === currentYear);
-    fromSel.appendChild(optFrom);
-    toSel.appendChild(optTo);
+    fromSel.appendChild(new Option(y, y, false, y === 2024));
+    toSel.appendChild(new Option(y, y, false, y === currentYear));
   }
 })();
-renderSeriesList();
 </script>
 
 <footer style="
