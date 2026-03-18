@@ -411,19 +411,11 @@
 
   <aside class="sidebar">
 
-    <!-- ── Step 0: Load spreadsheet ── -->
+    <!-- ── Step 0: Loading state ── -->
     <div>
       <h3 class="section-label">Series Configuration</h3>
-      <div id="dropZoneWrap">
-        <div class="drop-zone" id="dropZone"
-             onclick="document.getElementById('fileInput').click()"
-             ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
-          <input type="file" id="fileInput" accept=".xlsx" onchange="onFileSelected(this)">
-          <div class="dz-icon">📂</div>
-          <p><strong>Drop vectors-template.xlsx here</strong><br>or click to browse</p>
-        </div>
-      </div>
-      <div id="loadedFileInfo" style="display:none"></div>
+      <div id="loadingState" style="font-size:12px;color:var(--muted);padding:8px 2px;">Loading series…</div>
+      <div id="loadErrorState" style="display:none;font-size:12px;color:#dc2626;padding:8px 2px;line-height:1.5"></div>
     </div>
 
     <!-- ── Category ── -->
@@ -801,15 +793,9 @@ function loadFile(file) {
 }
 
 function activateUI(filename, count) {
-  // Show loaded file badge
-  document.getElementById('dropZoneWrap').style.display = 'none';
-  document.getElementById('loadedFileInfo').style.display = '';
-  document.getElementById('loadedFileInfo').innerHTML = `
-    <div class="loaded-file">
-      <span>📄 ${filename}</span>
-      <span style="color:var(--muted)">${count} series</span>
-      <button onclick="resetFile()" title="Load a different file">↺</button>
-    </div>`;
+  // Hide loading state, show series count
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('loadErrorState').style.display = 'none';
 
   // Populate category dropdown
   const sel = document.getElementById('categorySelect');
@@ -1778,16 +1764,19 @@ function applyFormula() {
 async function autoLoadTemplate() {
   try {
     const resp = await fetch('/vectors-template.xlsx');
-    if (!resp.ok) return; // fall back to drop zone
+    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
     const buf  = await resp.arrayBuffer();
     const wb   = XLSX.read(buf, { type: 'array' });
     CATEGORIES = parseExcel(wb);
     buildSeriesMap();
     const count = Object.values(CATEGORIES).reduce((n, c) => n + c.series.length, 0);
-    if (count === 0) return;
+    if (count === 0) throw new Error('No series found in template');
     activateUI('vectors-template.xlsx', count);
   } catch (err) {
-    console.warn('Auto-load template failed:', err);
+    console.error('Failed to load series template:', err);
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('loadErrorState').style.display = '';
+    document.getElementById('loadErrorState').textContent = `Failed to load series data — please try refreshing. (${err.message})`;
   }
 }
 
