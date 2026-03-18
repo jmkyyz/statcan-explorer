@@ -1773,6 +1773,25 @@ function applyFormula() {
 }
 
 // ═══════════════════════════════════════════════════════════
+// AUTO-LOAD DEFAULT TEMPLATE
+// ═══════════════════════════════════════════════════════════
+async function autoLoadTemplate() {
+  try {
+    const resp = await fetch('/vectors-template.xlsx');
+    if (!resp.ok) return; // fall back to drop zone
+    const buf  = await resp.arrayBuffer();
+    const wb   = XLSX.read(buf, { type: 'array' });
+    CATEGORIES = parseExcel(wb);
+    buildSeriesMap();
+    const count = Object.values(CATEGORIES).reduce((n, c) => n + c.series.length, 0);
+    if (count === 0) return;
+    activateUI('vectors-template.xlsx', count);
+  } catch (err) {
+    console.warn('Auto-load template failed:', err);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
 // INIT
 // ═══════════════════════════════════════════════════════════
 (function populateYearSelects() {
@@ -1784,6 +1803,8 @@ function applyFormula() {
     toSel.appendChild(new Option(y, y, false, y === currentYear));
   }
 })();
+
+autoLoadTemplate();
 </script>
 
 <footer style="

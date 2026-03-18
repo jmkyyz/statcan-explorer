@@ -33,6 +33,11 @@ def index():
     here = os.path.dirname(os.path.abspath(__file__))
     return send_from_directory(here, "statcan-explorer.html")
 
+@app.route("/vectors-template.xlsx")
+def vectors_template():
+    here = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(here, "vectors-template.xlsx")
+
 @app.route("/lab")
 def lab():
     here = os.path.dirname(os.path.abspath(__file__))
