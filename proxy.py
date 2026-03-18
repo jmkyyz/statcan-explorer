@@ -36,7 +36,7 @@ def index():
 @app.route("/lab")
 def lab():
     here = os.path.dirname(os.path.abspath(__file__))
-    return send_from_directory(here, "statcan-explorer-lab.html")
+    return send_from_directory(here, "statcan-explorer-v1.html")
 
 STATCAN_BASE = "https://www150.statcan.gc.ca/t1/wds/rest"
 
