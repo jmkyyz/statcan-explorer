@@ -68,27 +68,19 @@
 
   .app {
     display: grid;
-    grid-template-columns: 340px 1fr;
+    grid-template-columns: 300px 1fr;
     flex: 1;
     min-height: 0;
   }
 
   .sidebar {
     border-right: 1px solid var(--border);
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    background: var(--surface);
-  }
-  .sidebar-scroll {
-    flex: 1;
-    overflow-y: auto;
-    min-height: 0;
     padding: 20px;
-    padding-bottom: 8px;
     display: flex;
     flex-direction: column;
     gap: 22px;
+    overflow-y: auto;
+    background: var(--surface);
   }
 
   .section-label {
@@ -106,7 +98,7 @@
   .selected-series { display: flex; flex-direction: column; gap: 5px; margin-top: 8px; }
   .series-chip {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 7px;
     padding: 6px 9px;
     border: 1px solid var(--border);
@@ -145,12 +137,6 @@
   .chip-remove { cursor: pointer; color: var(--muted); font-size: 14px; line-height: 1;
                  flex-shrink: 0; transition: color 0.15s; padding: 5px 7px; margin: -5px -4px -5px 0; border-radius: 3px; }
   .chip-remove:hover { color: var(--accent3); }
-  .chip-transform {
-    font-size: 11px; height: 20px; padding: 0 4px;
-    border: 1px solid var(--border); border-radius: 3px;
-    background: var(--surface); color: var(--text);
-    font-family: 'DM Sans', sans-serif; cursor: pointer; flex-shrink: 0;
-  }
 
   .cansim-link {
     color: var(--muted);
@@ -424,7 +410,6 @@
 <div class="app">
 
   <aside class="sidebar">
-  <div class="sidebar-scroll">
 
     <!-- ── Step 0: Loading state ── -->
     <div>
@@ -527,8 +512,18 @@
       </div>
     </div>
 
-    <!-- ── Transform (now per-series, inside each chip) ── -->
-    <div id="transformSection" style="display:none"></div>
+    <!-- ── Transform ── -->
+    <div id="transformSection" style="display:none">
+      <h3 class="section-label">Transform</h3>
+      <div class="transform-chips" role="radiogroup" aria-label="Data transform">
+        <div class="chip active" role="radio" aria-checked="true"  tabindex="0" data-t="level"   onclick="selectTransform('level')"   onkeydown="if(event.key==='Enter'||event.key===' ')selectTransform('level')">Level</div>
+        <div class="chip"        role="radio" aria-checked="false" tabindex="0" data-t="pop"     onclick="selectTransform('pop')"     onkeydown="if(event.key==='Enter'||event.key===' ')selectTransform('pop')">Period % Chg</div>
+        <div class="chip"        role="radio" aria-checked="false" tabindex="0" data-t="pop_abs" onclick="selectTransform('pop_abs')" onkeydown="if(event.key==='Enter'||event.key===' ')selectTransform('pop_abs')">Period Chg</div>
+        <div class="chip"        role="radio" aria-checked="false" tabindex="0" data-t="yoy"     onclick="selectTransform('yoy')"     onkeydown="if(event.key==='Enter'||event.key===' ')selectTransform('yoy')">YoY % Chg</div>
+        <div class="chip"        role="radio" aria-checked="false" tabindex="0" data-t="yoy_abs" onclick="selectTransform('yoy_abs')" onkeydown="if(event.key==='Enter'||event.key===' ')selectTransform('yoy_abs')">YoY Chg</div>
+        <div class="chip"        role="radio" aria-checked="false" tabindex="0" data-t="index"   onclick="selectTransform('index')"   onkeydown="if(event.key==='Enter'||event.key===' ')selectTransform('index')">Index (start=100)</div>
+      </div>
+    </div>
 
     <!-- ── Formula ── -->
     <div id="formulaSection" style="display:none">
@@ -558,10 +553,8 @@
       </div>
     </div>
 
-  </div><!-- /.sidebar-scroll -->
-
-    <!-- ── Buttons (pinned) ── -->
-    <div id="btnSection" style="display:none;padding:12px 20px 20px;border-top:1px solid var(--border);flex-shrink:0;" class="btn-row">
+    <!-- ── Buttons ── -->
+    <div id="btnSection" style="display:none" class="btn-row">
       <button class="btn btn-secondary" onclick="clearChart()" title="Clear chart and selections">✕ Clear</button>
       <button class="btn btn-primary" id="fetchBtn" onclick="fetchData()">
         <span id="fetchBtnText">↓ Fetch Data</span>
@@ -627,7 +620,7 @@ const state = {
   fromYear: 2024, fromMonth: 1,
   toYear: new Date().getFullYear(), toMonth: 12,
   frequency: 'original',
-  seriesTransforms: {},   // sid → transform key; defaults to 'level'
+  transform: 'level',
   chartType: 'line',
   rawData: {},
   processedData: {},
@@ -726,7 +719,6 @@ function buildSeriesMap() {
           id:         s.id,
           name:       info.full || s.name,
           chipLabel:  info.short || s.name,
-          category:   cat.label,
           vectorId,
           tableId:    s.tableId,
           sourceFreq: cat.sourceFreq,
@@ -747,7 +739,6 @@ function buildSeriesMap() {
             id:         compoundId,
             name:       info.full || `${s.name} — ${key}`,
             chipLabel,
-            category:   cat.label,
             vectorId,
             tableId:    s.tableId,
             sourceFreq: cat.sourceFreq,
@@ -848,9 +839,7 @@ function resetFile() {
 function updateFreqDropdown() {
   const cat = CATEGORIES[state.category];
   if (!cat) return;
-  // Use coarsest freq across all active series (so cross-category mixes work correctly)
-  const allFreqs = [cat.sourceFreq, ...state.activeSeries.map(sid => SERIES_MAP[sid]?.sourceFreq)].filter(Boolean);
-  const srcFreq = allFreqs.includes('quarterly') ? 'quarterly' : 'monthly';
+  const srcFreq = cat.sourceFreq || 'monthly';
   const freqSel = document.getElementById('freqSelect');
   freqSel.querySelectorAll('option').forEach(opt => {
     opt.hidden = (opt.value === 'monthly_sum' && srcFreq === 'monthly') ||
@@ -863,6 +852,13 @@ function updateFreqDropdown() {
 
 function selectCategory(cat) {
   if (!CATEGORIES[cat]) return;
+  if (state.activeSeries.length > 0) {
+    if (!confirm('Changing category will clear your current series. Continue?')) {
+      document.getElementById('categorySelect').value = state.category;
+      return;
+    }
+  }
+  clearChart();
   state.category = cat;
   document.getElementById('breakdownGroup').style.display = 'none';
   updateFreqDropdown();
@@ -894,10 +890,6 @@ function renderSeriesList() {
 
   // Chips
   const LETTERS = ['A', 'B', 'C', 'D', 'E'];
-  const T_OPTS = [
-    ['level','Level'], ['pop','PoP %'], ['pop_abs','PoP Δ'],
-    ['yoy','YoY %'], ['yoy_abs','YoY Δ'], ['index','Index'],
-  ];
   chipsEl.innerHTML = state.activeSeries.map((sid, i) => {
     const s = SERIES_MAP[sid];
     if (!s) return '';
@@ -906,22 +898,13 @@ function renderSeriesList() {
     const uomTag = uom ? `<span style="font-size:11px;color:var(--muted);flex-shrink:0;white-space:nowrap;">${uom}</span>` : '';
     const label  = s.chipLabel || s.name;
     const letter = LETTERS[i];
-    const curT   = state.seriesTransforms[sid] || 'level';
-    const tOpts  = T_OPTS.map(([v,l]) => `<option value="${v}"${curT===v?' selected':''}>${l}</option>`).join('');
     return `<div class="series-chip" style="border-left-color:${color};">
-      <div class="chip-dot" style="background:${color};margin-top:3px;"></div>
-      <span style="font-size:11px;font-weight:500;color:${color};flex-shrink:0;min-width:10px;padding-top:2px;">${letter}</span>
-      <div style="flex:1;min-width:0;overflow:hidden;">
-        <div class="chip-name" data-tooltip="${s.name}">${label}</div>
-        <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;margin-bottom:3px;">${s.category || ''}</div>
-        <div style="display:flex;align-items:center;gap:5px;">
-          <select class="chip-transform" onclick="event.stopPropagation()"
-                  onchange="setSeriesTransform('${sid}', this.value)">${tOpts}</select>
-          ${uomTag}
-        </div>
-      </div>
+      <div class="chip-dot" style="background:${color};"></div>
+      <span style="font-size:11px;font-weight:500;color:${color};flex-shrink:0;min-width:10px;">${letter}</span>
+      <span class="chip-name" data-tooltip="${s.name}">${label}</span>
+      ${uomTag}
       <a href="${cansimUrl(s.tableId)}" target="_blank" class="cansim-link"
-         onclick="event.stopPropagation()" title="View table ${s.tableId} on StatCan" style="margin-top:1px;">↗</a>
+         onclick="event.stopPropagation()" title="View table ${s.tableId} on StatCan">↗</a>
       <span class="chip-remove" onclick="removeSeries('${sid}')" title="Remove">×</span>
     </div>`;
   }).join('');
@@ -1043,15 +1026,9 @@ function doAddSeries(id) {
 
 function removeSeries(id) {
   state.activeSeries = state.activeSeries.filter(x => x !== id);
-  delete state.rawData[id];
-  delete state.seriesTransforms[id];
   state.autoUpdateTo = true;
   renderSeriesList();
-  if (Object.keys(state.rawData).length) {
-    applyAndRender();
-  } else {
-    updateEmptyState();
-  }
+  updateEmptyState();
 }
 
 function updateEmptyState() {
@@ -1071,22 +1048,24 @@ function updateEmptyState() {
   }
 }
 
-function setSeriesTransform(sid, t) {
-  state.seriesTransforms[sid] = t;
+function selectTransform(t) {
+  state.transform = t;
+  document.querySelectorAll('.chip[data-t]').forEach(el => {
+    const isActive = el.dataset.t === t;
+    el.classList.toggle('active', isActive);
+    el.setAttribute('aria-checked', isActive ? 'true' : 'false');
+  });
   updateFormulaWarn();
   if (Object.keys(state.rawData).length) applyAndRender();
 }
 
-// Legacy stub — no longer used by UI but kept for safety
-function selectTransform(t) {}
-
 function updateFormulaWarn() {
   const el = document.getElementById('formulaTransformWarn');
   if (!el) return;
-  const nonLevel = Object.values(state.seriesTransforms).filter(t => t && t !== 'level');
-  const active = !!state.formulaResult?.length && nonLevel.length > 0;
+  const NAMES = { pop: 'Period % Change', pop_abs: 'Period Change', yoy: 'YoY % Change', yoy_abs: 'YoY Change', index: 'Index (start=100)' };
+  const active = !!state.formulaResult?.length && state.transform !== 'level';
   el.style.display = active ? '' : 'none';
-  if (active) el.textContent = `⚠ Formula is running on transformed values — set all series to Level for ratios or shares.`;
+  if (active) el.textContent = `⚠ Formula is running on ${NAMES[state.transform]} values — switch Transform to Level for ratios or shares.`;
 }
 
 function clearChart() {
@@ -1094,11 +1073,11 @@ function clearChart() {
   state.rawData = {};
   state.processedData = {};
   state.seriesUnits = {};
-  state.seriesTransforms = {};
   state.formulaResult = null;
   state.formula = '';
   state.pendingSeriesId = null;
   state.pendingDim1 = null;
+  selectTransform('level');
   state.fromYear = 2024; state.fromMonth = 1;
   state.toYear = new Date().getFullYear(); state.toMonth = 12;
   state.autoUpdateTo = true;
@@ -1176,65 +1155,41 @@ async function fetchData() {
 
   const { fromDate, toDate } = computeDateRange();
 
-  const seriesMeta   = state.activeSeries.map(sid => SERIES_MAP[sid]).filter(Boolean);
-  const statcanMeta  = seriesMeta.filter(sm => sm.tableId !== 'BOC');
-  const bocMeta      = seriesMeta.filter(sm => sm.tableId === 'BOC');
+  const seriesMeta = state.activeSeries.map(sid => SERIES_MAP[sid]).filter(Boolean);
+  const vectors    = seriesMeta.map(s => s.vectorId).join(',');
+
+  const cat       = CATEGORIES[state.category];
+  const srcFreq   = cat?.sourceFreq || 'monthly';
+  const yearSpan  = state.toYear - state.fromYear + 1;
+  const periods   = Math.ceil(yearSpan * (srcFreq === 'quarterly' ? 4 : 12) * 1.3) + 24;
 
   setLoading(true);
-  toast('Fetching data…', 'info');
+  toast('Fetching from Statistics Canada…', 'info');
 
   try {
-    state.rawData    = {};
+    const url = `${PROXY_URL}/api/series?vectors=${encodeURIComponent(vectors)}`
+              + `&fromDate=${fromDate}&toDate=${toDate}&periods=${periods}`;
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const json = await resp.json();
+
+    state.rawData = {};
     state.seriesUnits = {};
-
-    // ── StatCan fetch ──────────────────────────────────────────────────────
-    if (statcanMeta.length) {
-      const vectors  = statcanMeta.map(s => s.vectorId).join(',');
-      const srcFreq  = statcanMeta.some(sm => sm.sourceFreq === 'quarterly') ? 'quarterly' : 'monthly';
-      const yearSpan = state.toYear - state.fromYear + 1;
-      const periods  = Math.ceil(yearSpan * (srcFreq === 'quarterly' ? 4 : 12) * 1.3) + 24;
-
-      const url  = `${PROXY_URL}/api/series?vectors=${encodeURIComponent(vectors)}`
-                 + `&fromDate=${fromDate}&toDate=${toDate}&periods=${periods}`;
-      const resp = await fetch(url);
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${resp.status}`);
-      }
-      const json = await resp.json();
-      const byVectorId = {};
-      json.series.forEach(s => { if (s.vectorId != null) byVectorId[String(s.vectorId)] = s; });
-      statcanMeta.forEach(sm => {
-        const vid = String(sm.vectorId).replace(/^[vV]/i, '');
-        const s = byVectorId[vid];
-        if (!s) return;
-        if (s.error) { toast(`Vector ${vid}: ${s.error}`, 'error'); return; }
-        state.rawData[sm.id]     = s.data;
-        state.seriesUnits[sm.id] = { uom: s.uom || '', uomCode: s.uomCode || 0 };
-      });
-    }
-
-    // ── Bank of Canada fetch ───────────────────────────────────────────────
-    if (bocMeta.length) {
-      const bocVectors = bocMeta.map(s => s.vectorId).join(',');
-      const bocUrl     = `${PROXY_URL}/api/boc?series=${encodeURIComponent(bocVectors)}`
-                       + `&fromDate=${fromDate}&toDate=${toDate}`;
-      const bocResp    = await fetch(bocUrl);
-      if (!bocResp.ok) {
-        const err = await bocResp.json().catch(() => ({}));
-        throw new Error(err.error || `BoC API error: HTTP ${bocResp.status}`);
-      }
-      const bocJson  = await bocResp.json();
-      const bocByVec = {};
-      bocJson.series.forEach(s => { bocByVec[s.vectorId] = s; });
-      bocMeta.forEach(sm => {
-        const s = bocByVec[sm.vectorId];
-        if (!s) return;
-        if (s.error) { toast(`${sm.vectorId}: ${s.error}`, 'error'); return; }
-        state.rawData[sm.id]     = s.data;
-        state.seriesUnits[sm.id] = { uom: s.uom || 'percent', uomCode: 0 };
-      });
-    }
+    const byVectorId = {};
+    json.series.forEach(s => {
+      if (s.vectorId != null) byVectorId[String(s.vectorId)] = s;
+    });
+    seriesMeta.forEach(sm => {
+      const vid = String(sm.vectorId).replace(/^[vV]/i, '');
+      const s = byVectorId[vid];
+      if (!s) return;
+      if (s.error) { toast(`Vector ${vid}: ${s.error}`, 'error'); return; }
+      state.rawData[sm.id]    = s.data;
+      state.seriesUnits[sm.id] = { uom: s.uom || '', uomCode: s.uomCode || 0 };
+    });
 
     if (!Object.keys(state.rawData).length) throw new Error('No data returned');
 
@@ -1370,14 +1325,12 @@ const FREQ_LABELS = {
 // ═══════════════════════════════════════════════════════════
 function applyAndRender() {
   const cat = CATEGORIES[state.category];
+  const srcFreq = cat?.sourceFreq || 'monthly';
   state.processedData = {};
 
   for (const sid of state.activeSeries) {
     let pts = state.rawData[sid] || [];
     if (!pts.length) continue;
-
-    // Use each series' own source frequency so cross-category mixes convert correctly
-    const srcFreq = SERIES_MAP[sid]?.sourceFreq || cat?.sourceFreq || 'monthly';
 
     let norm;
     switch (state.frequency) {
@@ -1389,23 +1342,18 @@ function applyAndRender() {
       default:               norm = pts.map(p => ({ label: p.label, value: p.value }));
     }
 
-    norm = applyTransform(norm, state.seriesTransforms[sid] || 'level');
+    norm = applyTransform(norm, state.transform);
     state.processedData[sid] = norm;
   }
 
-  const TLABELS = {
+  const tLabel = {
     level: 'Level', pop: 'Period-over-Period % Change', pop_abs: 'Period-over-Period Change',
     yoy: 'Year-over-Year % Change', yoy_abs: 'Year-over-Year Change', index: 'Index (start = 100)'
-  };
-  const activeT = state.activeSeries.map(sid => state.seriesTransforms[sid] || 'level');
-  const uniqueT = [...new Set(activeT)];
-  const tLabel  = uniqueT.length === 1 ? (TLABELS[uniqueT[0]] || 'Level') : 'Mixed transforms';
+  }[state.transform] || 'Level';
   const fLabel = FREQ_LABELS[state.frequency] || state.frequency;
 
-  const cats = [...new Set(state.activeSeries.map(sid => SERIES_MAP[sid]?.category).filter(Boolean))];
-  const catTitle = cats.length === 1 ? cats[0] : cats.length > 1 ? 'Mixed categories' : (cat?.label || '');
   document.getElementById('chartTitle').textContent =
-    `${catTitle} — ${tLabel} (${fLabel})`;
+    `${cat?.label || ''} — ${tLabel} (${fLabel})`;
 
   const tables = [...new Set(
     state.activeSeries.map(sid => SERIES_MAP[sid]?.tableId).filter(Boolean)
@@ -1448,11 +1396,10 @@ function renderChart() {
     ...formulaLabels,
   ])].sort();
 
-  const allT   = sids.map(sid => state.seriesTransforms[sid] || 'level');
-  const isPct  = allT.length > 0 && allT.every(t => t === 'pop' || t === 'yoy');
-  const isAbs  = allT.length > 0 && allT.every(t => t === 'pop_abs' || t === 'yoy_abs');
-  const isChg  = isPct || isAbs;
-  const isIdx  = allT.length > 0 && allT.every(t => t === 'index');
+  const isPct     = state.transform === 'pop'     || state.transform === 'yoy';
+  const isAbs     = state.transform === 'pop_abs' || state.transform === 'yoy_abs';
+  const isChg     = isPct || isAbs;
+  const isIdx     = state.transform === 'index';
   const isBar     = state.chartType === 'bar';
   const isStacked = state.chartType === 'stacked';
   const isArea    = state.chartType === 'area';
@@ -1519,13 +1466,9 @@ function renderChart() {
             label: ctx => {
               const v = ctx.parsed.y;
               if (v == null) return null;
-              const fmt  = v.toLocaleString('en-CA', { maximumFractionDigits: 2 });
-              const sid  = sids[ctx.datasetIndex];
-              const t    = sid ? (state.seriesTransforms[sid] || 'level') : 'level';
-              const sPct = t === 'pop' || t === 'yoy';
-              const sChg = sPct || t === 'pop_abs' || t === 'yoy_abs';
-              const sfx  = sPct ? '%' : '';
-              return ` ${ctx.dataset.label}: ${sChg && v > 0 ? '+' : ''}${fmt}${sfx}`;
+              const fmt = v.toLocaleString('en-CA', { maximumFractionDigits: 2 });
+              const sfx = isPct ? '%' : '';
+              return ` ${ctx.dataset.label}: ${isChg && v > 0 ? '+' : ''}${fmt}${sfx}`;
             }
           }
         }
@@ -1550,7 +1493,7 @@ function renderChart() {
               return v.toFixed(1) + sfx;
             }
           },
-          grid: { color: ctx => ctx.tick.value === 0 ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.07)' }
+          grid: { color: 'rgba(0,0,0,0.07)' }
         }
       }
     }
@@ -1573,11 +1516,11 @@ function renderTable() {
     ...formulaLabels,
   ])].sort();
 
-  const getSuffix = sid => {
-    const t = state.seriesTransforms[sid] || 'level';
-    return (t === 'pop' || t === 'yoy') ? ' (%)' : (t === 'pop_abs' || t === 'yoy_abs') ? ' (chg)' : t === 'index' ? ' (start=100)' : '';
-  };
-  const isSeriesChg = sid => { const t = state.seriesTransforms[sid] || 'level'; return t !== 'level' && t !== 'index'; };
+  const isPct   = state.transform === 'pop'     || state.transform === 'yoy';
+  const isAbs   = state.transform === 'pop_abs' || state.transform === 'yoy_abs';
+  const isChg   = isPct || isAbs;
+  const isIndex = state.transform === 'index';
+  const suffix  = isPct ? ' (%)' : isAbs ? ' (chg)' : isIndex ? ' (start=100)' : '';
 
   if (hasFormula) {
     const fdmap = Object.fromEntries(state.formulaResult.map(p => [p.label, p.value]));
@@ -1591,20 +1534,20 @@ function renderTable() {
         return `<tr><td>${label}</td><td class="num ${cls}" style="color:#9333ea">${v.toLocaleString('en-CA', { maximumFractionDigits: 4 })}</td></tr>`;
       }).join('');
   } else {
+    const names = sids.map(sid => {
+      const s = SERIES_MAP[sid];
+      return s ? (s.chipLabel || s.name) : sid;
+    });
     document.getElementById('tableHead').innerHTML =
-      `<tr><th>Period</th>${sids.map(sid => {
-        const s = SERIES_MAP[sid]; const n = s ? (s.chipLabel || s.name) : sid;
-        return `<th>${n}${getSuffix(sid)}</th>`;
-      }).join('')}</tr>`;
+      `<tr><th>Period</th>${names.map(n => `<th>${n}${suffix}</th>`).join('')}</tr>`;
     document.getElementById('tableBody').innerHTML =
       allLabels.slice(-60).map(label => {
         const cells = sids.map(sid => {
           const dmap = Object.fromEntries(state.processedData[sid].map(p => [p.label, p.value]));
           const v = dmap[label];
           if (v == null) return '<td class="num">—</td>';
-          const chg  = isSeriesChg(sid);
-          const cls  = chg ? (v > 0 ? 'pos' : v < 0 ? 'neg' : '') : '';
-          const sign = chg && v > 0 ? '+' : '';
+          const cls  = isChg ? (v > 0 ? 'pos' : v < 0 ? 'neg' : '') : '';
+          const sign = isChg && v > 0 ? '+' : '';
           return `<td class="num ${cls}">${sign}${v.toLocaleString('en-CA', { maximumFractionDigits: 2 })}</td>`;
         }).join('');
         return `<tr><td>${label}</td>${cells}</tr>`;
@@ -1619,13 +1562,13 @@ function exportXlsx() {
   const sids = state.activeSeries.filter(s => state.processedData[s]?.length);
   if (!sids.length) return;
 
-  const cat    = CATEGORIES[state.category];
-  const fLabel = FREQ_LABELS[state.frequency] || state.frequency;
-  const XLABELS = { level:'Level', pop:'Period-over-Period % Change', pop_abs:'Period-over-Period Change', yoy:'Year-over-Year % Change', yoy_abs:'Year-over-Year Change', index:'Index (start = 100)' };
-  const getXSuffix = sid => { const t = state.seriesTransforms[sid] || 'level'; return (t==='pop'||t==='yoy') ? ' (%)' : (t==='pop_abs'||t==='yoy_abs') ? ' (chg)' : t==='index' ? ' (start=100)' : ''; };
-  const uniqueXT = [...new Set(sids.map(sid => state.seriesTransforms[sid] || 'level'))];
-  const tLabel   = uniqueXT.length === 1 ? (XLABELS[uniqueXT[0]] || 'Level') : 'Mixed transforms';
-  const names    = sids.map(sid => { const s = SERIES_MAP[sid]; return s ? (s.chipLabel || s.name) : sid; });
+  const cat     = CATEGORIES[state.category];
+  const tLabel  = { level:'Level', pop:'Period-over-Period % Change', pop_abs:'Period-over-Period Change', yoy:'Year-over-Year % Change', yoy_abs:'Year-over-Year Change', index:'Index (start = 100)' }[state.transform] || 'Level';
+  const fLabel  = FREQ_LABELS[state.frequency] || state.frequency;
+  const isPct   = state.transform === 'pop'     || state.transform === 'yoy';
+  const isAbs   = state.transform === 'pop_abs' || state.transform === 'yoy_abs';
+  const suffix  = isPct ? ' (%)' : isAbs ? ' (chg)' : '';
+  const names   = sids.map(sid => { const s = SERIES_MAP[sid]; return s ? (s.chipLabel || s.name) : sid; });
 
   const allLabels = [...new Set(sids.flatMap(s => state.processedData[s].map(p => p.label)))].sort();
   const hasFormula = !!state.formulaResult?.length;
@@ -1663,7 +1606,7 @@ function exportXlsx() {
       [`Statistics Canada — ${cat?.label}`],
       [`Transform: ${tLabel}`, `Output Frequency: ${fLabel}`, `Exported: ${new Date().toLocaleDateString('en-CA')}`],
       [`From: ${state.fromYear}-${String(state.fromMonth).padStart(2,'0')}`, `To: ${state.toYear}-${String(state.toMonth).padStart(2,'0')}`],
-      [], ['Period', ...sids.map((sid, i) => `${names[i]}${getXSuffix(sid)}`)],
+      [], ['Period', ...names.map(n => `${n}${suffix}`)],
       ...rows
     ]);
     wsData['!cols'] = [{ wch: 14 }, ...sids.map(() => ({ wch: 38 }))];

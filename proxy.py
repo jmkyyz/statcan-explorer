@@ -41,9 +41,10 @@ def vectors_template():
 @app.route("/lab")
 def lab():
     here = os.path.dirname(os.path.abspath(__file__))
-    return send_from_directory(here, "statcan-explorer-v1.html")
+    return send_from_directory(here, "statcan-explorer-lab.html")
 
 STATCAN_BASE = "https://www150.statcan.gc.ca/t1/wds/rest"
+BOC_BASE     = "https://www.bankofcanada.ca/valet"
 
 # ---------------------------------------------------------------------------
 # Scalar factor multipliers (from StatCan codeset)
@@ -404,6 +405,91 @@ def get_table_metadata():
         "releaseTime":  obj.get("releaseTime"),
         "dimensions":   obj.get("dimension", []),
     })
+
+
+# ---------------------------------------------------------------------------
+# Route: GET /api/boc
+# Query params:
+#   series   – comma-separated BoC V-codes, e.g. "V39079,V39078"
+#   fromDate – ISO date string YYYY-MM-DD
+#   toDate   – ISO date string YYYY-MM-DD
+#
+# Fetches from the Bank of Canada Valet API and converts daily observations
+# to monthly (last value per calendar month) so the frontend treats BoC
+# series identically to StatCan monthly series.
+# ---------------------------------------------------------------------------
+@app.route("/api/boc")
+def get_boc_series():
+    raw_series = request.args.get("series",   "")
+    from_date  = request.args.get("fromDate", "")
+    to_date    = request.args.get("toDate",   "")
+
+    if not raw_series:
+        return jsonify({"error": "No series specified"}), 400
+
+    series_codes = [s.strip() for s in raw_series.split(",") if s.strip()]
+    results = []
+
+    for code in series_codes:
+        # The frontend strips a leading v/V via replace(/^[vV]/, ''), turning
+        # "V39079" → "39079".  Re-add the prefix only for pure numeric codes.
+        # Named codes (FXUSDCAD, BD.CDN.10YR.DQ.YLD, W.BCPI, etc.) are passed
+        # through unchanged because they contain non-digit characters.
+        boc_code = f"V{code}" if code.isdigit() else code
+
+        params = {}
+        if from_date:
+            params["start_date"] = from_date
+        if to_date:
+            params["end_date"] = to_date
+
+        try:
+            resp = requests.get(
+                f"{BOC_BASE}/observations/{boc_code}/json",
+                params=params,
+                timeout=25,
+            )
+            resp.raise_for_status()
+        except requests.exceptions.RequestException as exc:
+            results.append({"vectorId": code, "error": str(exc)})
+            continue
+
+        data         = resp.json()
+        observations = data.get("observations", [])
+
+        # Convert to monthly: keep the last daily value for each calendar month
+        monthly = {}   # "YYYY-MM" → {"date": "YYYY-MM-DD", "value": float}
+        for obs in observations:
+            d = obs.get("d", "")
+            if not d:
+                continue
+            val_obj = obs.get(boc_code, {})   # BoC payload key uses V-prefix
+            val = val_obj.get("v")
+            if val is None or val == "":
+                continue
+            try:
+                val_f = float(val)
+            except (ValueError, TypeError):
+                continue
+            month_key = d[:7]                           # "YYYY-MM"
+            # Later dates overwrite earlier ones → end-of-month wins
+            if month_key not in monthly or d > monthly[month_key]["date"]:
+                monthly[month_key] = {"date": d, "value": val_f}
+
+        data_points = [
+            {"label": mk, "date": monthly[mk]["date"], "value": monthly[mk]["value"]}
+            for mk in sorted(monthly)
+        ]
+
+        results.append({
+            "vectorId":      code,
+            "frequency":     "Monthly",
+            "frequencyCode": 6,
+            "uom":           "percent",
+            "data":          data_points,
+        })
+
+    return jsonify({"series": results})
 
 
 # ---------------------------------------------------------------------------
