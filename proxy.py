@@ -36,15 +36,7 @@ def index():
 @app.route("/vectors-template.xlsx")
 def vectors_template():
     here = os.path.dirname(os.path.abspath(__file__))
-    primary = os.path.join(here, "vectors-template.xlsx")
-    backup  = os.path.join(here, "vectors-template.backup.xlsx")
-    try:
-        import openpyxl
-        openpyxl.load_workbook(primary, read_only=True).close()
-        return send_from_directory(here, "vectors-template.xlsx")
-    except Exception as e:
-        app.logger.warning(f"vectors-template.xlsx failed validation ({e}); serving backup")
-        return send_from_directory(here, "vectors-template.backup.xlsx")
+    return send_from_directory(here, "vectors-template.xlsx")
 
 @app.route("/lab")
 def lab():
