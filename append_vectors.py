@@ -1441,6 +1441,286 @@ for component, vec, short in [
                            "Commodity price index (weekly)", "BOC",
                            "Component", component, "", "", vec, f"BCPI (weekly) \u2014 {component}", short, FILL_WHITE))
 
+# ── CATEGORY: Labour ──────────────────────────────────────────────────────────
+
+# lfs_ind: LFS Employment by industry (14-10-0355-02) — Canada, SA and NSA
+LFS_IND_SERIES = [
+    ("Total employed, all industries",                       "Total",           2057603, 2057812),
+    ("Goods-producing sector",                               "Goods-producing", 2057604, 2057813),
+    ("  Forestry, fishing, mining, quarrying, oil and gas",  "Forestry/mining", 2057606, 2057815),
+    ("  Construction",                                       "Construction",    2057608, 2057817),
+    ("  Manufacturing",                                      "Manufacturing",   2057609, 2057818),
+    ("Services-producing sector",                            "Services",        2057610, 2057819),
+    ("  Wholesale and retail trade",                         "Wholesale/retail",2057611, 2057820),
+    ("  Transportation and warehousing",                     "Transportation",  2057612, 2057821),
+    ("  Finance, insurance, real estate, rental and leasing","Finance/ins/RE",  2057613, 2057822),
+    ("  Professional, scientific and technical services",    "Prof/sci/tech",   2057614, 2057823),
+    ("  Educational services",                               "Education",       2057616, 2057825),
+    ("  Health care and social assistance",                  "Health care",     2057617, 2057826),
+    ("  Accommodation and food services",                    "Accomm/food",     2057619, 2057828),
+    ("  Public administration",                              "Public admin",    2057621, 2057830),
+]
+for ind_name, short, sa_vec, nsa_vec in LFS_IND_SERIES:
+    for adj, vec in [("Seasonally adjusted", sa_vec), ("Unadjusted", nsa_vec)]:
+        fl = f"LFS — {ind_name.strip()} ({adj[:3]})"
+        rows_to_append.append(("Labour", "monthly", "lfs_ind",
+                               "LFS employment by industry", "14-10-0355-02",
+                               "Seasonal adjustment", adj, "Industry", ind_name.strip(),
+                               str(vec), fl, short, FILL_WHITE))
+
+# lfs_class: LFS Employment by class of worker (14-10-0288-01) — Canada, SA and NSA
+LFS_CLASS_SERIES = [
+    ("Total employed, all classes of workers", "Total employed",   2066967, 2067132),
+    ("Employees",                              "Employees",         2066968, 2067133),
+    ("  Public sector employees",              "Public sector",     2066969, 2067134),
+    ("  Private sector employees",             "Private sector",    2066970, 2067135),
+    ("Self-employed",                          "Self-employed",     2066971, 2067136),
+]
+for cls_name, short, sa_vec, nsa_vec in LFS_CLASS_SERIES:
+    for adj, vec in [("Seasonally adjusted", sa_vec), ("Unadjusted", nsa_vec)]:
+        fl = f"LFS — {cls_name.strip()} ({adj[:3]})"
+        rows_to_append.append(("Labour", "monthly", "lfs_class",
+                               "LFS employment by class of worker", "14-10-0288-01",
+                               "Seasonal adjustment", adj, "Class of worker", cls_name.strip(),
+                               str(vec), fl, short, FILL_WHITE))
+
+# lfs_wages: LFS average hourly wages by industry (14-10-0063-01) — Canada, NSA
+LFS_WAGES_SERIES = [
+    ("Total employees, all industries",                      "Total",           2132579),
+    ("Goods-producing sector",                               "Goods-producing", 2132654),
+    ("  Forestry, fishing, mining, quarrying, oil and gas",  "Forestry/mining", 2132584),
+    ("  Construction",                                       "Construction",    2132599),
+    ("  Manufacturing",                                      "Manufacturing",   2132604),
+    ("Services-producing sector",                            "Services",        2132594),
+    ("  Wholesale and retail trade",                         "Wholesale/retail",2132609),
+    ("  Transportation and warehousing",                     "Transportation",  2132614),
+    ("  Finance, insurance, real estate, rental and leasing","Finance/ins/RE",  2132619),
+    ("  Professional, scientific and technical services",    "Prof/sci/tech",   2132664),
+    ("  Educational services",                               "Education",       2132624),
+    ("  Health care and social assistance",                  "Health care",     2132629),
+    ("  Information, culture and recreation",                "Info/culture",    2132634),
+    ("  Accommodation and food services",                    "Accomm/food",     2132644),
+    ("  Public administration",                              "Public admin",    2132669),
+]
+for ind_name, short, vec in LFS_WAGES_SERIES:
+    fl = f"LFS avg hourly wage — {ind_name.strip()}"
+    rows_to_append.append(("Labour", "monthly", "lfs_wages",
+                           "LFS avg hourly wage by industry (NSA)", "14-10-0063-01",
+                           "Industry", ind_name.strip(), "", "",
+                           str(vec), fl, short, FILL_WHITE))
+
+# seph_earnings: SEPH average weekly earnings by industry (14-10-0223-01) — Canada, SA
+SEPH_EARNINGS_SERIES = [
+    ("Industrial aggregate (incl. unclassified)",            "IA incl. uncl.",  "v1544290282"),
+    ("Industrial aggregate (excl. unclassified)",            "IA excl. uncl.",  "v79311153"),
+    ("Goods producing industries",                           "Goods-producing", "v79311152"),
+    ("  Construction",                                       "Construction",    "v79311156"),
+    ("  Manufacturing",                                      "Manufacturing",   "v79311157"),
+    ("Service producing industries",                         "Services",        "v79311162"),
+    ("  Wholesale trade",                                    "Wholesale",       "v79311160"),
+    ("  Retail trade",                                       "Retail",          "v79311163"),
+    ("  Transportation and warehousing",                     "Transportation",  "v79311164"),
+    ("  Finance and insurance",                              "Finance/ins.",    "v79311166"),
+    ("  Real estate and rental and leasing",                 "Real estate",     "v79311167"),
+    ("  Professional, scientific and technical services",    "Prof/sci/tech",   "v79311168"),
+    ("  Educational services",                               "Education",       "v79311171"),
+    ("  Health care and social assistance",                  "Health care",     "v79311172"),
+    ("  Arts, entertainment and recreation",                 "Arts/entertain.", "v79311173"),
+    ("  Accommodation and food services",                    "Accomm/food",     "v79311174"),
+]
+for ind_name, short, vec in SEPH_EARNINGS_SERIES:
+    fl = f"SEPH avg weekly earnings — {ind_name.strip()}"
+    rows_to_append.append(("Labour", "monthly", "seph_earnings",
+                           "SEPH avg weekly earnings by industry (SA)", "14-10-0223-01",
+                           "Industry", ind_name.strip(), "", "",
+                           vec, fl, short, FILL_WHITE))
+
+# ── CATEGORY: Housing additions ────────────────────────────────────────────────
+
+# nhpi: New housing price index (18-10-0205-01) — Canada
+for price_type, vec, short in [
+    ("Total (house and land)", "v111955442", "Total"),
+    ("House only",             "v111955443", "House only"),
+    ("Land only",              "v111955444", "Land only"),
+]:
+    rows_to_append.append(("Housing and households", "monthly", "nhpi",
+                           "New housing price index", "18-10-0205-01",
+                           "Price type", price_type, "", "",
+                           vec, f"NHPI — {price_type}", short, FILL_GREY))
+
+# ── CATEGORY: Prices additions ─────────────────────────────────────────────────
+
+# ippi: Industrial Product Price Index (18-10-0265-01)
+IPPI_SERIES = [
+    ("Total IPPI",                                                          "Total IPPI",       "v1230995983"),
+    ("Total IPPI, excl. energy and petroleum products",                     "Excl. energy",     "v1230995984"),
+    ("Meat, fish and dairy products [P11]",                                 "Meat/fish/dairy",  "v1230995985"),
+    ("Fruit, vegetables, feed and other food products [P12]",               "Fruit/veg/feed",   "v1230995986"),
+    ("Chemicals and chemical products [P31]",                               "Chemicals",        "v1230995992"),
+    ("Lumber and other wood products [P41]",                                "Lumber/wood",      "v1230995994"),
+    ("Pulp and paper products [P42]",                                       "Pulp & paper",     "v1230995995"),
+    ("Energy and petroleum products [P51]",                                 "Energy/petroleum", "v1230995996"),
+    ("Primary ferrous metal products [P61]",                                "Ferrous metals",   "v1230995997"),
+    ("Primary non-ferrous metal products [P62]",                            "Non-ferrous metals","v1230995998"),
+    ("Fabricated metal products and construction materials [P63]",          "Fab metals/constr","v1230995999"),
+    ("Motorized and recreational vehicles [P71]",                           "Motor vehicles",   "v1230996000"),
+    ("Machinery and equipment [P72]",                                       "Machinery/equip.", "v1230996001"),
+    ("Electrical, electronic and telecom products [P73]",                   "Electrical/elec.", "v1230996002"),
+    ("Cement, glass, and other non-metallic mineral products [P81]",        "Cement/glass",     "v1230996004"),
+]
+for prod_name, short, vec in IPPI_SERIES:
+    rows_to_append.append(("Prices", "monthly", "ippi",
+                           "IPPI (industrial product prices)", "18-10-0265-01",
+                           "Product group", prod_name, "", "",
+                           vec, f"IPPI — {prod_name}", short, FILL_GREY))
+
+# rmpi: Raw Materials Price Index (18-10-0268-01)
+RMPI_SERIES = [
+    ("Total RMPI",                                  "Total RMPI",       "v1230998135"),
+    ("Crude energy products [M51]",                 "Crude energy",     "v1230998136"),
+    ("  Crude oil and bitumen",                     "Crude oil/bitumen","v1230998137"),
+    ("  Natural gas",                               "Natural gas",      "v1230998141"),
+    ("Total, excluding crude energy products",      "Excl. crude energy","v1230998148"),
+    ("Crop products [M11]",                         "Crop products",    "v1230998149"),
+    ("  Wheat",                                     "Wheat",            "v1230998150"),
+    ("  Canola",                                    "Canola",           "v1230998151"),
+    ("Animals and animal products [M21]",           "Animals/products", "v1230998165"),
+    ("Non-metallic minerals [M31]",                 "Non-metallic min.","v1230998177"),
+    ("Forestry products [M41]",                     "Forestry products","v1230998186"),
+    ("Metal ores, concentrates and scrap [M61]",    "Metal ores/scrap", "v1230998193"),
+]
+for mat_name, short, vec in RMPI_SERIES:
+    rows_to_append.append(("Prices", "monthly", "rmpi",
+                           "RMPI (raw materials prices)", "18-10-0268-01",
+                           "Material group", mat_name.strip(), "", "",
+                           vec, f"RMPI — {mat_name.strip()}", short, FILL_GREY))
+
+# ── CATEGORY: Government finance ───────────────────────────────────────────────
+
+GOVT_FIN_SERIES = [
+    ("Revenue",                      "Revenue",         "v52531053"),
+    ("Expense",                      "Expense",         "v52531064"),
+    ("Gross operating balance",      "Gross op. bal.",  "v52531073"),
+    ("Net operating balance",        "Net op. bal.",    "v52531074"),
+    ("Net lending or borrowing",     "Net lend/borrow", "v52531076"),
+    ("Total expenditure",            "Total expend.",   "v52531092"),
+]
+for item_name, short, vec in GOVT_FIN_SERIES:
+    rows_to_append.append(("Government finance", "quarterly", "fed_govt_ops",
+                           "Federal government operations", "10-10-0015-01",
+                           "Item", item_name, "", "",
+                           vec, f"Federal govt — {item_name}", short, FILL_WHITE))
+
+# ── CATEGORY: Energy ───────────────────────────────────────────────────────────
+
+# crude_oil: Supply and disposition of crude oil (25-10-0063-01)
+for measure, vec, short in [
+    ("Crude oil production (cubic metres)", "v107757044", "Production (m³)"),
+    ("Crude oil production (barrels)",      "v107757045", "Production (bbl)"),
+    ("Synthetic crude oil production (barrels)", "v107757061", "Synth. crude (bbl)"),
+]:
+    rows_to_append.append(("Energy", "monthly", "crude_oil",
+                           "Crude oil supply & disposition", "25-10-0063-01",
+                           "Measure", measure, "", "",
+                           vec, f"Crude oil — {measure}", short, FILL_GREY))
+
+# nat_gas: Supply and disposition of natural gas (25-10-0055-01)
+for measure, vec, short in [
+    ("Gross withdrawals (GJ)",       "v107638455", "Gross withdrawals"),
+    ("Marketable production (GJ)",   "v107638457", "Mktable production"),
+    ("Exports (GJ)",                 "v107638467", "Exports"),
+]:
+    rows_to_append.append(("Energy", "monthly", "nat_gas",
+                           "Natural gas supply & disposition", "25-10-0055-01",
+                           "Measure", measure, "", "",
+                           vec, f"Natural gas — {measure}", short, FILL_GREY))
+
+# ── CATEGORY: Agriculture ──────────────────────────────────────────────────────
+
+# farm_receipts: Farm cash receipts (32-10-0046-01) — Canada, quarterly
+FARM_RECEIPTS_SERIES = [
+    ("Total farm cash receipts",               "Total",              "v170328"),
+    ("Total crop receipts",                    "Total crops",        "v170329"),
+    ("  Wheat (except durum)",                 "Wheat",              "v170330"),
+    ("  Durum wheat",                          "Durum wheat",        "v170352"),
+    ("  Canola (including rapeseed)",           "Canola",             "v170334"),
+    ("  Soybeans",                             "Soybeans",           "v170335"),
+    ("  Corn for grain",                       "Corn",               "v170336"),
+    ("  Oats",                                 "Oats",               "v170363"),
+    ("  Barley",                               "Barley",             "v170365"),
+    ("  Lentils",                              "Lentils",            "v170349"),
+    ("  Dry peas",                             "Dry peas",           "v170353"),
+    ("  Fresh potatoes",                       "Potatoes",           "v170338"),
+    ("Total livestock and livestock product receipts", "Total livestock", "v170368"),
+    ("  Cattle",                               "Cattle",             "v170369"),
+    ("  Hogs",                                 "Hogs",               "v170380"),
+    ("  Unprocessed milk from bovine",         "Dairy milk",         "v170383"),
+    ("  Chickens for meat",                    "Chickens",           "v170384"),
+    ("  Eggs in shell",                        "Eggs",               "v170386"),
+    ("Total receipts from direct payments",    "Direct payments",    "v170387"),
+]
+for item_name, short, vec in FARM_RECEIPTS_SERIES:
+    rows_to_append.append(("Agriculture", "quarterly", "farm_receipts",
+                           "Farm cash receipts", "32-10-0046-01",
+                           "Type", item_name.strip(), "", "",
+                           vec, f"Farm cash receipts — {item_name.strip()}", short, FILL_WHITE))
+
+# crop_prod: Crop production, metric tonnes (32-10-0359-01) — Canada, annual
+CROP_PROD_SERIES = [
+    ("Wheat, all",      "Wheat (all)",   "v114995749"),
+    ("Wheat, spring",   "Wheat (spring)","v114995750"),
+    ("Wheat, durum",    "Wheat (durum)", "v115115187"),
+    ("Barley",          "Barley",        "v114995720"),
+    ("Oats",            "Oats",          "v114995738"),
+    ("Canola (rapeseed)","Canola",       "v114995727"),
+    ("Corn for grain",  "Corn",          "v114995731"),
+    ("Soybeans",        "Soybeans",      "v114995744"),
+    ("Lentils",         "Lentils",       "v114995735"),
+    ("Peas, dry",       "Dry peas",      "v114995739"),
+    ("Flaxseed",        "Flaxseed",      "v114995734"),
+    ("Mustard seed",    "Mustard seed",  "v114995737"),
+    ("Chick peas",      "Chick peas",    "v114995729"),
+]
+for crop_name, short, vec in CROP_PROD_SERIES:
+    rows_to_append.append(("Agriculture", "annual", "crop_prod",
+                           "Crop production (metric tonnes)", "32-10-0359-01",
+                           "Crop", crop_name, "", "",
+                           vec, f"Crop production — {crop_name}", short, FILL_WHITE))
+
+# ── CATEGORY: International additions ─────────────────────────────────────────
+
+# curr_acct: Current account balance, SA (36-10-0018-01) — quarterly
+CURR_ACCT_SERIES = [
+    ("Total current account",  "Balance", "Total CA",       "v61915304"),
+    ("Goods and services",     "Balance", "Goods & svcs",   "v61915305"),
+    ("  Goods",                "Balance", "Goods",          "v61915306"),
+    ("  Services",             "Balance", "Services",       "v61915308"),
+    ("Primary income",         "Balance", "Primary income", "v61915313"),
+    ("Secondary income",       "Balance", "Secondary inc.", "v61915327"),
+    ("Total current account",  "Receipts","Receipts",       "v61915244"),
+    ("Total current account",  "Payments","Payments",       "v61915273"),
+]
+for comp, flow, short, vec in CURR_ACCT_SERIES:
+    fl = f"Current account (SA) — {comp.strip()}, {flow}"
+    rows_to_append.append(("International securities", "quarterly", "curr_acct",
+                           "Current account balance (SA)", "36-10-0018-01",
+                           "Component", comp.strip(), "Flow", flow,
+                           vec, fl, short, FILL_GREY))
+
+# fdi: Foreign direct investment flows (36-10-0025-01) — quarterly
+FDI_SERIES = [
+    ("Canadian direct investment abroad", "All countries",    "CDI abroad (all)",  "v61913911"),
+    ("Canadian direct investment abroad", "United States",    "CDI abroad (US)",   "v61913915"),
+    ("Foreign direct investment in Canada","All countries",   "FDI in Canada (all)","v61913923"),
+    ("Foreign direct investment in Canada","United States",   "FDI in Canada (US)","v61913927"),
+]
+for direction, country, short, vec in FDI_SERIES:
+    fl = f"FDI — {direction}, {country}"
+    rows_to_append.append(("International securities", "quarterly", "fdi_flows",
+                           "Foreign direct investment flows", "36-10-0025-01",
+                           "Direction", direction, "Countries", country,
+                           vec, fl, short, FILL_GREY))
+
 # ── Write all rows to the worksheet ──────────────────────────────────────────
 current_row = start_row
 for row_data in rows_to_append:
