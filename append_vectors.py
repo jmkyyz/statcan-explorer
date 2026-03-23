@@ -154,7 +154,7 @@ mfg_real_rows = [
     ("Miscellaneous manufacturing", 123263938, "Real manufacturing sales: Miscellaneous", "Miscellaneous"),
 ]
 for d1v, vec, fl, sl in mfg_real_rows:
-    rows_to_append.append(("Sales", "monthly", "mfg_real", "Real manufacturing sales (2017$, SA)", "16-10-0013-01", "Industry", d1v, "", "", str(vec), fl, sl, FILL_WHITE))
+    rows_to_append.append(("Business and industry", "monthly", "mfg_real", "Real manufacturing sales (2017$, SA)", "16-10-0013-01", "Industry", d1v, "", "", str(vec), fl, sl, FILL_WHITE))
 
 # mfg_nom: 44 rows (2 adjustments × 22 industries)
 mfg_nom_industries = [
@@ -186,11 +186,11 @@ mfg_sa_vecs = [800450, 800452, 800453, 800454, 800455, 1745922, 800457, 800458, 
 
 for i, ((ind_name, ind_short), uv) in enumerate(zip(mfg_nom_industries, mfg_unadj_vecs)):
     fl = f"Unadjusted - {ind_name}"
-    rows_to_append.append(("Sales", "monthly", "mfg_nom", "Manufacturing sales by industry", "16-10-0047-01", "Adjustment", "Unadjusted", "Industry", ind_name, str(uv), fl, ind_short, FILL_WHITE))
+    rows_to_append.append(("Business and industry", "monthly", "mfg_nom", "Manufacturing sales by industry", "16-10-0047-01", "Adjustment", "Unadjusted", "Industry", ind_name, str(uv), fl, ind_short, FILL_WHITE))
 
 for i, ((ind_name, ind_short), sv) in enumerate(zip(mfg_nom_industries, mfg_sa_vecs)):
     fl = f"Seasonally adjusted - {ind_name}"
-    rows_to_append.append(("Sales", "monthly", "mfg_nom", "Manufacturing sales by industry", "16-10-0047-01", "Adjustment", "Seasonally adjusted", "Industry", ind_name, str(sv), fl, ind_short, FILL_WHITE))
+    rows_to_append.append(("Business and industry", "monthly", "mfg_nom", "Manufacturing sales by industry", "16-10-0047-01", "Adjustment", "Seasonally adjusted", "Industry", ind_name, str(sv), fl, ind_short, FILL_WHITE))
 
 # mv_vehicle: 3 rows
 mv_vehicle_rows = [
