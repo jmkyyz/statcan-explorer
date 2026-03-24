@@ -1614,21 +1614,79 @@ for mat_name, short, vec in RMPI_SERIES:
                            "Material group", mat_name.strip(), "", "",
                            vec, f"RMPI — {mat_name.strip()}", short, FILL_GREY))
 
-# ── CATEGORY: Government finance ───────────────────────────────────────────────
+# ── CATEGORY: Federal government finances ──────────────────────────────────────
+# fed_govt_ops: Federal government operations (10-10-0015-01), quarterly, dims=3
+# Structure: (group, sub_group, item, vector, short)
+# - group==sub_group==item → leaf at group level (auto-add)
+# - sub_group==item → leaf at sub_group level (auto-add after dim2)
+# - all different → show full 3-level cascade
 
-GOVT_FIN_SERIES = [
-    ("Revenue",                      "Revenue",         "v52531053"),
-    ("Expense",                      "Expense",         "v52531064"),
-    ("Gross operating balance",      "Gross op. bal.",  "v52531073"),
-    ("Net operating balance",        "Net op. bal.",    "v52531074"),
-    ("Net lending or borrowing",     "Net lend/borrow", "v52531076"),
-    ("Total expenditure",            "Total expend.",   "v52531092"),
+GOVT_FIN_ROWS = [
+    # ── Revenue ──────────────────────────────────────────────────────────────
+    ("Revenue",                             "Revenue",                              "Revenue",                                              "v52531053", "Revenue"),
+    ("Revenue",                             "Taxes",                                "Taxes",                                                "v52531054", "Taxes (total)"),
+    ("Revenue",                             "Taxes",                                "Taxes on income, profits, and capital gains",           "v52531055", "Income/profits/CG"),
+    ("Revenue",                             "Taxes",                                "Taxes on payroll and workforce",                        "v52531056", "Payroll tax"),
+    ("Revenue",                             "Taxes",                                "Taxes on property",                                     "v52531057", "Property tax"),
+    ("Revenue",                             "Taxes",                                "Taxes on goods and services",                           "v52531058", "Goods & services tax"),
+    ("Revenue",                             "Taxes",                                "Taxes on international trade and transactions",         "v52531059", "Trade & transactions tax"),
+    ("Revenue",                             "Taxes",                                "Other taxes",                                           "v52531060", "Other taxes"),
+    ("Revenue",                             "Social contributions",                 "Social contributions",                                  "v52531061", "Social contributions"),
+    ("Revenue",                             "Grants",                               "Grants, revenue",                                       "v52531062", "Grants (revenue)"),
+    ("Revenue",                             "Other revenue",                        "Other revenue",                                         "v52531063", "Other revenue"),
+    # ── Expense ───────────────────────────────────────────────────────────────
+    ("Expense",                             "Expense",                              "Expense",                                               "v52531064", "Expense"),
+    ("Expense",                             "Compensation of employees",            "Compensation of employees",                             "v52531065", "Compensation"),
+    ("Expense",                             "Use of goods and services",            "Use of goods and services",                             "v52531066", "Use of goods/services"),
+    ("Expense",                             "Consumption of fixed capital",         "Consumption of fixed capital",                          "v52531067", "Fixed capital consumption"),
+    ("Expense",                             "Interest",                             "Interest",                                              "v52531068", "Interest"),
+    ("Expense",                             "Subsidies",                            "Subsidies",                                             "v52531069", "Subsidies"),
+    ("Expense",                             "Grants",                               "Grants, expense",                                       "v52531070", "Grants (expense)"),
+    ("Expense",                             "Social benefits",                      "Social benefits",                                       "v52531071", "Social benefits"),
+    ("Expense",                             "Other expense",                        "Other expense",                                         "v52531072", "Other expense"),
+    # ── Operating balances & net position ────────────────────────────────────
+    ("Operating balance",                   "Gross operating balance",              "Gross operating balance",                               "v52531073", "Gross op. balance"),
+    ("Operating balance",                   "Net operating balance",                "Net operating balance",                                 "v52531074", "Net op. balance"),
+    ("Operating balance",                   "Net acq. of non-financial assets",     "Net acquisition of non-financial assets",               "v52531075", "Net acq. non-fin."),
+    ("Operating balance",                   "Net lending or borrowing",             "Net lending or borrowing",                              "v52531076", "Net lend./borrow."),
+    ("Operating balance",                   "Statistical discrepancy",              "Statistical discrepancy",                               "v52531091", "Stat. discrepancy"),
+    ("Operating balance",                   "Total expenditure",                    "Total expenditure",                                     "v52531092", "Total expenditure"),
+    # ── Net acquisition of financial assets ──────────────────────────────────
+    ("Financial assets (net flows)",        "Net acquisition of financial assets",  "Net acquisition of financial assets",                   "v52531077", "Net acq. fin. assets"),
+    ("Financial assets (net flows)",        "Net acquisition of financial assets",  "Monetary gold and SDRs",                                "v1563966088","Gold and SDRs"),
+    ("Financial assets (net flows)",        "Net acquisition of financial assets",  "Currency and deposits",                                 "v52531078", "Currency/deposits"),
+    ("Financial assets (net flows)",        "Net acquisition of financial assets",  "Debt securities",                                       "v52531079", "Debt securities"),
+    ("Financial assets (net flows)",        "Net acquisition of financial assets",  "Loans",                                                 "v52531080", "Loans"),
+    ("Financial assets (net flows)",        "Net acquisition of financial assets",  "Equity and investment fund shares",                     "v52531081", "Equity/fund shares"),
+    ("Financial assets (net flows)",        "Net acquisition of financial assets",  "Insurance and pension schemes",                         "v52531082", "Insurance/pensions"),
+    ("Financial assets (net flows)",        "Net acquisition of financial assets",  "Other accounts receivable",                             "v52531083", "Other receivable"),
+    # ── Net incurrence of liabilities ────────────────────────────────────────
+    ("Liabilities (net flows)",             "Net incurrence of liabilities",        "Net incurrence of liabilities",                         "v52531084", "Net incurrence liab."),
+    ("Liabilities (net flows)",             "Net incurrence of liabilities",        "Special drawing rights",                                "v1563966089","SDRs"),
+    ("Liabilities (net flows)",             "Net incurrence of liabilities",        "Currency and deposits",                                 "v52531085", "Currency/deposits"),
+    ("Liabilities (net flows)",             "Net incurrence of liabilities",        "Debt securities",                                       "v52531086", "Debt securities"),
+    ("Liabilities (net flows)",             "Net incurrence of liabilities",        "Loans",                                                 "v52531087", "Loans"),
+    ("Liabilities (net flows)",             "Net incurrence of liabilities",        "Equity and investment fund shares",                     "v52531088", "Equity/fund shares"),
+    ("Liabilities (net flows)",             "Net incurrence of liabilities",        "Insurance and pension schemes",                         "v52531089", "Insurance/pensions"),
+    ("Liabilities (net flows)",             "Net incurrence of liabilities",        "Other accounts payable",                                "v52531090", "Other payable"),
+    # ── Balance sheet ─────────────────────────────────────────────────────────
+    ("Balance sheet",                       "Net worth",                            "Net worth",                                             "v52531093", "Net worth"),
+    ("Balance sheet",                       "Net financial worth",                  "Net financial worth",                                   "v52531109", "Net financial worth"),
+    ("Balance sheet",                       "Non-financial assets",                 "Non-financial assets",                                  "v52531094", "Non-financial assets"),
+    ("Balance sheet",                       "Financial assets",                     "Financial assets",                                      "v52531095", "Financial assets"),
+    ("Balance sheet",                       "Liabilities",                          "Liabilities",                                           "v52531102", "Liabilities"),
 ]
-for item_name, short, vec in GOVT_FIN_SERIES:
-    rows_to_append.append(("Government finance", "quarterly", "fed_govt_ops",
+for group, sub, item, vec, short in GOVT_FIN_ROWS:
+    if group == sub == item:
+        fl = f"Federal govt — {item}"
+    elif sub == item:
+        fl = f"Federal govt — {group} / {item}"
+    else:
+        fl = f"Federal govt — {group} / {sub} / {item}"
+    rows_to_append.append(("Federal government finances", "quarterly", "fed_govt_ops",
                            "Federal government operations", "10-10-0015-01",
-                           "Item", item_name, "", "",
-                           vec, f"Federal govt — {item_name}", short, FILL_WHITE))
+                           "Group", group, "Sub-group", sub, "Item", item,
+                           vec, fl, short, FILL_WHITE))
 
 # ── CATEGORY: Energy ───────────────────────────────────────────────────────────
 
