@@ -10,15 +10,15 @@
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap');
 
   :root {
-    --bg: #f7f8fa;
-    --surface: #ffffff;
-    --surface2: #f0f2f5;
-    --border: #e1e4e8;
+    --bg: #f0ead6;
+    --surface: #faf7ee;
+    --surface2: #e6dfc8;
+    --border: #d0c8a8;
     --accent: #2563eb;
     --accent2: #1d4ed8;
     --accent3: #dc2626;
-    --text: #111827;
-    --muted: #6b7280;
+    --text: #2a2010;
+    --muted: #7d7060;
     --success: #16a34a;
     --lab: #7c3aed;
   }
@@ -354,8 +354,8 @@
     transition: background 0.15s, border-color 0.15s;
     white-space: nowrap;
   }
-  .formula-preset:hover { background: #e8edfa; border-color: var(--accent); color: var(--accent); }
-  .formula-active { background: #dbeafe !important; border-color: var(--accent) !important; color: var(--accent) !important; }
+  .formula-preset:hover { background: #e0d8c0; border-color: var(--accent); color: var(--accent); }
+  .formula-active { background: #d8d0b8 !important; border-color: var(--accent) !important; color: var(--accent) !important; }
   .formula-hint { font-size: 11px; color: var(--muted); margin-top: 4px; height: 14px; transition: opacity 0.15s; }
 
   .spinner {
@@ -1758,11 +1758,11 @@ function renderChart() {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: {
-          labels: { color: '#111827', font: { family: 'DM Sans', size: 12 }, boxWidth: 12, padding: 14 }
+          labels: { color: '#2a2010', font: { family: 'DM Sans', size: 12 }, boxWidth: 12, padding: 14 }
         },
         tooltip: {
-          backgroundColor: '#ffffff', borderColor: '#e1e4e8', borderWidth: 1,
-          titleColor: '#6b7280', bodyColor: '#111827',
+          backgroundColor: '#faf7ee', borderColor: '#d0c8a8', borderWidth: 1,
+          titleColor: '#7d7060', bodyColor: '#2a2010',
           titleFont: { family: 'DM Sans', size: 12 }, bodyFont: { family: 'DM Sans', size: 12 },
           callbacks: {
             label: ctx => {
@@ -1782,14 +1782,14 @@ function renderChart() {
       scales: {
         x: {
           stacked: isStacked,
-          ticks: { color: '#6b7280', font: { family: 'DM Sans', size: 10 }, maxRotation: 45, callback: (_, i) => xLabels[i] },
+          ticks: { color: '#7d7060', font: { family: 'DM Sans', size: 10 }, maxRotation: 45, callback: (_, i) => xLabels[i] },
           grid: { color: 'rgba(0,0,0,0.07)' }
         },
         y: {
           stacked: isStacked,
-          title: { display: !!yAxisUnit, text: yAxisUnit, color: '#6b7280', font: { family: 'DM Sans', size: 11 }, padding: { bottom: 4 } },
+          title: { display: !!yAxisUnit, text: yAxisUnit, color: '#7d7060', font: { family: 'DM Sans', size: 11 }, padding: { bottom: 4 } },
           ticks: {
-            color: '#6b7280', font: { family: 'DM Sans', size: 11 },
+            color: '#7d7060', font: { family: 'DM Sans', size: 11 },
             callback: v => {
               const sfx = isPct ? '%' : '';
               if (!isPct && Math.abs(v) >= 1e12) return (v / 1e12).toFixed(1) + 'T';

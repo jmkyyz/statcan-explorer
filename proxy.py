@@ -177,7 +177,7 @@ def get_series():
     def _fetch_info():
         r = requests.post(
             f"{STATCAN_BASE}/getSeriesInfoFromVector",
-            json=info_payload, timeout=25,
+            json=info_payload, timeout=45,
             headers={"Content-Type": "application/json"},
         )
         r.raise_for_status()
@@ -186,7 +186,7 @@ def get_series():
     def _fetch_data():
         r = requests.post(
             f"{STATCAN_BASE}/getDataFromVectorsAndLatestNPeriods",
-            json=data_payload, timeout=35,
+            json=data_payload, timeout=60,
             headers={"Content-Type": "application/json"},
         )
         r.raise_for_status()
