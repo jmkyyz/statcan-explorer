@@ -10,15 +10,15 @@
   @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap');
 
   :root {
-    --bg: #f7f8fa;
-    --surface: #ffffff;
-    --surface2: #f0f2f5;
-    --border: #e1e4e8;
+    --bg: #f0ead6;
+    --surface: #faf7ee;
+    --surface2: #e6dfc8;
+    --border: #d0c8a8;
     --accent: #2563eb;
     --accent2: #1d4ed8;
     --accent3: #dc2626;
-    --text: #111827;
-    --muted: #6b7280;
+    --text: #2a2010;
+    --muted: #7d7060;
     --success: #16a34a;
     --lab: #7c3aed;
   }
@@ -146,6 +146,14 @@
     background: var(--surface); color: var(--text);
     font-family: 'DM Sans', sans-serif; cursor: pointer; flex-shrink: 0;
   }
+  .apply-all-btn {
+    font-size: 10px; padding: 1px 6px; border-radius: 3px;
+    border: 1px solid var(--accent); color: var(--accent);
+    background: transparent; cursor: pointer; white-space: nowrap;
+    font-family: 'DM Sans', sans-serif; flex-shrink: 0;
+    transition: background 0.15s;
+  }
+  .apply-all-btn:hover { background: rgba(37,99,235,0.1); }
 
   .cansim-link {
     color: var(--muted);
@@ -354,8 +362,8 @@
     transition: background 0.15s, border-color 0.15s;
     white-space: nowrap;
   }
-  .formula-preset:hover { background: #e8edfa; border-color: var(--accent); color: var(--accent); }
-  .formula-active { background: #dbeafe !important; border-color: var(--accent) !important; color: var(--accent) !important; }
+  .formula-preset:hover { background: #e0d8c0; border-color: var(--accent); color: var(--accent); }
+  .formula-active { background: #d8d0b8 !important; border-color: var(--accent) !important; color: var(--accent) !important; }
   .formula-hint { font-size: 11px; color: var(--muted); margin-top: 4px; height: 14px; transition: opacity 0.15s; }
 
   .spinner {
@@ -668,6 +676,35 @@ const state = {
 let chartInst = null;
 
 // ═══════════════════════════════════════════════════════════
+// FRED — hardcoded U.S. series
+// ═══════════════════════════════════════════════════════════
+const FRED_SERIES = [
+  { id: 'fred_unrate',    name: 'Unemployment Rate (SA)',     chipLabel: 'Unemployment Rate SA (US)',    vectorId: 'UNRATE',    sourceFreq: 'monthly'   },
+  { id: 'fred_unratensa', name: 'Unemployment Rate (NSA)',    chipLabel: 'Unemployment Rate NSA (US)',   vectorId: 'UNRATENSA', sourceFreq: 'monthly'   },
+  { id: 'fred_payems',    name: 'Nonfarm Payrolls (SA)',      chipLabel: 'Nonfarm Payrolls SA (US)',     vectorId: 'PAYEMS',    sourceFreq: 'monthly'   },
+  { id: 'fred_paynsa',    name: 'Nonfarm Payrolls (NSA)',     chipLabel: 'Nonfarm Payrolls NSA (US)',    vectorId: 'PAYNSA',    sourceFreq: 'monthly'   },
+  { id: 'fred_cpiaucsl',  name: 'CPI All Items (SA)',         chipLabel: 'CPI All Items SA (US)',        vectorId: 'CPIAUCSL',  sourceFreq: 'monthly'   },
+  { id: 'fred_cpiaucns',  name: 'CPI All Items (NSA)',        chipLabel: 'CPI All Items NSA (US)',       vectorId: 'CPIAUCNS',  sourceFreq: 'monthly'   },
+  { id: 'fred_gdp',       name: 'GDP (Nominal)',              chipLabel: 'GDP Nominal (US)',             vectorId: 'GDP',       sourceFreq: 'quarterly' },
+  { id: 'fred_gdpc1',     name: 'Real GDP',                  chipLabel: 'Real GDP (US)',                vectorId: 'GDPC1',     sourceFreq: 'quarterly' },
+];
+
+function injectFredCategory() {
+  const catId = 'united_states';
+  CATEGORIES[catId] = {
+    id: catId, label: '🇺🇸 United States', sourceFreq: 'monthly',
+    series: FRED_SERIES.map(s => ({ id: s.id, name: s.name, tableId: 'FRED', dims: 0 })),
+  };
+  FRED_SERIES.forEach(s => {
+    SERIES_MAP[s.id] = {
+      id: s.id, name: s.name, chipLabel: s.chipLabel,
+      category: '🇺🇸 United States', vectorId: s.vectorId,
+      tableId: 'FRED', sourceFreq: s.sourceFreq,
+    };
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
 // HELPERS
 // ═══════════════════════════════════════════════════════════
 function cansimUrl(tableId) {
@@ -812,6 +849,7 @@ function buildSeriesMap() {
       }
     }
   }
+  injectFredCategory();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -971,14 +1009,19 @@ function renderSeriesList() {
       <div style="flex:1;min-width:0;overflow:hidden;">
         <div class="chip-name" data-full="${label}">${label}</div>
         <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;margin-bottom:3px;">${s.category || ''}</div>
-        <div style="display:flex;align-items:center;gap:5px;">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
           <select class="chip-transform" onclick="event.stopPropagation()"
                   onchange="setSeriesTransform('${sid}', this.value)">${tOpts}</select>
+          <button class="apply-all-btn" data-sid="${sid}"
+                  onclick="event.stopPropagation();applyTransformToAll('${sid}')"
+                  style="display:none">Apply to all</button>
           ${uomTag}
         </div>
       </div>
-      <a href="${cansimUrl(s.tableId)}" target="_blank" class="cansim-link"
-         onclick="event.stopPropagation()" title="View table ${s.tableId} on StatCan" style="margin-top:1px;">↗</a>
+      <a href="${s.tableId === 'FRED' ? `https://fred.stlouisfed.org/series/${s.vectorId}` : cansimUrl(s.tableId)}"
+         target="_blank" class="cansim-link" onclick="event.stopPropagation()"
+         title="${s.tableId === 'FRED' ? `View ${s.vectorId} on FRED` : `View table ${s.tableId} on StatCan`}"
+         style="margin-top:1px;">↗</a>
       <span class="chip-remove" onclick="removeSeries('${sid}')" title="Remove">×</span>
     </div>`;
   }).join('');
@@ -1310,6 +1353,20 @@ function updateEmptyState() {
 function setSeriesTransform(sid, t) {
   state.seriesTransforms[sid] = t;
   updateFormulaWarn();
+  if (state.activeSeries.length > 1) {
+    document.querySelectorAll('.apply-all-btn').forEach(btn => {
+      btn.style.display = btn.dataset.sid === sid ? '' : 'none';
+    });
+  }
+  if (Object.keys(state.rawData).length) applyAndRender();
+}
+
+function applyTransformToAll(sid) {
+  const t = state.seriesTransforms[sid] || 'level';
+  state.activeSeries.forEach(s => { state.seriesTransforms[s] = t; });
+  document.querySelectorAll('.chip-transform').forEach(sel => { sel.value = t; });
+  document.querySelectorAll('.apply-all-btn').forEach(btn => { btn.style.display = 'none'; });
+  updateFormulaWarn();
   if (Object.keys(state.rawData).length) applyAndRender();
 }
 
@@ -1414,8 +1471,9 @@ async function fetchData() {
   const { fromDate, toDate } = computeDateRange();
 
   const seriesMeta   = state.activeSeries.map(sid => SERIES_MAP[sid]).filter(Boolean);
-  const statcanMeta  = seriesMeta.filter(sm => sm.tableId !== 'BOC');
+  const statcanMeta  = seriesMeta.filter(sm => sm.tableId !== 'BOC' && sm.tableId !== 'FRED');
   const bocMeta      = seriesMeta.filter(sm => sm.tableId === 'BOC');
+  const fredMeta     = seriesMeta.filter(sm => sm.tableId === 'FRED');
 
   setLoading(true);
   toast('Fetching data…', 'info');
@@ -1470,6 +1528,27 @@ async function fetchData() {
         if (s.error) { toast(`${sm.vectorId}: ${s.error}`, 'error'); return; }
         state.rawData[sm.id]     = s.data;
         state.seriesUnits[sm.id] = { uom: s.uom || 'percent', uomCode: 0 };
+      });
+    }
+
+    // ── FRED fetch ────────────────────────────────────────────────────────
+    if (fredMeta.length) {
+      const fredSeries = fredMeta.map(s => s.vectorId).join(',');
+      const fredUrl    = `${PROXY_URL}/api/fred?series=${encodeURIComponent(fredSeries)}`
+                       + `&fromDate=${fromDate}&toDate=${toDate}`;
+      const fredResp   = await fetch(fredUrl);
+      if (!fredResp.ok) {
+        const err = await fredResp.json().catch(() => ({}));
+        throw new Error(err.error || `FRED API error: HTTP ${fredResp.status}`);
+      }
+      const fredJson  = await fredResp.json();
+      const fredByVec = {};
+      fredJson.series.forEach(s => { fredByVec[s.vectorId] = s; });
+      fredMeta.forEach(sm => {
+        const s = fredByVec[sm.vectorId];
+        if (!s) return;
+        state.rawData[sm.id]     = s.data;
+        state.seriesUnits[sm.id] = { uom: s.uom || '', uomCode: 0 };
       });
     }
 
@@ -1663,7 +1742,9 @@ function applyAndRender() {
   if (tables.length) {
     srcEl.style.display = '';
     srcEl.innerHTML = 'Source: ' + tables
-      .map(t => `<a href="${cansimUrl(t)}" target="_blank">CANSIM ${t} ↗</a>`)
+      .map(t => t === 'FRED'
+        ? `<a href="https://fred.stlouisfed.org" target="_blank">FRED ↗</a>`
+        : `<a href="${cansimUrl(t)}" target="_blank">CANSIM ${t} ↗</a>`)
       .join(' · ');
   } else {
     srcEl.style.display = 'none';
@@ -1758,11 +1839,11 @@ function renderChart() {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: {
-          labels: { color: '#111827', font: { family: 'DM Sans', size: 12 }, boxWidth: 12, padding: 14 }
+          labels: { color: '#2a2010', font: { family: 'DM Sans', size: 12 }, boxWidth: 12, padding: 14 }
         },
         tooltip: {
-          backgroundColor: '#ffffff', borderColor: '#e1e4e8', borderWidth: 1,
-          titleColor: '#6b7280', bodyColor: '#111827',
+          backgroundColor: '#faf7ee', borderColor: '#d0c8a8', borderWidth: 1,
+          titleColor: '#7d7060', bodyColor: '#2a2010',
           titleFont: { family: 'DM Sans', size: 12 }, bodyFont: { family: 'DM Sans', size: 12 },
           callbacks: {
             label: ctx => {
@@ -1782,14 +1863,14 @@ function renderChart() {
       scales: {
         x: {
           stacked: isStacked,
-          ticks: { color: '#6b7280', font: { family: 'DM Sans', size: 10 }, maxRotation: 45, callback: (_, i) => xLabels[i] },
+          ticks: { color: '#7d7060', font: { family: 'DM Sans', size: 10 }, maxRotation: 45, callback: (_, i) => xLabels[i] },
           grid: { color: 'rgba(0,0,0,0.07)' }
         },
         y: {
           stacked: isStacked,
-          title: { display: !!yAxisUnit, text: yAxisUnit, color: '#6b7280', font: { family: 'DM Sans', size: 11 }, padding: { bottom: 4 } },
+          title: { display: !!yAxisUnit, text: yAxisUnit, color: '#7d7060', font: { family: 'DM Sans', size: 11 }, padding: { bottom: 4 } },
           ticks: {
-            color: '#6b7280', font: { family: 'DM Sans', size: 11 },
+            color: '#7d7060', font: { family: 'DM Sans', size: 11 },
             callback: v => {
               const sfx = isPct ? '%' : '';
               if (!isPct && Math.abs(v) >= 1e12) return (v / 1e12).toFixed(1) + 'T';

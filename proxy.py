@@ -19,6 +19,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, date
 
 import requests
+from dotenv import load_dotenv
+load_dotenv()
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -487,6 +489,80 @@ def get_boc_series():
             "frequencyCode": 6,
             "uom":           "percent",
             "data":          data_points,
+        })
+
+    return jsonify({"series": results})
+
+
+# ---------------------------------------------------------------------------
+# Route: GET /api/fred
+# Query params:
+#   series   – comma-separated FRED series IDs, e.g. "UNRATE,PAYEMS"
+#   fromDate – ISO date string YYYY-MM-DD
+#   toDate   – ISO date string YYYY-MM-DD
+# ---------------------------------------------------------------------------
+@app.route("/api/fred")
+def get_fred():
+    series_raw = request.args.get("series", "")
+    from_date  = request.args.get("fromDate", "")
+    to_date    = request.args.get("toDate",   "")
+
+    api_key = os.environ.get("FRED_API_KEY", "")
+    if not api_key:
+        return jsonify({"error": "FRED_API_KEY not configured on server"}), 503
+
+    ids = [s.strip() for s in series_raw.split(",") if s.strip()]
+    if not ids:
+        return jsonify({"error": "No series specified"}), 400
+
+    def _fred_label(date_str, freq):
+        d = datetime.strptime(date_str, "%Y-%m-%d")
+        if freq == "quarterly":
+            q = (d.month - 1) // 3 + 1
+            return f"{d.year} Q{q}"
+        return f"{d.year}-{d.month:02d}"
+
+    results = []
+    for sid in ids:
+        params = {"series_id": sid, "api_key": api_key, "file_type": "json"}
+        if from_date:
+            params["observation_start"] = from_date
+        if to_date:
+            params["observation_end"] = to_date
+        try:
+            r = requests.get(
+                "https://api.stlouisfed.org/fred/series/observations",
+                params=params, timeout=30,
+            )
+            r.raise_for_status()
+            data = r.json()
+        except requests.exceptions.Timeout:
+            return jsonify({"error": f"FRED timed out fetching {sid}"}), 504
+        except requests.exceptions.RequestException as exc:
+            return jsonify({"error": f"FRED API error: {exc}"}), 502
+
+        observations = [
+            obs for obs in data.get("observations", [])
+            if obs.get("value") not in (".", None, "")
+        ]
+
+        # Detect frequency from date gap between first two points
+        freq = "monthly"
+        if len(observations) >= 2:
+            d1 = datetime.strptime(observations[0]["date"], "%Y-%m-%d")
+            d2 = datetime.strptime(observations[1]["date"], "%Y-%m-%d")
+            if (d2.year - d1.year) * 12 + (d2.month - d1.month) >= 3:
+                freq = "quarterly"
+
+        results.append({
+            "vectorId":      sid,
+            "frequency":     "Quarterly" if freq == "quarterly" else "Monthly",
+            "frequencyCode": 9 if freq == "quarterly" else 12,
+            "uom":           "",
+            "data": [
+                {"date": obs["date"], "label": _fred_label(obs["date"], freq), "value": float(obs["value"])}
+                for obs in observations
+            ],
         })
 
     return jsonify({"series": results})
