@@ -406,6 +406,46 @@
   }
   .loaded-file button:hover { color: var(--accent3); }
 
+  /* ── Saved Configurations ── */
+  .saved-config-item {
+    display: flex; align-items: flex-start; gap: 7px;
+    padding: 7px 9px; border: 1px solid var(--border); border-radius: 5px;
+    background: var(--surface2); transition: border-color 0.15s;
+  }
+  .saved-config-item:hover { border-color: var(--muted); }
+  .saved-config-name {
+    font-size: 12px; color: var(--text); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; line-height: 1.4;
+  }
+  .saved-config-meta { font-size: 10px; color: var(--muted); line-height: 1.4; }
+  .btn-cfg-load {
+    flex-shrink: 0; font-size: 11px; padding: 2px 7px; height: 22px;
+    border-radius: 4px; border: 1px solid var(--accent); color: var(--accent);
+    background: transparent; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    transition: background 0.15s; white-space: nowrap; margin-top: 1px;
+  }
+  .btn-cfg-load:hover { background: rgba(37,99,235,0.1); }
+  .btn-cfg-delete {
+    flex-shrink: 0; background: none; border: none; cursor: pointer;
+    color: var(--muted); font-size: 15px; padding: 0 3px; border-radius: 3px;
+    transition: color 0.15s; line-height: 1; margin-top: 1px;
+  }
+  .btn-cfg-delete:hover { color: var(--accent3); }
+  .cfg-save-panel {
+    margin-top: 6px; padding: 9px 10px;
+    background: rgba(37,99,235,0.05); border: 1px dashed var(--accent);
+    border-radius: 5px; display: flex; flex-direction: column; gap: 7px;
+  }
+  .cfg-save-label { font-size: 11px; color: var(--accent); font-weight: 500; }
+  .btn-cfg-add {
+    width: 100%; margin-top: 5px; padding: 6px;
+    border: 1px solid var(--border); border-radius: 5px;
+    background: var(--surface2); color: var(--muted);
+    font-family: 'DM Sans', sans-serif; font-size: 12px;
+    cursor: pointer; transition: border-color 0.15s, color 0.15s;
+  }
+  .btn-cfg-add:hover { border-color: var(--accent); color: var(--accent); }
+
   ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
@@ -437,6 +477,7 @@
       <div id="loadErrorState" style="display:none;font-size:12px;color:#dc2626;padding:8px 2px;line-height:1.5"></div>
     </div>
 
+    <!-- ── Saved Configurations ── -->
     <!-- ── Category ── -->
     <div id="categorySection" style="display:none">
       <h3 class="section-label">Category</h3>
@@ -592,11 +633,27 @@
   </div><!-- /.sidebar-scroll -->
 
     <!-- ── Buttons (pinned) ── -->
-    <div id="btnSection" style="display:none;padding:12px 20px 20px;border-top:1px solid var(--border);flex-shrink:0;" class="btn-row">
-      <button class="btn btn-secondary" onclick="clearChart()" title="Clear chart and selections">✕ Clear</button>
-      <button class="btn btn-primary" id="fetchBtn" onclick="fetchData()">
-        <span id="fetchBtnText">↓ Fetch Data</span>
-      </button>
+    <div id="btnSection" style="display:none;padding:12px 20px 20px;border-top:1px solid var(--border);flex-shrink:0;">
+      <div id="cfgSavePanel" class="cfg-save-panel" style="display:none;margin-bottom:10px;">
+        <div class="cfg-save-label">↳ Name this configuration</div>
+        <input type="text" id="cfgSaveName" placeholder="e.g. Services share of exports"
+               style="font-size:12px"
+               onkeydown="if(event.key==='Enter')confirmSaveConfig();if(event.key==='Escape')cancelSaveConfig()">
+        <div style="display:flex;gap:5px">
+          <button onclick="confirmSaveConfig()"
+                  style="flex:1;padding:5px;border:none;border-radius:4px;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer">Save</button>
+          <button onclick="cancelSaveConfig()"
+                  style="padding:5px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer">Cancel</button>
+        </div>
+      </div>
+      <div id="cfgBookmarkMsg" style="display:none;margin-bottom:10px;"></div>
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="clearChart()" title="Clear chart and selections">✕ Clear</button>
+        <button class="btn btn-secondary" id="btnCfgAdd" onclick="startSaveConfig()" title="Save current configuration as a bookmark">💾 Save</button>
+        <button class="btn btn-primary" id="fetchBtn" onclick="fetchData()">
+          <span id="fetchBtnText">↓ Fetch Data</span>
+        </button>
+      </div>
     </div>
 
   </aside>
@@ -919,6 +976,9 @@ function activateUI(filename, count) {
   renderSeriesList();
   updateEmptyState();
   document.getElementById('chartTitle').textContent = 'Select a series to begin';
+
+  // Auto-restore config if the page was opened via a bookmarked URL
+  tryLoadFromUrl();
 }
 
 function resetFile() {
@@ -2161,6 +2221,163 @@ function applyFormula() {
   updateFormulaWarn();
   renderChart();
   renderTable();
+}
+
+// ═══════════════════════════════════════════════════════════
+// SAVED CONFIGURATIONS  (bookmark-based, no local list)
+// ═══════════════════════════════════════════════════════════
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function _encodeConfig(config) {
+  try { return btoa(unescape(encodeURIComponent(JSON.stringify(config)))); } catch(e) { return null; }
+}
+function _decodeConfig(str) {
+  try { return JSON.parse(decodeURIComponent(escape(atob(str)))); } catch(e) { return null; }
+}
+
+function showBookmarkPrompt(name) {
+  const msg = document.getElementById('cfgBookmarkMsg');
+  if (!msg) return;
+  const isMac = /mac/i.test(navigator.platform);
+  const key   = isMac ? '⌘D' : 'Ctrl+D';
+  msg.style.display = '';
+  msg.innerHTML = `<div style="font-size:11px;padding:8px 10px;background:rgba(22,163,74,0.08);border:1px solid rgba(22,163,74,0.3);border-radius:5px;color:var(--success);line-height:1.6;margin-top:6px">
+    ✓ Ready to bookmark as <strong>${escHtml(name)}</strong><br>
+    Press <strong>${key}</strong> to save it in Chrome — the name is pre-filled.
+  </div>`;
+  clearTimeout(showBookmarkPrompt._t);
+  showBookmarkPrompt._t = setTimeout(() => { msg.style.display = 'none'; }, 10000);
+}
+
+function startSaveConfig() {
+  if (!state.activeSeries.length) {
+    toast('Add at least one series before saving', 'error');
+    return;
+  }
+  document.getElementById('cfgSavePanel').style.display = '';
+  document.getElementById('cfgSaveName').value = '';
+  document.getElementById('btnCfgAdd').style.display = 'none';
+  document.getElementById('cfgSaveName').focus();
+}
+
+function cancelSaveConfig() {
+  document.getElementById('cfgSavePanel').style.display = 'none';
+  document.getElementById('btnCfgAdd').style.display = '';
+}
+
+function confirmSaveConfig() {
+  const name = document.getElementById('cfgSaveName').value.trim();
+  if (!name) {
+    toast('Please enter a name for this configuration', 'error');
+    document.getElementById('cfgSaveName').focus();
+    return;
+  }
+
+  const config = {
+    name,
+    savedAt:          new Date().toISOString(),
+    category:         state.category,
+    activeSeries:     [...state.activeSeries],
+    seriesTransforms: { ...state.seriesTransforms },
+    fromYear:         parseInt(document.getElementById('fromYear').value),
+    fromMonth:        parseInt(document.getElementById('fromMonth').value),
+    toYear:           parseInt(document.getElementById('toYear').value),
+    toMonth:          parseInt(document.getElementById('toMonth').value),
+    frequency:        document.getElementById('freqSelect').value,
+    formula:          state.formula,
+    chartType:        state.chartType,
+  };
+
+  const encoded = _encodeConfig(config);
+  if (encoded) {
+    window.history.replaceState(null, '', '#cfg=' + encoded);
+    document.title = 'StatCan Explorer — ' + name;
+    showBookmarkPrompt(name);
+  }
+  cancelSaveConfig();
+  toast(`"${name}" ready to bookmark ✓`, 'success');
+}
+
+function loadConfigObj(config) {
+  if (!Object.keys(CATEGORIES).length) {
+    toast('Series data not loaded yet — please wait', 'error');
+    return;
+  }
+  if (config.category && !CATEGORIES[config.category]) {
+    toast('Category not found in current series file — the config may need updating', 'error');
+    return;
+  }
+  const missing = (config.activeSeries || []).filter(sid => !SERIES_MAP[sid]);
+  if (missing.length) {
+    toast(`${missing.length} series not found in current data file`, 'error');
+    return;
+  }
+
+  // Restore state
+  state.category         = config.category;
+  state.activeSeries     = [...(config.activeSeries || [])];
+  state.seriesTransforms = { ...(config.seriesTransforms || {}) };
+  state.formula          = config.formula || '';
+  state.chartType        = config.chartType || 'line';
+  state.rawData          = {};
+  state.processedData    = {};
+  state.seriesUnits      = {};
+  state.formulaResult    = null;
+  state.autoUpdateTo     = false;
+
+  const fy = config.fromYear  || 2024, fm = config.fromMonth || 1;
+  const ty = config.toYear    || new Date().getFullYear(), tm = config.toMonth || 12;
+  state.fromYear = fy; state.fromMonth = fm;
+  state.toYear   = ty; state.toMonth   = tm;
+
+  // Update DOM controls
+  document.getElementById('categorySelect').value = config.category;
+  document.getElementById('fromYear').value   = fy;
+  document.getElementById('fromMonth').value  = fm;
+  document.getElementById('toYear').value     = ty;
+  document.getElementById('toMonth').value    = tm;
+  document.getElementById('freqSelect').value = config.frequency || 'original';
+  const fInp = document.getElementById('formulaInput');
+  if (fInp) {
+    fInp.value = config.formula || '';
+    document.querySelectorAll('.formula-preset').forEach(b =>
+      b.classList.toggle('formula-active', b.dataset.expr === (config.formula || '').toUpperCase()));
+  }
+
+  // Sync chart-type tabs
+  document.querySelectorAll('.tab').forEach(el =>
+    el.classList.toggle('active', el.dataset.chart === state.chartType));
+
+  // Re-render sidebar
+  updateFreqDropdown();
+  renderSeriesList();
+  hideDimPanel();
+  updateFormulaWarn();
+
+  // Reset chart area
+  if (chartInst) { chartInst.destroy(); chartInst = null; }
+  document.getElementById('chartEmpty').style.display  = 'flex';
+  document.getElementById('myChart').style.display     = 'none';
+  document.getElementById('tableWrap').style.display   = 'none';
+  document.getElementById('exportBtn').style.display   = 'none';
+  document.getElementById('toolbarSources').style.display = 'none';
+  document.getElementById('chartTitle').textContent    = `"${config.name}"`;
+  document.getElementById('statusDot').className = 'status-dot';
+  document.getElementById('chartEmpty').querySelector('p').textContent =
+    `${config.activeSeries.length} series selected — fetching latest data…`;
+}
+
+function tryLoadFromUrl() {
+  const hash = window.location.hash;
+  if (!hash.startsWith('#cfg=')) return;
+  const config = _decodeConfig(hash.slice(5));
+  if (!config || !Array.isArray(config.activeSeries)) return;
+  loadConfigObj(config);
+  fetchData();
 }
 
 // ═══════════════════════════════════════════════════════════
