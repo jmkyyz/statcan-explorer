@@ -40,6 +40,11 @@ def vectors_template():
     here = os.path.dirname(os.path.abspath(__file__))
     return send_from_directory(here, "vectors-template.xlsx")
 
+@app.route("/vectors.xlsx")
+def vectors():
+    here = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(here, "Vectors.xlsx")
+
 @app.route("/lab")
 def lab():
     here = os.path.dirname(os.path.abspath(__file__))
