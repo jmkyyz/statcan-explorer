@@ -52,6 +52,8 @@ def lab():
 
 STATCAN_BASE = "https://www150.statcan.gc.ca/t1/wds/rest"
 BOC_BASE     = "https://www.bankofcanada.ca/valet"
+CIMT_BASE    = "https://www150.statcan.gc.ca/t1/cimt/rest"
+CIMT_REF_BASE = "https://www150.statcan.gc.ca/n1/pub/71-607-x/2021004"
 
 # ---------------------------------------------------------------------------
 # Scalar factor multipliers (from StatCan codeset)
@@ -155,6 +157,7 @@ def get_series():
     from_year     = request.args.get("from",     type=int)
     to_year       = request.args.get("to",       type=int)
     n_periods     = request.args.get("periods",  default=360, type=int)
+    agg           = request.args.get("agg",      "")
 
     if not raw_vectors:
         return jsonify({"error": "No vectors specified"}), 400
@@ -308,6 +311,18 @@ def get_series():
 
             label = period_label(ref_per, freq_code or 6)
             data_points.append({"label": label, "date": ref_per[:10], "value": value})
+
+        # Aggregate daily → monthly sums when requested
+        if agg == "monthly_sum" and freq_code == 1:
+            monthly: dict[str, float] = {}
+            for dp in data_points:
+                mk = dp["date"][:7]          # "YYYY-MM"
+                monthly[mk] = monthly.get(mk, 0.0) + dp["value"]
+            data_points = [
+                {"label": mk, "date": mk + "-01", "value": v}
+                for mk, v in sorted(monthly.items())
+            ]
+            freq_code = 6                    # treat as monthly going forward
 
         results.append({
             "vectorId":        vector_id,
@@ -571,6 +586,151 @@ def get_fred():
         })
 
     return jsonify({"series": results})
+
+
+# ---------------------------------------------------------------------------
+# Route: GET /api/cimt
+# Query params:
+#   flow       – 0=exports, 1=imports
+#   province   – CIMT province ID (1=Canada, 10=NL, 11=PEI, 12=NS, 13=NB,
+#                24=QC, 35=ON, 46=MB, 47=SK, 48=AB, 59=BC)
+#   country    – CIMT country ID (1000=World, 9=US, etc.)
+#   hs4        – HS4 heading code (0=all, or 4-digit code like "0101")
+#   start_date – YYYY-MM-DD
+#   end_date   – YYYY-MM-DD
+# ---------------------------------------------------------------------------
+def _cimt_fetch_year(province, country, hs4, flow, year):
+    """Fetch one calendar year from the CIMT API; return list of trade records."""
+    url = (f"{CIMT_BASE}/getReport/({province})/{country}/100/{hs4}/0"
+           f"/150000/{flow}/0/{year}-01-01/{year}-12-01")
+    try:
+        r = requests.get(url, timeout=45)
+        r.raise_for_status()
+        data = r.json()
+        if "message" in data:
+            return []          # non-fatal: skip years with no data
+        return data.get("trade", [])
+    except Exception:
+        return []
+
+
+@app.route("/api/cimt")
+def get_cimt():
+    flow       = request.args.get("flow",       "0")
+    province   = request.args.get("province",   "1")
+    country    = request.args.get("country",    "1000")
+    hs4        = request.args.get("hs4",        "0")
+    start_date = request.args.get("start_date", "2020-01-01")
+    end_date   = request.args.get("end_date",   "2025-01-01")
+
+    try:
+        start_dt = datetime.strptime(start_date[:10], "%Y-%m-%d")
+        end_dt   = datetime.strptime(end_date[:10],   "%Y-%m-%d")
+    except ValueError:
+        return jsonify({"error": "Invalid start_date or end_date"}), 400
+
+    years = list(range(start_dt.year, end_dt.year + 1))
+
+    # For short ranges (≤3 years) try a single request first; fall back to
+    # per-year chunking if the CIMT API returns a system error.
+    def _single_fetch():
+        url = (f"{CIMT_BASE}/getReport/({province})/{country}/100/{hs4}/0"
+               f"/150000/{flow}/0/{start_date}/{end_date}")
+        r = requests.get(url, timeout=60)
+        r.raise_for_status()
+        data = r.json()
+        if "message" in data:
+            return None          # signal: fall back to chunking
+        return data.get("trade", [])
+
+    all_records = []
+
+    if len(years) <= 3:
+        try:
+            records = _single_fetch()
+            if records is not None:
+                all_records = records
+            else:
+                all_records = []
+        except Exception:
+            all_records = []
+
+    if not all_records and years:
+        # Chunk by year in parallel
+        with ThreadPoolExecutor(max_workers=min(8, len(years))) as pool:
+            futures = {
+                pool.submit(_cimt_fetch_year, province, country, hs4, flow, y): y
+                for y in years
+            }
+            for fut in as_completed(futures):
+                all_records.extend(fut.result())
+
+    if not all_records:
+        return jsonify({"error": "No data returned from CIMT API for this selection"}), 404
+
+    # Filter to requested date window and aggregate by month
+    start_mk = start_dt.strftime("%Y-%m")
+    end_mk   = end_dt.strftime("%Y-%m")
+    by_date: dict[str, float] = {}
+    for rec in all_records:
+        month_key = rec["T"][:7]   # "YYYY-MM"
+        if month_key < start_mk or month_key > end_mk:
+            continue
+        by_date[month_key] = by_date.get(month_key, 0.0) + (rec.get("V") or 0.0)
+
+    series = [
+        {"label": mk, "date": mk + "-01", "value": v}
+        for mk, v in sorted(by_date.items())
+    ]
+
+    return jsonify({
+        "series":        series,
+        "uom":           "dollars",
+        "frequency":     "Monthly",
+        "frequencyCode": 6,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Route: GET /api/cimt-ref
+# Returns HS4 headings and country list from the CIMT web app reference files.
+# Results are cached for the lifetime of the server process.
+# ---------------------------------------------------------------------------
+_cimt_ref_cache: dict | None = None
+
+@app.route("/api/cimt-ref")
+def get_cimt_ref():
+    global _cimt_ref_cache
+    if _cimt_ref_cache is not None:
+        return jsonify(_cimt_ref_cache)
+
+    try:
+        hs4_resp = requests.get(f"{CIMT_REF_BASE}/hs4F.js",       timeout=20)
+        cnt_resp = requests.get(f"{CIMT_REF_BASE}/countriesF.js",  timeout=20)
+        hs4_resp.raise_for_status()
+        cnt_resp.raise_for_status()
+    except requests.exceptions.RequestException as exc:
+        return jsonify({"error": f"Failed to fetch CIMT reference data: {exc}"}), 502
+
+    # hs4F.js format: {"HS": "0101", "EN": "Live horses...", "FR": "..."}
+    hs4_pairs  = re.findall(r'"HS":\s*"(\d+)"[^}]*?"EN":\s*"([^"]+)"', hs4_resp.text, re.S)
+    hs4_list   = [{"hs": h, "en": e} for h, e in hs4_pairs]
+
+    # countriesF.js format: {"id": 9, ..., "en": "United States..."}
+    # Exclude id=1 (Canada — not a trade partner in this context)
+    cnt_pairs   = re.findall(r'"id":\s*(\d+).*?"en":\s*"([^"]+)"', cnt_resp.text, re.S)
+    seen_ids: set[int] = set()
+    country_list = []
+    for raw_id, en in cnt_pairs:
+        cid = int(raw_id)
+        if cid == 1 or cid in seen_ids:
+            continue
+        seen_ids.add(cid)
+        country_list.append({"id": cid, "en": en})
+    country_list.sort(key=lambda x: x["en"])
+
+    _cimt_ref_cache = {"hs4": hs4_list, "countries": country_list}
+    return jsonify(_cimt_ref_cache)
 
 
 # ---------------------------------------------------------------------------

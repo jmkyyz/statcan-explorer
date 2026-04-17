@@ -7,3 +7,7 @@ venv/
 *.egg-info/
 dist/
 .DS_Store
+
+# Credentials — never commit these
+gmail_app_password.txt.rtf
+anthropic_api_key.txt.rtf
