@@ -201,6 +201,12 @@
 
   /* Table */
   .table-wrap { overflow-x: auto; }
+  .scroll-hint {
+    font-size: 11px;
+    color: var(--muted);
+    text-align: right;
+    margin-bottom: 6px;
+  }
   table {
     width: 100%;
     border-collapse: collapse;
@@ -441,10 +447,12 @@
     <!-- Communications table -->
     <div class="card">
       <h3>Communication records <span id="tableCountLabel" style="font-weight:400;color:var(--muted)"></span></h3>
+      <p class="scroll-hint">Scroll right to see all columns →</p>
       <div class="table-wrap">
         <table id="commsTable">
           <thead>
             <tr>
+              <th></th>
               <th>Date</th>
               <th>Client</th>
               <th>Lobbyist</th>
@@ -452,7 +460,6 @@
               <th>Institution(s)</th>
               <th>Subject(s)</th>
               <th>Type</th>
-              <th></th>
             </tr>
           </thead>
           <tbody id="commsBody"></tbody>
@@ -535,7 +542,12 @@ function destroyChart(id) {
 
 function makeBarChart(id, labels, data, horizontal = false) {
   destroyChart(id);
-  const ctx = document.getElementById(id).getContext("2d");
+  const canvas = document.getElementById(id);
+  // For horizontal charts, grow the container to fit all labels (≥28px per bar)
+  if (horizontal && labels.length > 0) {
+    canvas.parentElement.style.height = Math.max(180, labels.length * 30) + "px";
+  }
+  const ctx = canvas.getContext("2d");
   charts[id] = new Chart(ctx, {
     type: "bar",
     data: {
@@ -555,7 +567,10 @@ function makeBarChart(id, labels, data, horizontal = false) {
       plugins: { legend: { display: false } },
       scales: {
         x: { grid: { display: !horizontal }, ticks: { font: { size: 11 } } },
-        y: { grid: { display: horizontal  }, ticks: { font: { size: 11 } } },
+        y: {
+          grid: { display: horizontal },
+          ticks: { font: { size: 11 }, autoSkip: false },
+        },
       },
     },
   });
@@ -655,6 +670,7 @@ function renderTable(d) {
       .map(s => `<span class="tag green">${s}</span>`).join(" ");
 
     return `<tr>
+      <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/cmmLgPblcVw?comlogId=${r.comlog_id}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
       <td style="white-space:nowrap">${r.comm_date}</td>
       <td><strong>${r.client_name}</strong></td>
       <td>${r.lobbyist}</td>
@@ -662,7 +678,6 @@ function renderTable(d) {
       <td>${instList || "—"}</td>
       <td>${subjList || "—"}</td>
       <td style="white-space:nowrap;color:var(--muted)">${type}</td>
-      <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/cmmLgPblcVw?comlogId=${r.comlog_id}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
     </tr>`;
   }).join("");
 
