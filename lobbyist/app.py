@@ -305,7 +305,7 @@ def communications():
                 )                                        AS dpoh_names,
                 GROUP_CONCAT(DISTINCT d.institution)     AS institutions,
                 GROUP_CONCAT(DISTINCT st.description)    AS subjects,
-                GROUP_CONCAT(DISTINCT sd.detail_text, ' || ')  AS subject_details
+                GROUP_CONCAT(sd.detail_text, ' || ')           AS subject_details
             FROM filtered_ids fi
             JOIN communications c  ON c.comlog_id  = fi.comlog_id
             LEFT JOIN dpoh d       ON d.comlog_id  = fi.comlog_id
