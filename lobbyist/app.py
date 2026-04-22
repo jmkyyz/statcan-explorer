@@ -6,10 +6,12 @@ Flask server: serves the HTML frontend and query API backed by lobby.db.
 
 import os
 import sqlite3
+import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
 
-from flask import Flask, g, jsonify, request, send_from_directory
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -19,7 +21,7 @@ DB_PATH = Path(__file__).parent / "lobby.db"
 PORT = int(os.environ.get("PORT", 5002))
 
 
-# ── DB connection helpers ────────────────────────────────────────────────────
+# ── DB connection ────────────────────────────────────────────────────────────
 
 @contextmanager
 def get_db():
@@ -27,7 +29,6 @@ def get_db():
         raise RuntimeError("lobby.db not found — run build_db.py first")
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
-    con.execute("PRAGMA query_only = ON")
     try:
         yield con
     finally:
@@ -38,20 +39,40 @@ def rows_to_list(rows):
     return [dict(r) for r in rows]
 
 
+# ── Simple in-memory cache ───────────────────────────────────────────────────
+
+_cache: dict = {}
+_cache_lock = threading.Lock()
+CACHE_TTL = 1800  # 30 minutes
+
+
+def _cache_get(key: str):
+    with _cache_lock:
+        entry = _cache.get(key)
+        if entry and time.time() < entry["exp"]:
+            return entry["val"]
+    return None
+
+
+def _cache_set(key: str, val):
+    with _cache_lock:
+        _cache[key] = {"val": val, "exp": time.time() + CACHE_TTL}
+
+
 # ── Filter helpers ───────────────────────────────────────────────────────────
 
-def build_filtered_cte(params: dict):
+def build_filter_select(params: dict):
     """
-    Returns (cte_sql, bind_params) that produces a CTE called filtered_ids
-    containing the comlog_ids matching all active filters.
+    Returns (inner_sql, binds) — the SELECT DISTINCT comlog_id query
+    matching all active filters.  Used both for CTE and temp-table approaches.
     """
-    date_from  = (params.get("date_from") or "2014-01").strip()
-    date_to    = (params.get("date_to")   or "2099-12").strip()
-    client_q   = (params.get("client_q") or "").strip()
-    reg_type   = (params.get("reg_type") or "").strip()
+    date_from   = (params.get("date_from") or "2014-01").strip()
+    date_to     = (params.get("date_to")   or "2099-12").strip()
+    client_q    = (params.get("client_q")  or "").strip()
+    reg_type    = (params.get("reg_type")  or "").strip()
     institution = (params.get("institution") or "").strip()
-    subject    = (params.get("subject") or "").strip()
-    dpoh_q     = (params.get("dpoh_q") or "").strip()
+    subject     = (params.get("subject")   or "").strip()
+    dpoh_q      = (params.get("dpoh_q")    or "").strip()
 
     joins  = []
     wheres = ["c.comm_month BETWEEN ? AND ?"]
@@ -65,7 +86,6 @@ def build_filtered_cte(params: dict):
         wheres.append("c.reg_type = ?")
         binds.append(int(reg_type))
 
-    # Institution and DPOH filters both need the dpoh table joined once
     if institution or dpoh_q:
         joins.append("JOIN dpoh d ON c.comlog_id = d.comlog_id")
 
@@ -82,18 +102,17 @@ def build_filtered_cte(params: dict):
         wheres.append("s.subject_code = ?")
         binds.append(subject)
 
-    join_sql  = " ".join(joins)
-    where_sql = " AND ".join(wheres)
+    sql = (
+        f"SELECT DISTINCT c.comlog_id "
+        f"FROM communications c {' '.join(joins)} "
+        f"WHERE {' AND '.join(wheres)}"
+    )
+    return sql, binds
 
-    cte = f"""
-        WITH filtered_ids AS (
-            SELECT DISTINCT c.comlog_id
-            FROM communications c
-            {join_sql}
-            WHERE {where_sql}
-        )
-    """
-    return cte, binds
+
+def build_filtered_cte(params: dict):
+    inner, binds = build_filter_select(params)
+    return f"WITH filtered_ids AS ({inner})\n", binds
 
 
 # ── Static frontend ──────────────────────────────────────────────────────────
@@ -133,157 +152,128 @@ def institutions():
     with get_db() as con:
         rows = con.execute(
             """SELECT institution, COUNT(DISTINCT comlog_id) AS comm_count
-               FROM dpoh
-               WHERE institution != ''
-               GROUP BY institution
-               ORDER BY comm_count DESC"""
+               FROM dpoh WHERE institution != ''
+               GROUP BY institution ORDER BY comm_count DESC"""
         ).fetchall()
     return jsonify(rows_to_list(rows))
 
 
 @app.route("/api/clients")
 def clients():
-    """Autocomplete: return up to 50 matching client names."""
     q = (request.args.get("q") or "").strip()
     with get_db() as con:
         if q:
             rows = con.execute(
-                """SELECT DISTINCT client_name, client_num
-                   FROM communications
+                """SELECT DISTINCT client_name, client_num FROM communications
                    WHERE client_name LIKE ? COLLATE NOCASE
-                   ORDER BY client_name
-                   LIMIT 50""",
+                   ORDER BY client_name LIMIT 50""",
                 (f"%{q}%",),
             ).fetchall()
         else:
             rows = con.execute(
-                """SELECT DISTINCT client_name, client_num
-                   FROM communications
-                   ORDER BY client_name
-                   LIMIT 200"""
+                """SELECT DISTINCT client_name, client_num FROM communications
+                   ORDER BY client_name LIMIT 200"""
             ).fetchall()
     return jsonify(rows_to_list(rows))
 
 
-# ── Stats (main analytics endpoint) ─────────────────────────────────────────
+# ── Stats ─────────────────────────────────────────────────────────────────────
 
-@app.route("/api/stats")
-def stats():
+def _compute_stats(params: dict) -> dict:
     """
-    Returns aggregated analytics for the current filter set:
-      - totals (comms, unique clients, unique lobbyists, unique DPOHs)
-      - by_month time series
-      - top_clients, top_institutions, top_subjects, top_dpoh
+    Run all analytics queries for the given filter params.
+    Uses a temp table so the expensive filter join runs only once,
+    then all 7 aggregations scan the small materialised result.
     """
-    cte, binds = build_filtered_cte(request.args)
+    inner_sql, binds = build_filter_select(params)
 
     with get_db() as con:
-        # Totals
-        row = con.execute(
-            cte + """
-            SELECT
-                COUNT(*)                            AS total,
-                COUNT(DISTINCT c.client_num)        AS unique_clients,
-                COUNT(DISTINCT c.reg_num)           AS unique_lobbyists
-            FROM filtered_ids fi
+        # Materialise filtered IDs once — the only expensive operation
+        con.execute(f"CREATE TEMP TABLE _fids AS {inner_sql}", binds)
+        con.execute("CREATE INDEX _fids_idx ON _fids(comlog_id)")
+
+        row = con.execute("""
+            SELECT COUNT(*)                     AS total,
+                   COUNT(DISTINCT c.client_num) AS unique_clients,
+                   COUNT(DISTINCT c.reg_num)    AS unique_lobbyists
+            FROM _fids fi
             JOIN communications c ON c.comlog_id = fi.comlog_id
-            """,
-            binds,
-        ).fetchone()
+        """).fetchone()
         totals = dict(row)
 
-        # Unique DPOHs (separate query to keep things readable)
-        dpoh_count = con.execute(
-            cte + """
-            SELECT COUNT(DISTINCT d.dpoh_last || ',' || d.dpoh_first) AS unique_dpoh
-            FROM filtered_ids fi
+        totals["unique_dpoh"] = con.execute("""
+            SELECT COUNT(DISTINCT d.dpoh_last || ',' || d.dpoh_first)
+            FROM _fids fi
             JOIN dpoh d ON d.comlog_id = fi.comlog_id
             WHERE d.dpoh_last != ''
-            """,
-            binds,
-        ).fetchone()[0]
-        totals["unique_dpoh"] = dpoh_count
+        """).fetchone()[0]
 
-        # By month
-        by_month = con.execute(
-            cte + """
+        by_month = con.execute("""
             SELECT c.comm_month AS month, COUNT(*) AS count
-            FROM filtered_ids fi
+            FROM _fids fi
             JOIN communications c ON c.comlog_id = fi.comlog_id
-            GROUP BY c.comm_month
-            ORDER BY c.comm_month
-            """,
-            binds,
-        ).fetchall()
+            GROUP BY c.comm_month ORDER BY c.comm_month
+        """).fetchall()
 
-        # Top clients (up to 20)
-        top_clients = con.execute(
-            cte + """
+        top_clients = con.execute("""
             SELECT c.client_name, COUNT(*) AS count
-            FROM filtered_ids fi
+            FROM _fids fi
             JOIN communications c ON c.comlog_id = fi.comlog_id
             WHERE c.client_name != ''
-            GROUP BY c.client_name
-            ORDER BY count DESC
-            LIMIT 20
-            """,
-            binds,
-        ).fetchall()
+            GROUP BY c.client_name ORDER BY count DESC LIMIT 20
+        """).fetchall()
 
-        # Top institutions (up to 20)
-        top_institutions = con.execute(
-            cte + """
+        top_institutions = con.execute("""
             SELECT d.institution, COUNT(DISTINCT fi.comlog_id) AS count
-            FROM filtered_ids fi
+            FROM _fids fi
             JOIN dpoh d ON d.comlog_id = fi.comlog_id
             WHERE d.institution != ''
-            GROUP BY d.institution
-            ORDER BY count DESC
-            LIMIT 20
-            """,
-            binds,
-        ).fetchall()
+            GROUP BY d.institution ORDER BY count DESC LIMIT 20
+        """).fetchall()
 
-        # Top subjects (all)
-        top_subjects = con.execute(
-            cte + """
+        top_subjects = con.execute("""
             SELECT s.subject_code, st.description, COUNT(DISTINCT fi.comlog_id) AS count
-            FROM filtered_ids fi
+            FROM _fids fi
             JOIN subjects s ON s.comlog_id = fi.comlog_id
             JOIN subject_types st ON st.subject_code = s.subject_code
             WHERE s.subject_code != ''
-            GROUP BY s.subject_code
-            ORDER BY count DESC
-            """,
-            binds,
-        ).fetchall()
+            GROUP BY s.subject_code ORDER BY count DESC
+        """).fetchall()
 
-        # Top DPOHs (up to 20)
-        top_dpoh = con.execute(
-            cte + """
-            SELECT
-                d.dpoh_first || ' ' || d.dpoh_last AS name,
-                d.dpoh_title AS title,
-                d.institution,
-                COUNT(DISTINCT fi.comlog_id) AS count
-            FROM filtered_ids fi
+        top_dpoh = con.execute("""
+            SELECT d.dpoh_first || ' ' || d.dpoh_last AS name,
+                   d.dpoh_title AS title,
+                   d.institution,
+                   COUNT(DISTINCT fi.comlog_id) AS count
+            FROM _fids fi
             JOIN dpoh d ON d.comlog_id = fi.comlog_id
             WHERE d.dpoh_last != ''
             GROUP BY d.dpoh_last, d.dpoh_first, d.institution
-            ORDER BY count DESC
-            LIMIT 20
-            """,
-            binds,
-        ).fetchall()
+            ORDER BY count DESC LIMIT 20
+        """).fetchall()
 
-    return jsonify({
+    return {
         **totals,
         "by_month":         rows_to_list(by_month),
         "top_clients":      rows_to_list(top_clients),
         "top_institutions": rows_to_list(top_institutions),
         "top_subjects":     rows_to_list(top_subjects),
         "top_dpoh":         rows_to_list(top_dpoh),
-    })
+    }
+
+
+@app.route("/api/stats")
+def stats():
+    params = {k: v for k, v in request.args.items() if v}
+    key = str(sorted(params.items()))
+
+    cached = _cache_get(key)
+    if cached is not None:
+        return jsonify(cached)
+
+    result = _compute_stats(params)
+    _cache_set(key, result)
+    return jsonify(result)
 
 
 # ── Communications table (paginated) ─────────────────────────────────────────
@@ -328,6 +318,23 @@ def communications():
         ).fetchall()
 
     return jsonify({"total": total, "rows": rows_to_list(rows)})
+
+
+# ── Pre-warm cache on startup ─────────────────────────────────────────────────
+
+def _prewarm():
+    """Compute default stats in the background so the first page load is fast."""
+    time.sleep(3)  # let Flask finish starting
+    try:
+        print("Pre-warming stats cache...", flush=True)
+        result = _compute_stats({})
+        _cache_set("[]", result)  # key for empty params
+        print("Cache ready.", flush=True)
+    except Exception as e:
+        print(f"Pre-warm failed: {e}", flush=True)
+
+
+threading.Thread(target=_prewarm, daemon=True).start()
 
 
 # ── Run ───────────────────────────────────────────────────────────────────────
