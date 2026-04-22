@@ -399,6 +399,11 @@
       </div>
     </div>
 
+    <!-- Jump link -->
+    <p style="text-align:right;margin-bottom:16px;font-size:12px">
+      <a href="#comms-section" style="color:var(--muted);text-decoration:none">Jump to records ↓</a>
+    </p>
+
     <!-- Time series -->
     <div class="card">
       <h3>Communications over time</h3>
@@ -431,21 +436,8 @@
       </div>
     </div>
 
-    <!-- Top DPOHs -->
-    <div class="card">
-      <h3>Most-lobbied officials (DPOHs)</h3>
-      <div class="table-wrap">
-        <table id="dpohTable">
-          <thead>
-            <tr><th>#</th><th>Name</th><th>Title</th><th>Institution</th><th>Communications</th></tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-
     <!-- Communications table -->
-    <div class="card">
+    <div class="card" id="comms-section">
       <h3>Communication records <span id="tableCountLabel" style="font-weight:400;color:var(--muted)"></span></h3>
       <p class="scroll-hint">Scroll right to see all columns →</p>
       <div class="table-wrap">
@@ -470,6 +462,19 @@
         <span id="pageLabel"></span>
         <button class="page-btn" id="nextBtn" disabled>Next →</button>
         <span style="margin-left:auto" id="pageTotal"></span>
+      </div>
+    </div>
+
+    <!-- Top DPOHs -->
+    <div class="card">
+      <h3>Most-lobbied officials (DPOHs)</h3>
+      <div class="table-wrap">
+        <table id="dpohTable">
+          <thead>
+            <tr><th>#</th><th>Name</th><th>Title</th><th>Institution</th><th>Communications</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
       </div>
     </div>
 
