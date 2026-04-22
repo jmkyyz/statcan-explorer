@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Canadian Lobbyist Registry Explorer</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --red:    #c0392b;
+    --red-lt: #e74c3c;
+    --bg:     #f4f5f7;
+    --card:   #ffffff;
+    --border: #dde1e7;
+    --text:   #1a1d23;
+    --muted:  #6b7280;
+    --accent: #1d4ed8;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  /* ── Header ─────────────────────────────────────────────── */
+  header {
+    background: var(--red);
+    color: #fff;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,.2);
+  }
+  header .maple { font-size: 28px; }
+  header h1 { font-size: 18px; font-weight: 700; letter-spacing: .3px; }
+  header p  { font-size: 12px; opacity: .85; }
+  .db-status {
+    margin-left: auto;
+    font-size: 11px;
+    background: rgba(255,255,255,.15);
+    padding: 4px 10px;
+    border-radius: 12px;
+  }
+
+  /* ── Layout ─────────────────────────────────────────────── */
+  .layout {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 0;
+    min-height: calc(100vh - 56px);
+  }
+
+  /* ── Sidebar ─────────────────────────────────────────────── */
+  aside {
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    padding: 20px 16px;
+    overflow-y: auto;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 56px);
+  }
+  aside h2 {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .8px;
+    color: var(--muted);
+    margin-bottom: 14px;
+  }
+  .filter-group { margin-bottom: 18px; }
+  .filter-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    margin-bottom: 5px;
+  }
+  .filter-group input,
+  .filter-group select {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+  }
+  .filter-group input:focus,
+  .filter-group select:focus { border-color: var(--accent); }
+
+  .year-range { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .reg-type-group { display: flex; flex-direction: column; gap: 5px; }
+  .reg-type-group label {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 13px; font-weight: 400; color: var(--text);
+    cursor: pointer;
+  }
+  .reg-type-group input[type=checkbox] { width: 14px; height: 14px; }
+
+  /* Autocomplete */
+  .autocomplete-wrap { position: relative; }
+  .autocomplete-list {
+    position: absolute;
+    top: 100%; left: 0; right: 0;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-top: none;
+    border-radius: 0 0 6px 6px;
+    max-height: 200px;
+    overflow-y: auto;
+    z-index: 100;
+    display: none;
+  }
+  .autocomplete-list.open { display: block; }
+  .autocomplete-list li {
+    padding: 7px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    list-style: none;
+  }
+  .autocomplete-list li:hover { background: var(--bg); }
+  .autocomplete-list li.selected { background: #e8eeff; }
+
+  .btn-apply {
+    width: 100%;
+    padding: 9px;
+    background: var(--red);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 4px;
+  }
+  .btn-apply:hover { background: var(--red-lt); }
+  .btn-clear {
+    width: 100%;
+    padding: 7px;
+    background: none;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+  .btn-clear:hover { color: var(--text); border-color: #aaa; }
+
+  /* ── Main content ────────────────────────────────────────── */
+  main {
+    padding: 20px 24px;
+    overflow-y: auto;
+  }
+
+  /* Stat cards */
+  .stat-cards {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+  .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: var(--red); line-height: 1.2; margin: 4px 0 2px; }
+  .stat-card .sub   { font-size: 11px; color: var(--muted); }
+
+  /* Charts */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+  .card h3 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+  .chart-wrap { position: relative; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+  /* Table */
+  .table-wrap { overflow-x: auto; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  th {
+    background: var(--bg);
+    padding: 9px 12px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--muted);
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+    max-width: 200px;
+  }
+  tr:hover td { background: #fafbfc; }
+  .tag {
+    display: inline-block;
+    background: #e8eeff;
+    color: var(--accent);
+    border-radius: 10px;
+    padding: 2px 8px;
+    font-size: 11px;
+    margin: 1px;
+    white-space: nowrap;
+  }
+  .tag.red { background: #fee2e2; color: var(--red); }
+  .tag.green { background: #d1fae5; color: #065f46; }
+
+  /* Pagination */
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .page-btn {
+    padding: 5px 12px;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--card);
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .page-btn:hover:not(:disabled) { background: var(--bg); }
+  .page-btn:disabled { opacity: .4; cursor: default; }
+
+  /* Loading overlay */
+  .loading-overlay {
+    position: fixed; inset: 0;
+    background: rgba(255,255,255,.6);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 200;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--red);
+  }
+  .loading-overlay.show { display: flex; }
+
+  .spinner {
+    width: 32px; height: 32px;
+    border: 3px solid var(--border);
+    border-top-color: var(--red);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    margin-right: 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .no-data { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div> Loading…
+</div>
+
+<header>
+  <span class="maple">🍁</span>
+  <div>
+    <h1>Canadian Lobbyist Registry Explorer</h1>
+    <p>Office of the Commissioner of Lobbying — communication reports 2014–present</p>
+  </div>
+  <div class="db-status" id="dbStatus">Connecting…</div>
+</header>
+
+<div class="layout">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────── -->
+  <aside>
+    <h2>Filters</h2>
+
+    <div class="filter-group">
+      <label>Year range</label>
+      <div class="year-range">
+        <select id="yearFrom"></select>
+        <select id="yearTo"></select>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Registration type</label>
+      <div class="reg-type-group">
+        <label><input type="checkbox" class="reg-type-cb" value="1" checked> Consultant</label>
+        <label><input type="checkbox" class="reg-type-cb" value="2" checked> In-house (Corporation)</label>
+        <label><input type="checkbox" class="reg-type-cb" value="3" checked> In-house (Organization)</label>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>Subject / Topic</label>
+      <select id="subjectSelect">
+        <option value="">All topics</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Government institution lobbied</label>
+      <select id="institutionSelect">
+        <option value="">All institutions</option>
+      </select>
+    </div>
+
+    <div class="filter-group">
+      <label>Client / Organization</label>
+      <div class="autocomplete-wrap">
+        <input type="text" id="clientInput" placeholder="Search client name…" autocomplete="off">
+        <ul class="autocomplete-list" id="clientList"></ul>
+      </div>
+    </div>
+
+    <div class="filter-group">
+      <label>DPOH name (individual lobbied)</label>
+      <input type="text" id="dpohInput" placeholder="Search last name…" autocomplete="off">
+    </div>
+
+    <button class="btn-apply" id="applyBtn">Apply filters</button>
+    <button class="btn-clear" id="clearBtn">Clear all filters</button>
+  </aside>
+
+  <!-- ── Main ───────────────────────────────────────────────── -->
+  <main id="main">
+
+    <!-- Stat cards -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="label">Communications</div>
+        <div class="value" id="statTotal">—</div>
+        <div class="sub" id="statAmend"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Unique clients</div>
+        <div class="value" id="statClients">—</div>
+        <div class="sub">organizations</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Unique lobbyists</div>
+        <div class="value" id="statLobbyists">—</div>
+        <div class="sub">registrants</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Unique DPOHs</div>
+        <div class="value" id="statDpoh">—</div>
+        <div class="sub">officials lobbied</div>
+      </div>
+    </div>
+
+    <!-- Time series -->
+    <div class="card">
+      <h3>Communications over time</h3>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="timeChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Top clients + institutions -->
+    <div class="two-col">
+      <div class="card">
+        <h3>Top clients</h3>
+        <div class="chart-wrap" style="height:260px">
+          <canvas id="clientChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Top institutions lobbied</h3>
+        <div class="chart-wrap" style="height:260px">
+          <canvas id="instChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top subjects -->
+    <div class="card">
+      <h3>By subject matter</h3>
+      <div class="chart-wrap" style="height:260px">
+        <canvas id="subjectChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Top DPOHs -->
+    <div class="card">
+      <h3>Most-lobbied officials (DPOHs)</h3>
+      <div class="table-wrap">
+        <table id="dpohTable">
+          <thead>
+            <tr><th>#</th><th>Name</th><th>Title</th><th>Institution</th><th>Communications</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Communications table -->
+    <div class="card">
+      <h3>Communication records <span id="tableCountLabel" style="font-weight:400;color:var(--muted)"></span></h3>
+      <div class="table-wrap">
+        <table id="commsTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Client</th>
+              <th>Lobbyist</th>
+              <th>DPOH(s)</th>
+              <th>Institution(s)</th>
+              <th>Subject(s)</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody id="commsBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button class="page-btn" id="prevBtn" disabled>← Prev</button>
+        <span id="pageLabel"></span>
+        <button class="page-btn" id="nextBtn" disabled>Next →</button>
+        <span style="margin-left:auto" id="pageTotal"></span>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────
+const API = "";  // same-origin; change to full URL for local dev against remote
+const PAGE_SIZE = 50;
+const REG_LABELS = { 1: "Consultant", 2: "In-house Corp", 3: "In-house Org" };
+
+// ── State ─────────────────────────────────────────────────────────────────
+let currentPage   = 0;
+let totalComms    = 0;
+let charts        = {};
+let clientSelected = { name: "", num: "" };
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+const fmt = n => n?.toLocaleString("en-CA") ?? "—";
+const show = id => document.getElementById(id)?.classList.add("show");
+const hide = id => document.getElementById(id)?.classList.remove("show");
+
+function loading(on) {
+  document.getElementById("loadingOverlay").classList.toggle("show", on);
+}
+
+async function apiFetch(path) {
+  const r = await fetch(API + path);
+  if (!r.ok) throw new Error(`API error ${r.status}`);
+  return r.json();
+}
+
+// ── Filter state ──────────────────────────────────────────────────────────
+function getFilters() {
+  const checkedTypes = [...document.querySelectorAll(".reg-type-cb:checked")]
+                         .map(cb => cb.value);
+  return {
+    year_from:   document.getElementById("yearFrom").value,
+    year_to:     document.getElementById("yearTo").value,
+    reg_type:    checkedTypes.length === 1 ? checkedTypes[0] : "",
+    subject:     document.getElementById("subjectSelect").value,
+    institution: document.getElementById("institutionSelect").value,
+    client_q:    clientSelected.name
+                   ? clientSelected.name
+                   : document.getElementById("clientInput").value.trim(),
+    dpoh_q:      document.getElementById("dpohInput").value.trim(),
+  };
+}
+
+function filtersToQS(extra = {}) {
+  const f = { ...getFilters(), ...extra };
+  return "?" + Object.entries(f)
+    .filter(([, v]) => v !== "" && v !== undefined)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join("&");
+}
+
+// ── Chart helpers ──────────────────────────────────────────────────────────
+const PALETTE = [
+  "#c0392b","#2980b9","#27ae60","#8e44ad","#d35400",
+  "#16a085","#2c3e50","#f39c12","#1abc9c","#e74c3c",
+];
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+function makeBarChart(id, labels, data, horizontal = false) {
+  destroyChart(id);
+  const ctx = document.getElementById(id).getContext("2d");
+  charts[id] = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: horizontal
+          ? data.map((_, i) => PALETTE[i % PALETTE.length])
+          : "#c0392b",
+        borderRadius: 3,
+      }],
+    },
+    options: {
+      indexAxis: horizontal ? "y" : "x",
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display: !horizontal }, ticks: { font: { size: 11 } } },
+        y: { grid: { display: horizontal  }, ticks: { font: { size: 11 } } },
+      },
+    },
+  });
+}
+
+function makeLineChart(id, labels, data) {
+  destroyChart(id);
+  const ctx = document.getElementById(id).getContext("2d");
+  charts[id] = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [{
+        data,
+        borderColor: "#c0392b",
+        backgroundColor: "rgba(192,57,43,.08)",
+        borderWidth: 2,
+        pointRadius: labels.length > 60 ? 0 : 3,
+        fill: true,
+        tension: 0.3,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, maxTicksLimit: 24, maxRotation: 45 } },
+        y: { ticks: { font: { size: 11 } }, beginAtZero: true },
+      },
+    },
+  });
+}
+
+// ── Render stats ──────────────────────────────────────────────────────────
+function renderStats(d) {
+  document.getElementById("statTotal").textContent     = fmt(d.total);
+  document.getElementById("statClients").textContent   = fmt(d.unique_clients);
+  document.getElementById("statLobbyists").textContent = fmt(d.unique_lobbyists);
+  document.getElementById("statDpoh").textContent      = fmt(d.unique_dpoh);
+
+  // Time series
+  makeLineChart(
+    "timeChart",
+    d.by_month.map(r => r.month),
+    d.by_month.map(r => r.count),
+  );
+
+  // Top clients
+  const tc = d.top_clients.slice(0, 15);
+  makeBarChart("clientChart", tc.map(r => r.client_name), tc.map(r => r.count), true);
+
+  // Top institutions
+  const ti = d.top_institutions.slice(0, 15);
+  makeBarChart("instChart", ti.map(r => r.institution), ti.map(r => r.count), true);
+
+  // Top subjects
+  const ts = d.top_subjects.slice(0, 20);
+  makeBarChart("subjectChart", ts.map(r => r.description), ts.map(r => r.count), true);
+
+  // DPOH table
+  const tbody = document.querySelector("#dpohTable tbody");
+  tbody.innerHTML = d.top_dpoh.length === 0
+    ? `<tr><td colspan="5" class="no-data">No data</td></tr>`
+    : d.top_dpoh.map((r, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${r.name}</strong></td>
+          <td style="color:var(--muted)">${r.title || ""}</td>
+          <td>${r.institution}</td>
+          <td><strong>${fmt(r.count)}</strong></td>
+        </tr>`).join("");
+}
+
+// ── Render table ──────────────────────────────────────────────────────────
+function renderTable(d) {
+  totalComms = d.total;
+  document.getElementById("tableCountLabel").textContent =
+    `— ${fmt(d.total)} records`;
+
+  const tbody = document.getElementById("commsBody");
+  if (d.rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="no-data">No records match the current filters.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = d.rows.map(r => {
+    const type = REG_LABELS[r.reg_type] || r.reg_type;
+    const dpohList = (r.dpoh_names || "").split(",")
+      .map(s => s.trim()).filter(Boolean)
+      .map(s => `<span class="tag">${s}</span>`).join(" ");
+    const instList = [...new Set((r.institutions || "").split(",")
+      .map(s => s.trim()).filter(Boolean))]
+      .map(s => `<span class="tag red">${s}</span>`).join(" ");
+    const subjList = (r.subjects || "").split(",")
+      .map(s => s.trim()).filter(Boolean)
+      .map(s => `<span class="tag green">${s}</span>`).join(" ");
+
+    return `<tr>
+      <td style="white-space:nowrap">${r.comm_date}</td>
+      <td><strong>${r.client_name}</strong></td>
+      <td>${r.lobbyist}</td>
+      <td>${dpohList || "—"}</td>
+      <td>${instList || "—"}</td>
+      <td>${subjList || "—"}</td>
+      <td style="white-space:nowrap;color:var(--muted)">${type}</td>
+    </tr>`;
+  }).join("");
+
+  // Pagination controls
+  const totalPages = Math.ceil(totalComms / PAGE_SIZE);
+  document.getElementById("prevBtn").disabled = currentPage === 0;
+  document.getElementById("nextBtn").disabled = currentPage >= totalPages - 1;
+  document.getElementById("pageLabel").textContent =
+    `Page ${currentPage + 1} of ${totalPages}`;
+  document.getElementById("pageTotal").textContent =
+    `${fmt(totalComms)} total`;
+}
+
+// ── Load everything ───────────────────────────────────────────────────────
+async function loadAll() {
+  loading(true);
+  try {
+    const qs = filtersToQS();
+    const [statsData, tableData] = await Promise.all([
+      apiFetch("/api/stats" + qs),
+      apiFetch("/api/communications" + filtersToQS({ limit: PAGE_SIZE, offset: 0 })),
+    ]);
+    currentPage = 0;
+    renderStats(statsData);
+    renderTable(tableData);
+  } catch (e) {
+    console.error(e);
+    alert("Error loading data: " + e.message);
+  } finally {
+    loading(false);
+  }
+}
+
+async function loadTable() {
+  loading(true);
+  try {
+    const qs = filtersToQS({ limit: PAGE_SIZE, offset: currentPage * PAGE_SIZE });
+    const data = await apiFetch("/api/communications" + qs);
+    renderTable(data);
+  } finally {
+    loading(false);
+  }
+}
+
+// ── Populate filter dropdowns ─────────────────────────────────────────────
+async function populateFilters() {
+  // Year selects
+  const now = new Date().getFullYear();
+  const yearFrom = document.getElementById("yearFrom");
+  const yearTo   = document.getElementById("yearTo");
+  for (let y = 2014; y <= now; y++) {
+    yearFrom.add(new Option(y, y));
+    yearTo.add(new Option(y, y));
+  }
+  yearFrom.value = 2014;
+  yearTo.value   = now;
+
+  // Subjects
+  const subjects = await apiFetch("/api/subjects");
+  const subSel = document.getElementById("subjectSelect");
+  subjects.forEach(s => {
+    subSel.add(new Option(s.description, s.subject_code));
+  });
+
+  // Institutions
+  const insts = await apiFetch("/api/institutions");
+  const instSel = document.getElementById("institutionSelect");
+  insts.forEach(i => {
+    instSel.add(new Option(i.institution, i.institution));
+  });
+}
+
+// ── Client autocomplete ───────────────────────────────────────────────────
+let acTimer = null;
+const clientInput = document.getElementById("clientInput");
+const clientList  = document.getElementById("clientList");
+
+clientInput.addEventListener("input", () => {
+  clientSelected = { name: "", num: "" };
+  clearTimeout(acTimer);
+  const q = clientInput.value.trim();
+  if (q.length < 2) { clientList.classList.remove("open"); return; }
+  acTimer = setTimeout(async () => {
+    const data = await apiFetch(`/api/clients?q=${encodeURIComponent(q)}`);
+    clientList.innerHTML = data.map(c =>
+      `<li data-name="${c.client_name}" data-num="${c.client_num}">${c.client_name}</li>`
+    ).join("");
+    clientList.classList.toggle("open", data.length > 0);
+  }, 300);
+});
+
+clientList.addEventListener("click", e => {
+  const li = e.target.closest("li");
+  if (!li) return;
+  clientSelected = { name: li.dataset.name, num: li.dataset.num };
+  clientInput.value = li.dataset.name;
+  clientList.classList.remove("open");
+});
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".autocomplete-wrap")) clientList.classList.remove("open");
+});
+
+// ── Pagination ────────────────────────────────────────────────────────────
+document.getElementById("prevBtn").addEventListener("click", () => {
+  if (currentPage > 0) { currentPage--; loadTable(); }
+});
+document.getElementById("nextBtn").addEventListener("click", () => {
+  if (currentPage < Math.ceil(totalComms / PAGE_SIZE) - 1) {
+    currentPage++;
+    loadTable();
+  }
+});
+
+// ── Apply / Clear ─────────────────────────────────────────────────────────
+document.getElementById("applyBtn").addEventListener("click", loadAll);
+
+document.getElementById("clearBtn").addEventListener("click", () => {
+  document.getElementById("yearFrom").value = 2014;
+  document.getElementById("yearTo").value   = new Date().getFullYear();
+  document.querySelectorAll(".reg-type-cb").forEach(cb => cb.checked = true);
+  document.getElementById("subjectSelect").value    = "";
+  document.getElementById("institutionSelect").value = "";
+  clientInput.value = "";
+  clientSelected    = { name: "", num: "" };
+  document.getElementById("dpohInput").value = "";
+  loadAll();
+});
+
+// Pressing Enter in any text field triggers apply
+document.querySelectorAll("input[type=text]").forEach(el => {
+  el.addEventListener("keydown", e => { if (e.key === "Enter") loadAll(); });
+});
+
+// ── Health check + init ───────────────────────────────────────────────────
+async function init() {
+  try {
+    const h = await apiFetch("/api/health");
+    const [minY, maxY] = h.date_range.map(d => d.slice(0, 4));
+    document.getElementById("dbStatus").textContent =
+      `${fmt(h.total_comms)} records · ${minY}–${maxY}`;
+  } catch {
+    document.getElementById("dbStatus").textContent = "DB unavailable";
+    return;
+  }
+
+  await populateFilters();
+  await loadAll();
+}
+
+init();
+</script>
+</body>
+</html>
