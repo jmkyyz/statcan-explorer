@@ -96,7 +96,9 @@
   .filter-group input:focus,
   .filter-group select:focus { border-color: var(--accent); }
 
-  .year-range { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .date-range { display: flex; flex-direction: column; gap: 6px; }
+  .date-row   { display: grid; grid-template-columns: auto 1fr; gap: 6px; align-items: center; }
+  .date-row span { font-size: 11px; color: var(--muted); white-space: nowrap; }
 
   .reg-type-group { display: flex; flex-direction: column; gap: 5px; }
   .reg-type-group label {
@@ -305,10 +307,22 @@
     <h2>Filters</h2>
 
     <div class="filter-group">
-      <label>Year range</label>
-      <div class="year-range">
-        <select id="yearFrom"></select>
-        <select id="yearTo"></select>
+      <label>Date range</label>
+      <div class="date-range">
+        <div class="date-row">
+          <span>From</span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+            <select id="monthFrom"></select>
+            <select id="yearFrom"></select>
+          </div>
+        </div>
+        <div class="date-row">
+          <span>To</span>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px">
+            <select id="monthTo"></select>
+            <select id="yearTo"></select>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -485,9 +499,11 @@ async function apiFetch(path) {
 function getFilters() {
   const checkedTypes = [...document.querySelectorAll(".reg-type-cb:checked")]
                          .map(cb => cb.value);
+  const mFrom = document.getElementById("monthFrom").value.padStart(2, "0");
+  const mTo   = document.getElementById("monthTo").value.padStart(2, "0");
   return {
-    year_from:   document.getElementById("yearFrom").value,
-    year_to:     document.getElementById("yearTo").value,
+    date_from:   `${document.getElementById("yearFrom").value}-${mFrom}`,
+    date_to:     `${document.getElementById("yearTo").value}-${mTo}`,
     reg_type:    checkedTypes.length === 1 ? checkedTypes[0] : "",
     subject:     document.getElementById("subjectSelect").value,
     institution: document.getElementById("institutionSelect").value,
@@ -691,16 +707,32 @@ async function loadTable() {
 
 // ── Populate filter dropdowns ─────────────────────────────────────────────
 async function populateFilters() {
+  const now  = new Date();
+  const nowY = now.getFullYear();
+  const nowM = now.getMonth() + 1;
+
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
+                  "Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  // Month selects
+  const monthFrom = document.getElementById("monthFrom");
+  const monthTo   = document.getElementById("monthTo");
+  MONTHS.forEach((name, i) => {
+    monthFrom.add(new Option(name, i + 1));
+    monthTo.add(new Option(name, i + 1));
+  });
+  monthFrom.value = 1;
+  monthTo.value   = nowM;
+
   // Year selects
-  const now = new Date().getFullYear();
   const yearFrom = document.getElementById("yearFrom");
   const yearTo   = document.getElementById("yearTo");
-  for (let y = 2014; y <= now; y++) {
+  for (let y = 2014; y <= nowY; y++) {
     yearFrom.add(new Option(y, y));
     yearTo.add(new Option(y, y));
   }
   yearFrom.value = 2014;
-  yearTo.value   = now;
+  yearTo.value   = nowY;
 
   // Subjects
   const subjects = await apiFetch("/api/subjects");
@@ -763,8 +795,11 @@ document.getElementById("nextBtn").addEventListener("click", () => {
 document.getElementById("applyBtn").addEventListener("click", loadAll);
 
 document.getElementById("clearBtn").addEventListener("click", () => {
-  document.getElementById("yearFrom").value = 2014;
-  document.getElementById("yearTo").value   = new Date().getFullYear();
+  const now = new Date();
+  document.getElementById("monthFrom").value = 1;
+  document.getElementById("yearFrom").value  = 2014;
+  document.getElementById("monthTo").value   = now.getMonth() + 1;
+  document.getElementById("yearTo").value    = now.getFullYear();
   document.querySelectorAll(".reg-type-cb").forEach(cb => cb.checked = true);
   document.getElementById("subjectSelect").value    = "";
   document.getElementById("institutionSelect").value = "";

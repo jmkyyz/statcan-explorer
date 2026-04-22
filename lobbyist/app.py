@@ -45,8 +45,8 @@ def build_filtered_cte(params: dict):
     Returns (cte_sql, bind_params) that produces a CTE called filtered_ids
     containing the comlog_ids matching all active filters.
     """
-    year_from  = int(params.get("year_from", 2014))
-    year_to    = int(params.get("year_to", 2026))
+    date_from  = (params.get("date_from") or "2014-01").strip()
+    date_to    = (params.get("date_to")   or "2099-12").strip()
     client_q   = (params.get("client_q") or "").strip()
     reg_type   = (params.get("reg_type") or "").strip()
     institution = (params.get("institution") or "").strip()
@@ -54,8 +54,8 @@ def build_filtered_cte(params: dict):
     dpoh_q     = (params.get("dpoh_q") or "").strip()
 
     joins  = []
-    wheres = ["c.comm_year BETWEEN ? AND ?"]
-    binds  = [year_from, year_to]
+    wheres = ["c.comm_month BETWEEN ? AND ?"]
+    binds  = [date_from, date_to]
 
     if client_q:
         wheres.append("c.client_name LIKE ? COLLATE NOCASE")

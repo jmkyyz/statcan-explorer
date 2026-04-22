@@ -211,6 +211,37 @@ def build():
 
     log(f"  {n_subj:,} subject records inserted")
 
+    # ── 3b. Subject matter details (V6 registrations, post-Oct 2024) ─────────
+    log("Reading Communication_SubjectMatterDetailsExport.csv ...")
+    n_subj2 = 0
+    batch = []
+
+    f, reader = open_csv(zf, "Communication_SubjectMatterDetailsExport.csv")
+    for row in reader:
+        cid_raw = clean(row.get("COMLOG_ID", ""))
+        code    = clean(row.get("SUBJECT_CODE_OBJET", ""))
+        if not cid_raw or not code:
+            continue
+        cid = int(cid_raw)
+        if cid not in valid_ids:
+            continue
+
+        batch.append((cid, code))
+
+        if len(batch) >= BATCH:
+            con.executemany("INSERT OR IGNORE INTO subjects (comlog_id,subject_code) VALUES (?,?)", batch)
+            con.commit()
+            n_subj2 += len(batch)
+            batch.clear()
+
+    if batch:
+        con.executemany("INSERT OR IGNORE INTO subjects (comlog_id,subject_code) VALUES (?,?)", batch)
+        con.commit()
+        n_subj2 += len(batch)
+    f.close()
+
+    log(f"  {n_subj2:,} additional subject records inserted (V6)")
+
     # ── 4. Subject type codes (small file) ───────────────────────────────────
     log("Reading Codes_SubjectMatterTypesExport.csv ...")
     f, reader = open_csv(zf, "Codes_SubjectMatterTypesExport.csv")
