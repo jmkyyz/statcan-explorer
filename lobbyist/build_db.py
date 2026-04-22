@@ -218,15 +218,17 @@ def build():
 
     f, reader = open_csv(zf, "Communication_SubjectMatterDetailsExport.csv")
     for row in reader:
-        cid_raw = clean(row.get("COMLOG_ID", ""))
-        code    = clean(row.get("SUBJECT_CODE_OBJET", ""))
-        if not cid_raw or not code:
+        cid_raw  = clean(row.get("COMLOG_ID", ""))
+        code_raw = clean(row.get("SUBJECT_CODE_OBJET", ""))
+        if not cid_raw or not code_raw:
             continue
         cid = int(cid_raw)
         if cid not in valid_ids:
             continue
 
-        batch.append((cid, code))
+        # SUBJECT_CODE_OBJET can be a comma-separated list (e.g. "SMT-10, SMT-25")
+        for code in [c.strip() for c in code_raw.split(",") if c.strip()]:
+            batch.append((cid, code))
 
         if len(batch) >= BATCH:
             con.executemany("INSERT OR IGNORE INTO subjects (comlog_id,subject_code) VALUES (?,?)", batch)
