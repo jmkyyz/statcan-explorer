@@ -6,106 +6,59 @@ Downloads the Office of the Commissioner of Lobbying open data,
 filters communications to 2014-onwards, and builds lobby.db (SQLite).
 
 Run during Render's build step, or locally to refresh the database:
-    python build_db.py
+    python -u build_db.py
 """
 
+import csv
 import io
 import sqlite3
+import sys
 import zipfile
 from pathlib import Path
 
-import pandas as pd
 import requests
 
 COMMS_URL = "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip"
 DB_PATH = Path(__file__).parent / "lobby.db"
 MIN_DATE = "2014-01-01"
+BATCH = 5_000
 
-CHUNKSIZE = 50_000
+
+def log(msg):
+    print(msg, flush=True)
 
 
 def download_zip(url: str) -> zipfile.ZipFile:
-    print(f"Downloading {url} ...")
+    log(f"Downloading {url} ...")
     r = requests.get(url, timeout=300)
     r.raise_for_status()
-    print(f"  {len(r.content) / 1e6:.1f} MB downloaded")
+    log(f"  {len(r.content) / 1e6:.1f} MB downloaded")
     return zipfile.ZipFile(io.BytesIO(r.content))
 
 
-def read_csv(zf: zipfile.ZipFile, name: str, **kwargs) -> pd.DataFrame:
-    with zf.open(name) as f:
-        df = pd.read_csv(f, dtype=str, encoding="utf-8-sig", na_filter=False, **kwargs)
-    df.columns = [c.strip() for c in df.columns]
-    df.replace("null", "", inplace=True)
-    return df
+def open_csv(zf: zipfile.ZipFile, name: str):
+    """Return a csv.DictReader for a file inside the zip."""
+    f = zf.open(name)
+    # utf-8-sig strips the BOM if present
+    return f, csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig"))
+
+
+def clean(val):
+    v = (val or "").strip()
+    return "" if v.lower() == "null" else v
 
 
 def build():
     zf = download_zip(COMMS_URL)
 
-    # ── Primary export ──────────────────────────────────────────────────────
-    print("Reading Communication_PrimaryExport.csv ...")
-    primary = read_csv(
-        zf,
-        "Communication_PrimaryExport.csv",
-        usecols=[
-            "COMLOG_ID", "CLIENT_ORG_CORP_NUM", "EN_CLIENT_ORG_CORP_NM_AN",
-            "REGISTRANT_NUM_DECLARANT", "RGSTRNT_LAST_NM_DCLRNT",
-            "RGSTRNT_1ST_NM_PRENOM_DCLRNT", "COMM_DATE", "REG_TYPE_ENR",
-            "PREV_COMLOG_ID_PRECEDNT",
-        ],
-    )
-    primary = primary[primary["COMM_DATE"] >= MIN_DATE].copy()
-    primary["comm_year"]  = primary["COMM_DATE"].str[:4].astype(int)
-    primary["comm_month"] = primary["COMM_DATE"].str[:7]
-    primary["is_amendment"] = (primary["PREV_COMLOG_ID_PRECEDNT"] != "").astype(int)
-    print(f"  {len(primary):,} rows (2014+)")
-
-    valid_ids = set(primary["COMLOG_ID"])
-
-    # ── DPOH export ─────────────────────────────────────────────────────────
-    print("Reading Communication_DpohExport.csv ...")
-    dpoh_chunks = []
-    with zf.open("Communication_DpohExport.csv") as f:
-        for chunk in pd.read_csv(
-            f, dtype=str, encoding="utf-8-sig", na_filter=False, chunksize=CHUNKSIZE
-        ):
-            chunk.columns = [c.strip() for c in chunk.columns]
-            chunk.replace("null", "", inplace=True)
-            dpoh_chunks.append(chunk[chunk["COMLOG_ID"].isin(valid_ids)])
-    dpoh = pd.concat(dpoh_chunks, ignore_index=True)
-    print(f"  {len(dpoh):,} rows")
-
-    # ── Subject matters export ───────────────────────────────────────────────
-    print("Reading Communication_SubjectMattersExport.csv ...")
-    subj_chunks = []
-    with zf.open("Communication_SubjectMattersExport.csv") as f:
-        for chunk in pd.read_csv(
-            f, dtype=str, encoding="utf-8-sig", na_filter=False, chunksize=CHUNKSIZE
-        ):
-            chunk.columns = [c.strip() for c in chunk.columns]
-            chunk.replace("null", "", inplace=True)
-            subj_chunks.append(chunk[chunk["COMLOG_ID"].isin(valid_ids)])
-    subjects = pd.concat(subj_chunks, ignore_index=True)
-    subjects = subjects[subjects["SUBJECT_CODE_OBJET"] != ""]
-    print(f"  {len(subjects):,} rows")
-
-    # ── Subject matter type codes ────────────────────────────────────────────
-    print("Reading Codes_SubjectMatterTypesExport.csv ...")
-    smt = read_csv(zf, "Codes_SubjectMatterTypesExport.csv")
-    print(f"  {len(smt):,} codes")
-
-    # ── Build SQLite ─────────────────────────────────────────────────────────
-    print(f"Building {DB_PATH} ...")
     if DB_PATH.exists():
         DB_PATH.unlink()
 
     con = sqlite3.connect(DB_PATH)
-    cur = con.cursor()
+    con.execute("PRAGMA journal_mode=WAL")
+    con.execute("PRAGMA synchronous=OFF")  # faster writes during bulk load
 
-    cur.executescript("""
-        PRAGMA journal_mode=WAL;
-
+    con.executescript("""
         CREATE TABLE communications (
             comlog_id    INTEGER PRIMARY KEY,
             client_num   TEXT,
@@ -119,7 +72,6 @@ def build():
             reg_type     INTEGER,
             is_amendment INTEGER
         );
-
         CREATE TABLE dpoh (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             comlog_id    INTEGER,
@@ -129,91 +81,168 @@ def build():
             branch       TEXT,
             institution  TEXT
         );
-
         CREATE TABLE subjects (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             comlog_id    INTEGER,
             subject_code TEXT
         );
-
         CREATE TABLE subject_types (
             subject_code TEXT PRIMARY KEY,
             description  TEXT
         );
     """)
 
-    # Insert in batches for speed
-    con.executemany(
-        "INSERT INTO communications VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-        [
-            (
-                int(r.COMLOG_ID),
-                r.CLIENT_ORG_CORP_NUM,
-                r.EN_CLIENT_ORG_CORP_NM_AN,
-                r.REGISTRANT_NUM_DECLARANT,
-                r.RGSTRNT_LAST_NM_DCLRNT,
-                r.RGSTRNT_1ST_NM_PRENOM_DCLRNT,
-                r.COMM_DATE,
-                int(r.comm_year),
-                r.comm_month,
-                int(r.REG_TYPE_ENR) if r.REG_TYPE_ENR else 0,
-                int(r.is_amendment),
+    # ── 1. Primary communications ────────────────────────────────────────────
+    log("Reading Communication_PrimaryExport.csv ...")
+    valid_ids = set()
+    n_primary = 0
+    batch = []
+
+    f, reader = open_csv(zf, "Communication_PrimaryExport.csv")
+    for row in reader:
+        comm_date = clean(row.get("COMM_DATE", ""))
+        if comm_date < MIN_DATE:
+            continue
+
+        cid = int(clean(row["COMLOG_ID"]))
+        valid_ids.add(cid)
+        prev = clean(row.get("PREV_COMLOG_ID_PRECEDNT", ""))
+        reg_type_raw = clean(row.get("REG_TYPE_ENR", ""))
+
+        batch.append((
+            cid,
+            clean(row.get("CLIENT_ORG_CORP_NUM", "")),
+            clean(row.get("EN_CLIENT_ORG_CORP_NM_AN", "")),
+            clean(row.get("REGISTRANT_NUM_DECLARANT", "")),
+            clean(row.get("RGSTRNT_LAST_NM_DCLRNT", "")),
+            clean(row.get("RGSTRNT_1ST_NM_PRENOM_DCLRNT", "")),
+            comm_date,
+            int(comm_date[:4]),
+            comm_date[:7],
+            int(reg_type_raw) if reg_type_raw else 0,
+            1 if prev else 0,
+        ))
+
+        if len(batch) >= BATCH:
+            con.executemany("INSERT INTO communications VALUES (?,?,?,?,?,?,?,?,?,?,?)", batch)
+            con.commit()
+            n_primary += len(batch)
+            batch.clear()
+
+    if batch:
+        con.executemany("INSERT INTO communications VALUES (?,?,?,?,?,?,?,?,?,?,?)", batch)
+        con.commit()
+        n_primary += len(batch)
+    f.close()
+
+    log(f"  {n_primary:,} communications inserted ({len(valid_ids):,} unique IDs)")
+
+    # ── 2. DPOH records ───────────────────────────────────────────────────────
+    log("Reading Communication_DpohExport.csv ...")
+    n_dpoh = 0
+    batch = []
+
+    f, reader = open_csv(zf, "Communication_DpohExport.csv")
+    for row in reader:
+        cid_raw = clean(row.get("COMLOG_ID", ""))
+        if not cid_raw:
+            continue
+        cid = int(cid_raw)
+        if cid not in valid_ids:
+            continue
+
+        batch.append((
+            cid,
+            clean(row.get("DPOH_LAST_NM_TCPD", "")),
+            clean(row.get("DPOH_FIRST_NM_PRENOM_TCPD", "")),
+            clean(row.get("DPOH_TITLE_TITRE_TCPD", "")),
+            clean(row.get("BRANCH_UNIT_DIRECTION_SERVICE", "")),
+            clean(row.get("INSTITUTION", "")),
+        ))
+
+        if len(batch) >= BATCH:
+            con.executemany(
+                "INSERT INTO dpoh (comlog_id,dpoh_last,dpoh_first,dpoh_title,branch,institution) VALUES (?,?,?,?,?,?)",
+                batch,
             )
-            for r in primary.itertuples(index=False)
-        ],
-    )
-    print(f"  {len(primary):,} communications inserted")
+            con.commit()
+            n_dpoh += len(batch)
+            batch.clear()
 
-    con.executemany(
-        "INSERT INTO dpoh (comlog_id,dpoh_last,dpoh_first,dpoh_title,branch,institution) VALUES (?,?,?,?,?,?)",
-        [
-            (
-                int(r.COMLOG_ID),
-                r.DPOH_LAST_NM_TCPD,
-                r.DPOH_FIRST_NM_PRENOM_TCPD,
-                r.DPOH_TITLE_TITRE_TCPD,
-                r.BRANCH_UNIT_DIRECTION_SERVICE,
-                r.INSTITUTION,
-            )
-            for r in dpoh.itertuples(index=False)
-        ],
-    )
-    print(f"  {len(dpoh):,} DPOH records inserted")
+    if batch:
+        con.executemany(
+            "INSERT INTO dpoh (comlog_id,dpoh_last,dpoh_first,dpoh_title,branch,institution) VALUES (?,?,?,?,?,?)",
+            batch,
+        )
+        con.commit()
+        n_dpoh += len(batch)
+    f.close()
 
-    con.executemany(
-        "INSERT INTO subjects (comlog_id,subject_code) VALUES (?,?)",
-        [
-            (int(r.COMLOG_ID), r.SUBJECT_CODE_OBJET)
-            for r in subjects.itertuples(index=False)
-        ],
-    )
-    print(f"  {len(subjects):,} subject records inserted")
+    log(f"  {n_dpoh:,} DPOH records inserted")
 
-    con.executemany(
-        "INSERT INTO subject_types VALUES (?,?)",
-        [(r.SUBJECT_CODE_OBJET, r.SMT_EN_DESC) for r in smt.itertuples(index=False)],
-    )
+    # ── 3. Subject matters ────────────────────────────────────────────────────
+    log("Reading Communication_SubjectMattersExport.csv ...")
+    n_subj = 0
+    batch = []
 
-    # ── Indexes ──────────────────────────────────────────────────────────────
-    cur.executescript("""
-        CREATE INDEX idx_c_year     ON communications(comm_year);
-        CREATE INDEX idx_c_month    ON communications(comm_month);
-        CREATE INDEX idx_c_client   ON communications(client_name COLLATE NOCASE);
-        CREATE INDEX idx_c_cnum     ON communications(client_num);
-        CREATE INDEX idx_c_regtype  ON communications(reg_type);
-        CREATE INDEX idx_c_regnum   ON communications(reg_num);
-        CREATE INDEX idx_d_comlog   ON dpoh(comlog_id);
-        CREATE INDEX idx_d_inst     ON dpoh(institution);
-        CREATE INDEX idx_d_name     ON dpoh(dpoh_last, dpoh_first);
-        CREATE INDEX idx_s_comlog   ON subjects(comlog_id);
-        CREATE INDEX idx_s_code     ON subjects(subject_code);
-    """)
+    f, reader = open_csv(zf, "Communication_SubjectMattersExport.csv")
+    for row in reader:
+        cid_raw = clean(row.get("COMLOG_ID", ""))
+        code    = clean(row.get("SUBJECT_CODE_OBJET", ""))
+        if not cid_raw or not code:
+            continue
+        cid = int(cid_raw)
+        if cid not in valid_ids:
+            continue
 
+        batch.append((cid, code))
+
+        if len(batch) >= BATCH:
+            con.executemany("INSERT INTO subjects (comlog_id,subject_code) VALUES (?,?)", batch)
+            con.commit()
+            n_subj += len(batch)
+            batch.clear()
+
+    if batch:
+        con.executemany("INSERT INTO subjects (comlog_id,subject_code) VALUES (?,?)", batch)
+        con.commit()
+        n_subj += len(batch)
+    f.close()
+
+    log(f"  {n_subj:,} subject records inserted")
+
+    # ── 4. Subject type codes (small file) ───────────────────────────────────
+    log("Reading Codes_SubjectMatterTypesExport.csv ...")
+    f, reader = open_csv(zf, "Codes_SubjectMatterTypesExport.csv")
+    smt_rows = [
+        (clean(row["SUBJECT_CODE_OBJET"]), clean(row["SMT_EN_DESC"]))
+        for row in reader
+        if clean(row.get("SUBJECT_CODE_OBJET", ""))
+    ]
+    f.close()
+    con.executemany("INSERT INTO subject_types VALUES (?,?)", smt_rows)
     con.commit()
+    log(f"  {len(smt_rows):,} subject type codes inserted")
+
+    # ── 5. Indexes ────────────────────────────────────────────────────────────
+    log("Creating indexes ...")
+    con.executescript("""
+        CREATE INDEX idx_c_year    ON communications(comm_year);
+        CREATE INDEX idx_c_month   ON communications(comm_month);
+        CREATE INDEX idx_c_client  ON communications(client_name COLLATE NOCASE);
+        CREATE INDEX idx_c_cnum    ON communications(client_num);
+        CREATE INDEX idx_c_regtype ON communications(reg_type);
+        CREATE INDEX idx_c_regnum  ON communications(reg_num);
+        CREATE INDEX idx_d_comlog  ON dpoh(comlog_id);
+        CREATE INDEX idx_d_inst    ON dpoh(institution);
+        CREATE INDEX idx_d_name    ON dpoh(dpoh_last, dpoh_first);
+        CREATE INDEX idx_s_comlog  ON subjects(comlog_id);
+        CREATE INDEX idx_s_code    ON subjects(subject_code);
+    """)
     con.close()
 
     size_mb = DB_PATH.stat().st_size / 1e6
-    print(f"Done. lobby.db = {size_mb:.1f} MB")
+    log(f"Done. lobby.db = {size_mb:.1f} MB")
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ services:
     name: lobbyist-explorer
     runtime: python
     rootDir: lobbyist
-    buildCommand: pip install -r requirements.txt && python build_db.py
+    buildCommand: pip install -r requirements.txt && python -u build_db.py
     startCommand: python app.py
     envVars:
       - key: PORT
