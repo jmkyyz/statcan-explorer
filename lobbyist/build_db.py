@@ -90,6 +90,11 @@ def build():
             subject_code TEXT PRIMARY KEY,
             description  TEXT
         );
+        CREATE TABLE subject_details (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            comlog_id    INTEGER,
+            detail_text  TEXT
+        );
     """)
 
     # ── 1. Primary communications ────────────────────────────────────────────
@@ -215,8 +220,22 @@ def build():
     log("Reading Communication_SubjectMatterDetailsExport.csv ...")
     n_subj2 = 0
     batch = []
+    detail_batch = []
 
     f, reader = open_csv(zf, "Communication_SubjectMatterDetailsExport.csv")
+    # Detect which column holds the English detail description
+    _det_col = None
+    for candidate in ("EN_DESCRIPTION", "DESCRIPTION_EN", "DESCRIP_EN",
+                      "DESCRIPTION", "EN_DESCRIP", "DETAIL_EN", "EN_DETAIL",
+                      "SMT_EN_DESCRIPTION", "EN_SUBJECT_MATTER_DETAILS"):
+        if candidate in (reader.fieldnames or []):
+            _det_col = candidate
+            break
+    if _det_col:
+        log(f"  Detail description column: {_det_col}")
+    else:
+        log(f"  No detail description column found (columns: {reader.fieldnames})")
+
     for row in reader:
         cid_raw  = clean(row.get("COMLOG_ID", ""))
         code_raw = clean(row.get("SUBJECT_CODE_OBJET", ""))
@@ -230,16 +249,29 @@ def build():
         for code in [c.strip() for c in code_raw.split(",") if c.strip()]:
             batch.append((cid, code))
 
+        if _det_col:
+            detail = clean(row.get(_det_col, ""))
+            if detail:
+                detail_batch.append((cid, detail))
+
         if len(batch) >= BATCH:
             con.executemany("INSERT OR IGNORE INTO subjects (comlog_id,subject_code) VALUES (?,?)", batch)
             con.commit()
             n_subj2 += len(batch)
             batch.clear()
 
+        if len(detail_batch) >= BATCH:
+            con.executemany("INSERT INTO subject_details (comlog_id,detail_text) VALUES (?,?)", detail_batch)
+            con.commit()
+            detail_batch.clear()
+
     if batch:
         con.executemany("INSERT OR IGNORE INTO subjects (comlog_id,subject_code) VALUES (?,?)", batch)
         con.commit()
         n_subj2 += len(batch)
+    if detail_batch:
+        con.executemany("INSERT INTO subject_details (comlog_id,detail_text) VALUES (?,?)", detail_batch)
+        con.commit()
     f.close()
 
     log(f"  {n_subj2:,} additional subject records inserted (V6)")
@@ -271,6 +303,7 @@ def build():
         CREATE INDEX idx_d_name    ON dpoh(dpoh_last, dpoh_first);
         CREATE INDEX idx_s_comlog  ON subjects(comlog_id);
         CREATE INDEX idx_s_code    ON subjects(subject_code);
+        CREATE INDEX idx_sd_comlog ON subject_details(comlog_id);
     """)
     con.close()
 

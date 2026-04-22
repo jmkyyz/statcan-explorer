@@ -243,6 +243,24 @@
   }
   .tag.red { background: #fee2e2; color: var(--red); }
   .tag.green { background: #d1fae5; color: #065f46; }
+  .subj-cell { position: relative; }
+  .subj-detail-tip {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: 100%;
+    z-index: 100;
+    background: #1e293b;
+    color: #f1f5f9;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    max-width: 320px;
+    white-space: normal;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+  }
+  .subj-cell:hover .subj-detail-tip { display: block; }
 
   /* Pagination */
   .pagination {
@@ -673,6 +691,10 @@ function renderTable(d) {
     const subjList = (r.subjects || "").split(",")
       .map(s => s.trim()).filter(Boolean)
       .map(s => `<span class="tag green">${s}</span>`).join(" ");
+    const details = (r.subject_details || "").trim();
+    const subjTip = details
+      ? `<div class="subj-detail-tip">${details.split(" || ").map(d => `• ${d}`).join("<br>")}</div>`
+      : "";
 
     return `<tr>
       <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/cmmLgPblcVw?comlogId=${r.comlog_id}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
@@ -681,7 +703,7 @@ function renderTable(d) {
       <td>${r.lobbyist}</td>
       <td>${dpohList || "—"}</td>
       <td>${instList || "—"}</td>
-      <td>${subjList || "—"}</td>
+      <td class="subj-cell">${subjList || "—"}${subjTip}</td>
       <td style="white-space:nowrap;color:var(--muted)">${type}</td>
     </tr>`;
   }).join("");

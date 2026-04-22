@@ -304,12 +304,14 @@ def communications():
                          ELSE d.dpoh_last END
                 )                                        AS dpoh_names,
                 GROUP_CONCAT(DISTINCT d.institution)     AS institutions,
-                GROUP_CONCAT(DISTINCT st.description)    AS subjects
+                GROUP_CONCAT(DISTINCT st.description)    AS subjects,
+                GROUP_CONCAT(DISTINCT sd.detail_text, ' || ')  AS subject_details
             FROM filtered_ids fi
             JOIN communications c  ON c.comlog_id  = fi.comlog_id
             LEFT JOIN dpoh d       ON d.comlog_id  = fi.comlog_id
             LEFT JOIN subjects s   ON s.comlog_id  = fi.comlog_id
             LEFT JOIN subject_types st ON st.subject_code = s.subject_code
+            LEFT JOIN subject_details sd ON sd.comlog_id = fi.comlog_id
             GROUP BY fi.comlog_id
             ORDER BY c.comm_date DESC
             LIMIT ? OFFSET ?
