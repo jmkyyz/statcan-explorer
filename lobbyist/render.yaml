@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: lobbyist
     buildCommand: pip install -r requirements.txt && python -u build_db.py
-    startCommand: python app.py
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --timeout 120 app:app
     envVars:
       - key: PORT
         value: 10000
