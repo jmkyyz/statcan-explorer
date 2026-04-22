@@ -65,25 +65,22 @@ def build_filtered_cte(params: dict):
         wheres.append("c.reg_type = ?")
         binds.append(int(reg_type))
 
+    # Institution and DPOH filters both need the dpoh table joined once
+    if institution or dpoh_q:
+        joins.append("JOIN dpoh d ON c.comlog_id = d.comlog_id")
+
     if institution:
-        joins.append("JOIN dpoh d ON c.comlog_id = d.comlog_id AND d.institution = ?")
+        wheres.append("d.institution = ?")
         binds.append(institution)
 
-    if subject:
-        joins.append("JOIN subjects s ON c.comlog_id = s.comlog_id AND s.subject_code = ?")
-        binds.append(subject)
-
     if dpoh_q:
-        if institution:
-            # dpoh already joined above; add name filter
-            wheres.append("(d.dpoh_last LIKE ? COLLATE NOCASE OR d.dpoh_first LIKE ? COLLATE NOCASE)")
-            binds += [f"%{dpoh_q}%", f"%{dpoh_q}%"]
-        else:
-            joins.append(
-                "JOIN dpoh d ON c.comlog_id = d.comlog_id "
-                "AND (d.dpoh_last LIKE ? COLLATE NOCASE OR d.dpoh_first LIKE ? COLLATE NOCASE)"
-            )
-            binds += [f"%{dpoh_q}%", f"%{dpoh_q}%"]
+        wheres.append("(d.dpoh_last LIKE ? COLLATE NOCASE OR d.dpoh_first LIKE ? COLLATE NOCASE)")
+        binds += [f"%{dpoh_q}%", f"%{dpoh_q}%"]
+
+    if subject:
+        joins.append("JOIN subjects s ON c.comlog_id = s.comlog_id")
+        wheres.append("s.subject_code = ?")
+        binds.append(subject)
 
     join_sql  = " ".join(joins)
     where_sql = " AND ".join(wheres)
