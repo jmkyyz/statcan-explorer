@@ -243,13 +243,11 @@
   }
   .tag.red { background: #fee2e2; color: var(--red); }
   .tag.green { background: #d1fae5; color: #065f46; }
-  .subj-cell { position: relative; }
-  .subj-detail-tip {
+
+  #subj-tooltip {
     display: none;
-    position: absolute;
-    left: 0;
-    top: 100%;
-    z-index: 100;
+    position: fixed;
+    z-index: 1000;
     background: #1e293b;
     color: #f1f5f9;
     border-radius: 6px;
@@ -259,8 +257,8 @@
     max-width: 320px;
     white-space: normal;
     box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    pointer-events: none;
   }
-  .subj-cell:hover .subj-detail-tip { display: block; }
 
   /* Pagination */
   .pagination {
@@ -314,6 +312,8 @@
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div> Loading…
 </div>
+
+<div id="subj-tooltip"></div>
 
 <header>
   <span class="maple">🍁</span>
@@ -692,9 +692,6 @@ function renderTable(d) {
       .map(s => s.trim()).filter(Boolean)
       .map(s => `<span class="tag green">${s}</span>`).join(" ");
     const details = (r.subject_details || "").trim();
-    const subjTip = details
-      ? `<div class="subj-detail-tip">${details.split(" || ").map(d => `• ${d}`).join("<br>")}</div>`
-      : "";
 
     return `<tr>
       <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/cmmLgPblcVw?comlogId=${r.comlog_id}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
@@ -703,7 +700,7 @@ function renderTable(d) {
       <td>${r.lobbyist}</td>
       <td>${dpohList || "—"}</td>
       <td>${instList || "—"}</td>
-      <td class="subj-cell">${subjList || "—"}${subjTip}</td>
+      <td class="subj-cell" data-detail="${details ? details.replace(/"/g, '&quot;') : ''}">${subjList || "—"}</td>
       <td style="white-space:nowrap;color:var(--muted)">${type}</td>
     </tr>`;
   }).join("");
@@ -856,6 +853,34 @@ document.getElementById("clearBtn").addEventListener("click", () => {
 // Pressing Enter in any text field triggers apply
 document.querySelectorAll("input[type=text]").forEach(el => {
   el.addEventListener("keydown", e => { if (e.key === "Enter") loadAll(); });
+});
+
+// ── Subject tooltip (fixed-position, flips above when near bottom) ────────
+const subjTooltip = document.getElementById("subj-tooltip");
+
+document.getElementById("main").addEventListener("mouseover", e => {
+  const cell = e.target.closest(".subj-cell");
+  if (!cell || !cell.dataset.detail) { subjTooltip.style.display = "none"; return; }
+
+  subjTooltip.innerHTML = cell.dataset.detail.split(" || ").map(d => `• ${d}`).join("<br>");
+  subjTooltip.style.display = "block";
+
+  const rect = cell.getBoundingClientRect();
+  const tipH = subjTooltip.offsetHeight;
+  const tipW = subjTooltip.offsetWidth;
+
+  let top  = rect.bottom + 4;
+  let left = rect.left;
+
+  if (top + tipH > window.innerHeight - 8) top = rect.top - tipH - 4;
+  if (left + tipW > window.innerWidth  - 8) left = window.innerWidth - tipW - 8;
+
+  subjTooltip.style.top  = top  + "px";
+  subjTooltip.style.left = left + "px";
+});
+
+document.getElementById("main").addEventListener("mouseleave", () => {
+  subjTooltip.style.display = "none";
 });
 
 // ── Health check + init ───────────────────────────────────────────────────
