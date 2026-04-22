@@ -452,6 +452,7 @@
               <th>Institution(s)</th>
               <th>Subject(s)</th>
               <th>Type</th>
+              <th></th>
             </tr>
           </thead>
           <tbody id="commsBody"></tbody>
@@ -661,6 +662,7 @@ function renderTable(d) {
       <td>${instList || "—"}</td>
       <td>${subjList || "—"}</td>
       <td style="white-space:nowrap;color:var(--muted)">${type}</td>
+      <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/cmmLgPblcVw?comlogId=${r.comlog_id}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
     </tr>`;
   }).join("");
 
