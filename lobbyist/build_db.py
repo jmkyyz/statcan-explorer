@@ -40,7 +40,7 @@ def open_csv(zf: zipfile.ZipFile, name: str):
     """Return a csv.DictReader for a file inside the zip."""
     f = zf.open(name)
     # utf-8-sig strips the BOM if present
-    return f, csv.DictReader(io.TextIOWrapper(f, encoding="utf-8-sig"))
+    return f, csv.DictReader(io.TextIOWrapper(f, encoding="latin-1"))
 
 
 def clean(val):
