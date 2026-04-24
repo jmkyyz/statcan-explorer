@@ -4,6 +4,8 @@ app.py — Lobbyist Registry Explorer
 Flask server: serves the HTML frontend and query API backed by lobby.db.
 """
 
+import datetime
+import json
 import os
 import sqlite3
 import threading
@@ -275,6 +277,19 @@ def _compute_stats(params: dict) -> dict:
     }
 
 
+def _is_default_params(params: dict) -> bool:
+    """True when params represent an unfiltered 'all data' request."""
+    extra = {k for k in params if k not in ("date_from", "date_to")}
+    if extra:
+        return False
+    now = datetime.datetime.utcnow()
+    current_month = f"{now.year}-{now.month:02d}"
+    return (
+        params.get("date_from", "2014-01") <= "2014-01"
+        and params.get("date_to", "2099-12") >= current_month
+    )
+
+
 @app.route("/api/stats")
 def stats():
     params = {k: v for k, v in request.args.items() if v}
@@ -283,6 +298,17 @@ def stats():
     cached = _cache_get(key)
     if cached is not None:
         return jsonify(cached)
+
+    # Serve pre-computed stats from the DB for unfiltered requests
+    if _is_default_params(params):
+        with get_db() as con:
+            row = con.execute(
+                "SELECT value FROM meta WHERE key = 'default_stats'"
+            ).fetchone()
+        if row:
+            result = json.loads(row[0])
+            _cache_set(key, result)
+            return jsonify(result)
 
     result = _compute_stats(params)
     _cache_set(key, result)
@@ -380,13 +406,12 @@ def trigger_update():
 # ── Pre-warm cache on startup ─────────────────────────────────────────────────
 
 def _prewarm():
-    """Pre-warm subjects, institutions, and default stats so first page load is fast."""
-    time.sleep(3)  # let Flask finish starting
+    """Load subjects, institutions, and pre-computed stats into cache from the DB."""
+    time.sleep(2)
     try:
-        import datetime
         print("Pre-warming cache...", flush=True)
+        now = datetime.datetime.utcnow()
 
-        # Subjects and institutions (static within a deployment)
         with get_db() as con:
             subj = rows_to_list(con.execute(
                 "SELECT subject_code, description FROM subject_types ORDER BY description"
@@ -396,17 +421,20 @@ def _prewarm():
                    FROM dpoh WHERE institution != ''
                    GROUP BY institution ORDER BY comm_count DESC"""
             ).fetchall())
+            stats_row = con.execute(
+                "SELECT value FROM meta WHERE key = 'default_stats'"
+            ).fetchone()
+
         _cache_set("__subjects__", subj)
         _cache_set("__institutions__", inst)
 
-        # Stats with the default params the frontend sends on load
-        now = datetime.datetime.utcnow()
-        default_params = {
-            "date_from": "2014-01",
-            "date_to": f"{now.year}-{now.month:02d}",
-        }
-        result = _compute_stats(default_params)
-        _cache_set(str(sorted(default_params.items())), result)
+        if stats_row:
+            default_stats = json.loads(stats_row[0])
+            default_params = {
+                "date_from": "2014-01",
+                "date_to": f"{now.year}-{now.month:02d}",
+            }
+            _cache_set(str(sorted(default_params.items())), default_stats)
 
         print("Cache ready.", flush=True)
     except Exception as e:

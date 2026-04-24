@@ -11,6 +11,7 @@ Run during Render's build step, or locally to refresh the database:
 
 import csv
 import io
+import json
 import sqlite3
 import sys
 import zipfile
@@ -55,6 +56,73 @@ def open_csv(zf: zipfile.ZipFile, name: str):
 def clean(val):
     v = (val or "").strip()
     return "" if v.lower() == "null" else v
+
+
+def compute_default_stats(con):
+    """Compute unfiltered stats and store as JSON in the meta table."""
+    log("Computing default stats for cache...")
+
+    row = con.execute("""
+        SELECT COUNT(*)                   AS total,
+               COUNT(DISTINCT client_num) AS unique_clients,
+               COUNT(DISTINCT reg_num)    AS unique_lobbyists
+        FROM communications
+    """).fetchone()
+    result = {"total": row[0], "unique_clients": row[1], "unique_lobbyists": row[2]}
+
+    result["unique_dpoh"] = con.execute("""
+        SELECT COUNT(DISTINCT dpoh_last || ',' || dpoh_first)
+        FROM dpoh WHERE dpoh_last != ''
+    """).fetchone()[0]
+
+    by_month = con.execute("""
+        SELECT comm_month, COUNT(*) FROM communications
+        GROUP BY comm_month ORDER BY comm_month
+    """).fetchall()
+    result["by_month"] = [{"month": r[0], "count": r[1]} for r in by_month]
+
+    top_clients = con.execute("""
+        SELECT client_name, COUNT(*) AS cnt FROM communications
+        WHERE client_name != ''
+        GROUP BY client_name ORDER BY cnt DESC LIMIT 20
+    """).fetchall()
+    result["top_clients"] = [{"client_name": r[0], "count": r[1]} for r in top_clients]
+
+    top_inst = con.execute("""
+        SELECT institution, COUNT(DISTINCT comlog_id) AS cnt
+        FROM dpoh WHERE institution != ''
+        GROUP BY institution ORDER BY cnt DESC LIMIT 20
+    """).fetchall()
+    result["top_institutions"] = [{"institution": r[0], "count": r[1]} for r in top_inst]
+
+    top_subj = con.execute("""
+        SELECT s.subject_code, st.description, COUNT(DISTINCT s.comlog_id) AS cnt
+        FROM subjects s
+        JOIN subject_types st ON st.subject_code = s.subject_code
+        WHERE s.subject_code != ''
+        GROUP BY s.subject_code ORDER BY cnt DESC
+    """).fetchall()
+    result["top_subjects"] = [
+        {"subject_code": r[0], "description": r[1], "count": r[2]} for r in top_subj
+    ]
+
+    top_dpoh = con.execute("""
+        SELECT dpoh_first || ' ' || dpoh_last AS name,
+               dpoh_title, institution,
+               COUNT(DISTINCT comlog_id) AS cnt
+        FROM dpoh WHERE dpoh_last != ''
+        GROUP BY dpoh_last, dpoh_first, institution
+        ORDER BY cnt DESC LIMIT 20
+    """).fetchall()
+    result["top_dpoh"] = [
+        {"name": r[0], "title": r[1], "institution": r[2], "count": r[3]}
+        for r in top_dpoh
+    ]
+
+    con.execute("INSERT OR REPLACE INTO meta VALUES (?, ?)",
+                ("default_stats", json.dumps(result)))
+    con.commit()
+    log(f"  Done ({result['total']:,} communications)")
 
 
 def build():
@@ -329,6 +397,7 @@ def build():
         CREATE INDEX idx_s_code    ON subjects(subject_code);
         CREATE INDEX idx_sd_comlog ON subject_details(comlog_id);
     """)
+    compute_default_stats(con)
     con.close()
 
     size_mb = DB_PATH.stat().st_size / 1e6
