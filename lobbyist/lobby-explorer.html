@@ -305,6 +305,34 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .no-data { text-align: center; color: var(--muted); padding: 40px; font-size: 13px; }
+
+  /* ── Update banner ───────────────────────────────────────────── */
+  #updateBanner {
+    display: none;
+    background: #fefce8;
+    border-bottom: 1px solid #fde68a;
+    padding: 10px 24px;
+    font-size: 13px;
+    color: #78350f;
+    align-items: center;
+    gap: 12px;
+  }
+  #updateBanner.show { display: flex; }
+  #updateBanner strong { font-weight: 600; }
+  .btn-update {
+    margin-left: auto;
+    padding: 6px 14px;
+    background: #d97706;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-update:hover { background: #b45309; }
+  .btn-update:disabled { opacity: .6; cursor: default; }
 </style>
 </head>
 <body>
@@ -323,6 +351,11 @@
   </div>
   <div class="db-status" id="dbStatus">Connecting…</div>
 </header>
+
+<div id="updateBanner">
+  <span>⚠ <strong>Updated data available</strong> from the Office of the Commissioner of Lobbying.</span>
+  <button class="btn-update" id="updateBtn">Rebuild database</button>
+</div>
 
 <div class="layout">
 
@@ -635,11 +668,12 @@ function renderStats(d) {
   document.getElementById("statLobbyists").textContent = fmt(d.unique_lobbyists);
   document.getElementById("statDpoh").textContent      = fmt(d.unique_dpoh);
 
-  // Time series
+  // Time series — drop last month (always partial data)
+  const completeMonths = d.by_month.slice(0, -1);
   makeLineChart(
     "timeChart",
-    d.by_month.map(r => r.month),
-    d.by_month.map(r => r.count),
+    completeMonths.map(r => r.month),
+    completeMonths.map(r => r.count),
   );
 
   // Top clients
@@ -746,8 +780,8 @@ async function loadTable() {
   }
 }
 
-// ── Populate filter dropdowns ─────────────────────────────────────────────
-async function populateFilters() {
+// ── Populate date dropdowns (sync — must run before filtersToQS) ──────────
+function initDateDropdowns() {
   const now  = new Date();
   const nowY = now.getFullYear();
   const nowM = now.getMonth() + 1;
@@ -755,7 +789,6 @@ async function populateFilters() {
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
                   "Jul","Aug","Sep","Oct","Nov","Dec"];
 
-  // Month selects
   const monthFrom = document.getElementById("monthFrom");
   const monthTo   = document.getElementById("monthTo");
   MONTHS.forEach((name, i) => {
@@ -765,7 +798,6 @@ async function populateFilters() {
   monthFrom.value = 1;
   monthTo.value   = nowM;
 
-  // Year selects
   const yearFrom = document.getElementById("yearFrom");
   const yearTo   = document.getElementById("yearTo");
   for (let y = 2014; y <= nowY; y++) {
@@ -774,20 +806,6 @@ async function populateFilters() {
   }
   yearFrom.value = 2014;
   yearTo.value   = nowY;
-
-  // Subjects
-  const subjects = await apiFetch("/api/subjects");
-  const subSel = document.getElementById("subjectSelect");
-  subjects.forEach(s => {
-    subSel.add(new Option(s.description, s.subject_code));
-  });
-
-  // Institutions
-  const insts = await apiFetch("/api/institutions");
-  const instSel = document.getElementById("institutionSelect");
-  insts.forEach(i => {
-    instSel.add(new Option(i.institution, i.institution));
-  });
 }
 
 // ── Client autocomplete ───────────────────────────────────────────────────
@@ -883,20 +901,86 @@ document.getElementById("main").addEventListener("mouseleave", () => {
   subjTooltip.style.display = "none";
 });
 
+// ── Update check ──────────────────────────────────────────────────────────
+async function checkForUpdate() {
+  try {
+    const data = await apiFetch("/api/check-update");
+    if (!data.update_available) return;
+
+    const banner = document.getElementById("updateBanner");
+    const btn    = document.getElementById("updateBtn");
+    banner.classList.add("show");
+
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.textContent = "Triggering rebuild…";
+      try {
+        await fetch("/api/trigger-update", { method: "POST" });
+      } catch {
+        btn.textContent = "Error — try again";
+        btn.disabled = false;
+        return;
+      }
+
+      // Update banner message and start polling for completion
+      const bannerText = banner.querySelector("span");
+      bannerText.innerHTML = "⏳ <strong>Database rebuild in progress</strong> — this takes about 2 minutes. The page will reload automatically when the updated data is ready.";
+      btn.style.display = "none";
+
+      const poll = setInterval(async () => {
+        try {
+          const status = await apiFetch("/api/check-update");
+          if (!status.update_available) {
+            clearInterval(poll);
+            bannerText.innerHTML = "✓ <strong>Update complete!</strong> Reloading…";
+            setTimeout(() => window.location.reload(), 1500);
+          }
+        } catch {
+          // server mid-restart — keep polling
+        }
+      }, 15000);
+    });
+  } catch {
+    // silently ignore — update check is best-effort
+  }
+}
+
 // ── Health check + init ───────────────────────────────────────────────────
 async function init() {
+  initDateDropdowns();  // sync — sets up date selects so filtersToQS() works
+
+  loading(true);
   try {
-    const h = await apiFetch("/api/health");
-    const [minY, maxY] = h.date_range.map(d => d.slice(0, 4));
+    const [health, subjects, institutions, statsData, tableData] = await Promise.all([
+      apiFetch("/api/health"),
+      apiFetch("/api/subjects"),
+      apiFetch("/api/institutions"),
+      apiFetch("/api/stats" + filtersToQS()),
+      apiFetch("/api/communications" + filtersToQS({ limit: PAGE_SIZE, offset: 0 })),
+    ]);
+
+    const [minY, maxY] = health.date_range.map(d => d.slice(0, 4));
     document.getElementById("dbStatus").textContent =
-      `${fmt(h.total_comms)} records · ${minY}–${maxY}`;
-  } catch {
+      `${fmt(health.total_comms)} records · ${minY}–${maxY}`;
+
+    const subSel = document.getElementById("subjectSelect");
+    subjects.forEach(s => subSel.add(new Option(s.description, s.subject_code)));
+
+    const instSel = document.getElementById("institutionSelect");
+    institutions.forEach(i => instSel.add(new Option(i.institution, i.institution)));
+
+    currentPage = 0;
+    renderStats(statsData);
+    renderTable(tableData);
+  } catch (e) {
     document.getElementById("dbStatus").textContent = "DB unavailable";
+    console.error(e);
     return;
+  } finally {
+    loading(false);
   }
 
-  await populateFilters();
-  await loadAll();
+  checkForUpdate();  // fire-and-forget; shows banner if update available
 }
 
 init();

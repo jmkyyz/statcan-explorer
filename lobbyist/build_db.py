@@ -24,6 +24,15 @@ MIN_DATE = "2014-01-01"
 BATCH = 5_000
 
 
+def get_remote_last_modified() -> str:
+    """Return the Last-Modified header from the zip URL, or empty string."""
+    try:
+        r = requests.head(COMMS_URL, timeout=30)
+        return r.headers.get("Last-Modified", "")
+    except Exception:
+        return ""
+
+
 def log(msg):
     print(msg, flush=True)
 
@@ -49,6 +58,9 @@ def clean(val):
 
 
 def build():
+    remote_last_modified = get_remote_last_modified()
+    log(f"Remote Last-Modified: {remote_last_modified or '(unknown)'}")
+
     zf = download_zip(COMMS_URL)
 
     if DB_PATH.exists():
@@ -59,6 +71,10 @@ def build():
     con.execute("PRAGMA synchronous=OFF")  # faster writes during bulk load
 
     con.executescript("""
+        CREATE TABLE meta (
+            key   TEXT PRIMARY KEY,
+            value TEXT
+        );
         CREATE TABLE communications (
             comlog_id    INTEGER PRIMARY KEY,
             client_num   TEXT,
@@ -289,7 +305,15 @@ def build():
     con.commit()
     log(f"  {len(smt_rows):,} subject type codes inserted")
 
-    # ── 5. Indexes ────────────────────────────────────────────────────────────
+    # ── 5. Meta ───────────────────────────────────────────────────────────────
+    import datetime
+    con.execute("INSERT OR REPLACE INTO meta VALUES (?, ?)",
+                ("source_last_modified", remote_last_modified))
+    con.execute("INSERT OR REPLACE INTO meta VALUES (?, ?)",
+                ("built_at", datetime.datetime.utcnow().isoformat()))
+    con.commit()
+
+    # ── 6. Indexes ────────────────────────────────────────────────────────────
     log("Creating indexes ...")
     con.executescript("""
         CREATE INDEX idx_c_year    ON communications(comm_year);

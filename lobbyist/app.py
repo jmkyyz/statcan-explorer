@@ -11,6 +11,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 
+import requests as http_requests
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
@@ -19,6 +20,8 @@ CORS(app)
 
 DB_PATH = Path(__file__).parent / "lobby.db"
 PORT = int(os.environ.get("PORT", 5002))
+COMMS_ZIP_URL = "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip"
+RENDER_DEPLOY_HOOK = os.environ.get("RENDER_DEPLOY_HOOK", "")
 
 
 # ── DB connection ────────────────────────────────────────────────────────────
@@ -140,22 +143,32 @@ def health():
 
 @app.route("/api/subjects")
 def subjects():
+    cached = _cache_get("__subjects__")
+    if cached is not None:
+        return jsonify(cached)
     with get_db() as con:
         rows = con.execute(
             "SELECT subject_code, description FROM subject_types ORDER BY description"
         ).fetchall()
-    return jsonify(rows_to_list(rows))
+    result = rows_to_list(rows)
+    _cache_set("__subjects__", result)
+    return jsonify(result)
 
 
 @app.route("/api/institutions")
 def institutions():
+    cached = _cache_get("__institutions__")
+    if cached is not None:
+        return jsonify(cached)
     with get_db() as con:
         rows = con.execute(
             """SELECT institution, COUNT(DISTINCT comlog_id) AS comm_count
                FROM dpoh WHERE institution != ''
                GROUP BY institution ORDER BY comm_count DESC"""
         ).fetchall()
-    return jsonify(rows_to_list(rows))
+    result = rows_to_list(rows)
+    _cache_set("__institutions__", result)
+    return jsonify(result)
 
 
 @app.route("/api/clients")
@@ -322,15 +335,79 @@ def communications():
     return jsonify({"total": total, "rows": rows_to_list(rows)})
 
 
+# ── Update check ─────────────────────────────────────────────────────────────
+
+@app.route("/api/check-update")
+def check_update():
+    try:
+        r = http_requests.head(COMMS_ZIP_URL, timeout=15)
+        remote_lm = r.headers.get("Last-Modified", "")
+    except Exception as e:
+        return jsonify({"error": f"HEAD request failed: {e}"}), 502
+
+    with get_db() as con:
+        row = con.execute(
+            "SELECT value FROM meta WHERE key = 'source_last_modified'"
+        ).fetchone()
+        local_lm = row[0] if row else ""
+
+        built_row = con.execute(
+            "SELECT value FROM meta WHERE key = 'built_at'"
+        ).fetchone()
+        built_at = built_row[0] if built_row else ""
+
+    update_available = bool(remote_lm and remote_lm != local_lm)
+    return jsonify({
+        "update_available": update_available,
+        "remote_last_modified": remote_lm,
+        "local_last_modified": local_lm,
+        "built_at": built_at,
+    })
+
+
+@app.route("/api/trigger-update", methods=["POST"])
+def trigger_update():
+    if not RENDER_DEPLOY_HOOK:
+        return jsonify({"error": "RENDER_DEPLOY_HOOK not configured"}), 503
+    try:
+        r = http_requests.post(RENDER_DEPLOY_HOOK, timeout=15)
+        r.raise_for_status()
+        return jsonify({"status": "deploy triggered"})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
 # ── Pre-warm cache on startup ─────────────────────────────────────────────────
 
 def _prewarm():
-    """Compute default stats in the background so the first page load is fast."""
+    """Pre-warm subjects, institutions, and default stats so first page load is fast."""
     time.sleep(3)  # let Flask finish starting
     try:
-        print("Pre-warming stats cache...", flush=True)
-        result = _compute_stats({})
-        _cache_set("[]", result)  # key for empty params
+        import datetime
+        print("Pre-warming cache...", flush=True)
+
+        # Subjects and institutions (static within a deployment)
+        with get_db() as con:
+            subj = rows_to_list(con.execute(
+                "SELECT subject_code, description FROM subject_types ORDER BY description"
+            ).fetchall())
+            inst = rows_to_list(con.execute(
+                """SELECT institution, COUNT(DISTINCT comlog_id) AS comm_count
+                   FROM dpoh WHERE institution != ''
+                   GROUP BY institution ORDER BY comm_count DESC"""
+            ).fetchall())
+        _cache_set("__subjects__", subj)
+        _cache_set("__institutions__", inst)
+
+        # Stats with the default params the frontend sends on load
+        now = datetime.datetime.utcnow()
+        default_params = {
+            "date_from": "2014-01",
+            "date_to": f"{now.year}-{now.month:02d}",
+        }
+        result = _compute_stats(default_params)
+        _cache_set(str(sorted(default_params.items())), result)
+
         print("Cache ready.", flush=True)
     except Exception as e:
         print(f"Pre-warm failed: {e}", flush=True)
