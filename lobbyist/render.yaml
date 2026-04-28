@@ -3,7 +3,10 @@ services:
     name: lobbyist-explorer
     runtime: python
     rootDir: lobbyist
-    buildCommand: pip install -r requirements.txt && python -u build_db.py
+    buildCommand: >-
+      pip install -r requirements.txt &&
+      curl -L --fail -o lobby.db
+      "https://github.com/jmkyyz/statcan-explorer/releases/download/db-latest/lobby.db"
     startCommand: gunicorn --bind 0.0.0.0:$PORT --timeout 120 app:app
     envVars:
       - key: PORT
