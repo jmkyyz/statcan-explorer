@@ -13,11 +13,11 @@ import csv
 import io
 import json
 import sqlite3
+import subprocess
 import sys
+import tempfile
 import zipfile
 from pathlib import Path
-
-import requests
 
 COMMS_URL = "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip"
 DB_PATH = Path(__file__).parent / "lobby.db"
@@ -29,24 +29,44 @@ def log(msg):
     print(msg, flush=True)
 
 
-HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    )
-}
-
-
 def download_zip(url: str) -> tuple:
-    """Download the zip and return (ZipFile, file_size_bytes, last_modified_header)."""
+    """Download the zip via curl and return (ZipFile, file_size_bytes, last_modified_header).
+
+    Uses curl instead of requests because lobbycanada.gc.ca blocks Python's
+    TLS fingerprint from cloud provider IPs.
+    """
     log(f"Downloading {url} ...")
-    r = requests.get(url, headers=HEADERS, timeout=300)
-    r.raise_for_status()
-    data = r.content
-    log(f"  {len(data) / 1e6:.1f} MB downloaded")
-    lm = r.headers.get("Last-Modified", "")
-    return zipfile.ZipFile(io.BytesIO(data)), len(data), lm
+    body_path = Path(tempfile.mktemp(suffix=".zip"))
+    hdr_path  = Path(tempfile.mktemp(suffix=".txt"))
+    try:
+        result = subprocess.run(
+            [
+                "curl", "-L", "-s", "--fail",
+                "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "-D", str(hdr_path),
+                "-o", str(body_path),
+                url,
+            ],
+            capture_output=True, text=True, timeout=300,
+        )
+        if result.returncode != 0:
+            raise RuntimeError(f"curl failed (exit {result.returncode}): {result.stderr.strip()}")
+
+        data = body_path.read_bytes()
+        log(f"  {len(data) / 1e6:.1f} MB downloaded")
+
+        lm = ""
+        try:
+            for line in hdr_path.read_text(errors="ignore").splitlines():
+                if line.lower().startswith("last-modified:"):
+                    lm = line.split(":", 1)[1].strip()
+        except Exception:
+            pass
+
+        return zipfile.ZipFile(io.BytesIO(data)), len(data), lm
+    finally:
+        body_path.unlink(missing_ok=True)
+        hdr_path.unlink(missing_ok=True)
 
 
 def open_csv(zf: zipfile.ZipFile, name: str):
