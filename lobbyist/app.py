@@ -24,6 +24,13 @@ DB_PATH = Path(__file__).parent / "lobby.db"
 PORT = int(os.environ.get("PORT", 5002))
 COMMS_ZIP_URL = "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip"
 RENDER_DEPLOY_HOOK = os.environ.get("RENDER_DEPLOY_HOOK", "")
+BROWSER_HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    )
+}
 
 
 # ── DB connection ────────────────────────────────────────────────────────────
@@ -368,7 +375,7 @@ def check_update():
     try:
         # lobbycanada.gc.ca rejects HEAD requests; use GET with stream=True
         # so we read only response headers and never download the body.
-        r = http_requests.get(COMMS_ZIP_URL, stream=True, timeout=15)
+        r = http_requests.get(COMMS_ZIP_URL, headers=BROWSER_HEADERS, stream=True, timeout=15)
         r.raise_for_status()
         remote_lm = r.headers.get("Last-Modified", "")
         remote_cl = r.headers.get("Content-Length", "")

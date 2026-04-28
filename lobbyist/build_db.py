@@ -29,10 +29,19 @@ def log(msg):
     print(msg, flush=True)
 
 
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/124.0.0.0 Safari/537.36"
+    )
+}
+
+
 def download_zip(url: str) -> tuple:
     """Download the zip and return (ZipFile, file_size_bytes, last_modified_header)."""
     log(f"Downloading {url} ...")
-    r = requests.get(url, timeout=300)
+    r = requests.get(url, headers=HEADERS, timeout=300)
     r.raise_for_status()
     data = r.content
     log(f"  {len(data) / 1e6:.1f} MB downloaded")
