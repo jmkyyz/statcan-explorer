@@ -366,10 +366,15 @@ def communications():
 @app.route("/api/check-update")
 def check_update():
     try:
-        r = http_requests.head(COMMS_ZIP_URL, timeout=15)
+        # lobbycanada.gc.ca rejects HEAD requests; use GET with stream=True
+        # so we read only response headers and never download the body.
+        r = http_requests.get(COMMS_ZIP_URL, stream=True, timeout=15)
+        r.raise_for_status()
         remote_lm = r.headers.get("Last-Modified", "")
+        remote_cl = r.headers.get("Content-Length", "")
+        r.close()
     except Exception as e:
-        return jsonify({"error": f"HEAD request failed: {e}"}), 502
+        return jsonify({"error": f"Request failed: {e}"}), 502
 
     with get_db() as con:
         row = con.execute(
@@ -377,16 +382,30 @@ def check_update():
         ).fetchone()
         local_lm = row[0] if row else ""
 
+        size_row = con.execute(
+            "SELECT value FROM meta WHERE key = 'source_file_size'"
+        ).fetchone()
+        local_size = size_row[0] if size_row else ""
+
         built_row = con.execute(
             "SELECT value FROM meta WHERE key = 'built_at'"
         ).fetchone()
         built_at = built_row[0] if built_row else ""
 
-    update_available = bool(remote_lm and remote_lm != local_lm)
+    # Primary signal: Last-Modified header; fallback: Content-Length vs stored size
+    if remote_lm and local_lm:
+        update_available = remote_lm != local_lm
+    elif remote_cl and local_size:
+        update_available = remote_cl != local_size
+    else:
+        update_available = False
+
     return jsonify({
         "update_available": update_available,
         "remote_last_modified": remote_lm,
         "local_last_modified": local_lm,
+        "remote_content_length": remote_cl,
+        "local_file_size": local_size,
         "built_at": built_at,
     })
 

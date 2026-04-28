@@ -25,25 +25,19 @@ MIN_DATE = "2014-01-01"
 BATCH = 5_000
 
 
-def get_remote_last_modified() -> str:
-    """Return the Last-Modified header from the zip URL, or empty string."""
-    try:
-        r = requests.head(COMMS_URL, timeout=30)
-        return r.headers.get("Last-Modified", "")
-    except Exception:
-        return ""
-
-
 def log(msg):
     print(msg, flush=True)
 
 
-def download_zip(url: str) -> zipfile.ZipFile:
+def download_zip(url: str) -> tuple:
+    """Download the zip and return (ZipFile, file_size_bytes, last_modified_header)."""
     log(f"Downloading {url} ...")
     r = requests.get(url, timeout=300)
     r.raise_for_status()
-    log(f"  {len(r.content) / 1e6:.1f} MB downloaded")
-    return zipfile.ZipFile(io.BytesIO(r.content))
+    data = r.content
+    log(f"  {len(data) / 1e6:.1f} MB downloaded")
+    lm = r.headers.get("Last-Modified", "")
+    return zipfile.ZipFile(io.BytesIO(data)), len(data), lm
 
 
 def open_csv(zf: zipfile.ZipFile, name: str):
@@ -126,10 +120,9 @@ def compute_default_stats(con):
 
 
 def build():
-    remote_last_modified = get_remote_last_modified()
+    zf, file_size, remote_last_modified = download_zip(COMMS_URL)
     log(f"Remote Last-Modified: {remote_last_modified or '(unknown)'}")
-
-    zf = download_zip(COMMS_URL)
+    log(f"File size: {file_size:,} bytes")
 
     if DB_PATH.exists():
         DB_PATH.unlink()
@@ -377,6 +370,8 @@ def build():
     import datetime
     con.execute("INSERT OR REPLACE INTO meta VALUES (?, ?)",
                 ("source_last_modified", remote_last_modified))
+    con.execute("INSERT OR REPLACE INTO meta VALUES (?, ?)",
+                ("source_file_size", str(file_size)))
     con.execute("INSERT OR REPLACE INTO meta VALUES (?, ?)",
                 ("built_at", datetime.datetime.utcnow().isoformat()))
     con.commit()
