@@ -41,7 +41,7 @@ def download_zip(url: str) -> tuple:
     try:
         result = subprocess.run(
             [
-                "curl", "-L", "-s", "--fail", "-k",
+                "curl", "-L", "-s", "--fail", "-k", "--http1.1",
                 "-A", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                 "-D", str(hdr_path),
                 "-o", str(body_path),
