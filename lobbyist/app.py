@@ -24,13 +24,12 @@ DB_PATH = Path(__file__).parent / "lobby.db"
 PORT = int(os.environ.get("PORT", 5002))
 COMMS_ZIP_URL = "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip"
 RENDER_DEPLOY_HOOK = os.environ.get("RENDER_DEPLOY_HOOK", "")
-BROWSER_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    )
-}
+
+try:
+    from curl_cffi import requests as cffi_requests
+    _HAVE_CFFI = True
+except ImportError:
+    _HAVE_CFFI = False
 
 
 # ── DB connection ────────────────────────────────────────────────────────────
@@ -373,9 +372,11 @@ def communications():
 @app.route("/api/check-update")
 def check_update():
     try:
-        # lobbycanada.gc.ca rejects HEAD requests; use GET with stream=True
-        # so we read only response headers and never download the body.
-        r = http_requests.get(COMMS_ZIP_URL, headers=BROWSER_HEADERS, stream=True, timeout=15)
+        # lobbycanada.gc.ca uses JA3 TLS fingerprint blocking — only curl_cffi
+        # (Chrome impersonation) gets through. If not installed, skip check.
+        if not _HAVE_CFFI:
+            return jsonify({"update_available": False, "note": "curl_cffi not available"})
+        r = cffi_requests.get(COMMS_ZIP_URL, impersonate="chrome", stream=True, timeout=15)
         r.raise_for_status()
         remote_lm = r.headers.get("Last-Modified", "")
         remote_cl = r.headers.get("Content-Length", "")
