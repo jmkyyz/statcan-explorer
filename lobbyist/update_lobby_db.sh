@@ -61,21 +61,35 @@ else
     LOCAL_CL=""
 fi
 
-# Compare — skip if both Last-Modified and size are unchanged
+# Compare — skip full rebuild if ZIP is unchanged, but always run patch
+ZIP_CHANGED=true
 if [ -n "$REMOTE_LM" ] && [ "$REMOTE_LM" = "$LOCAL_LM" ]; then
-    echo "    No change (Last-Modified: $REMOTE_LM). Skipping build."
-    exit 0
-fi
-if [ -z "$REMOTE_LM" ] && [ -n "$REMOTE_CL" ] && [ "$REMOTE_CL" = "$LOCAL_CL" ]; then
-    echo "    No change (Content-Length: $REMOTE_CL). Skipping build."
-    exit 0
+    echo "    No change in open-data ZIP (Last-Modified: $REMOTE_LM). Skipping full rebuild."
+    ZIP_CHANGED=false
+elif [ -z "$REMOTE_LM" ] && [ -n "$REMOTE_CL" ] && [ "$REMOTE_CL" = "$LOCAL_CL" ]; then
+    echo "    No change in open-data ZIP (Content-Length: $REMOTE_CL). Skipping full rebuild."
+    ZIP_CHANGED=false
 fi
 
-echo "    New data detected (remote: $REMOTE_LM, local: $LOCAL_LM). Rebuilding ..."
+if [ "$ZIP_CHANGED" = true ]; then
+    echo "    New open-data ZIP detected (remote: $REMOTE_LM, local: $LOCAL_LM). Rebuilding ..."
+    # ── 1. Full rebuild from open-data ZIP ──────────────────────────────────────
+    echo "==> Building lobby.db ..."
+    python3 -u lobbyist/build_db.py
+fi
 
-# ── 1. Build the database ────────────────────────────────────────────────────
-echo "==> Building lobby.db ..."
-python3 -u lobbyist/build_db.py
+# ── 1b. Always patch with real-time records from the live registry ────────────
+echo "==> Patching with recent live records ..."
+PATCH_OUTPUT=$(python3 -u lobbyist/patch_recent.py 2>&1)
+echo "$PATCH_OUTPUT"
+PATCH_NEW=$(echo "$PATCH_OUTPUT" | grep -oP 'New: \K[0-9]+' || echo "0")
+
+# Skip publish/redeploy if nothing changed at all
+if [ "$ZIP_CHANGED" = false ] && [ "$PATCH_NEW" = "0" ]; then
+    echo ""
+    echo "==> Nothing changed — no publish or redeploy needed."
+    exit 0
+fi
 
 # ── 2. Publish to GitHub Releases ───────────────────────────────────────────
 echo "==> Publishing to GitHub Releases (db-latest) ..."

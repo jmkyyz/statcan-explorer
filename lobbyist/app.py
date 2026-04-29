@@ -142,7 +142,19 @@ def health():
             total = con.execute("SELECT COUNT(*) FROM communications").fetchone()[0]
             min_d = con.execute("SELECT MIN(comm_date) FROM communications").fetchone()[0]
             max_d = con.execute("SELECT MAX(comm_date) FROM communications").fetchone()[0]
-        return jsonify({"status": "ok", "total_comms": total, "date_range": [min_d, max_d]})
+            patched = con.execute(
+                "SELECT value FROM meta WHERE key='patched_at'"
+            ).fetchone()
+            patch_count = con.execute(
+                "SELECT value FROM meta WHERE key='patch_new_count'"
+            ).fetchone()
+        return jsonify({
+            "status": "ok",
+            "total_comms": total,
+            "date_range": [min_d, max_d],
+            "patched_at": patched[0] if patched else None,
+            "patch_new_count": int(patch_count[0]) if patch_count else 0,
+        })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -408,6 +420,16 @@ def check_update():
     else:
         update_available = False
 
+    with get_db() as con:
+        patched_row = con.execute(
+            "SELECT value FROM meta WHERE key='patched_at'"
+        ).fetchone()
+        patch_count_row = con.execute(
+            "SELECT value FROM meta WHERE key='patch_new_count'"
+        ).fetchone()
+    patched_at = patched_row[0] if patched_row else ""
+    patch_new_count = int(patch_count_row[0]) if patch_count_row else 0
+
     return jsonify({
         "update_available": update_available,
         "remote_last_modified": remote_lm,
@@ -415,6 +437,8 @@ def check_update():
         "remote_content_length": remote_cl,
         "local_file_size": local_size,
         "built_at": built_at,
+        "patched_at": patched_at,
+        "patch_new_count": patch_new_count,
     })
 
 
