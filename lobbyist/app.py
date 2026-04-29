@@ -40,10 +40,32 @@ def get_db():
         raise RuntimeError("lobby.db not found — run build_db.py first")
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
+    con.execute("PRAGMA cache_size = -65536")   # 64 MB page cache
+    con.execute("PRAGMA mmap_size = 268435456")  # 256 MB memory-mapped I/O
+    con.execute("PRAGMA temp_store = MEMORY")
     try:
         yield con
     finally:
         con.close()
+
+
+def _ensure_indexes():
+    """Add performance indexes that may be missing from older DB builds."""
+    try:
+        with get_db() as con:
+            existing = {r[0] for r in con.execute(
+                "SELECT name FROM sqlite_master WHERE type='index'"
+            ).fetchall()}
+            if "idx_c_date" not in existing:
+                print("Adding idx_c_date index...", flush=True)
+                con.execute("CREATE INDEX idx_c_date ON communications(comm_date DESC)")
+                con.commit()
+            if "idx_d_inst_comlog" not in existing:
+                print("Adding idx_d_inst_comlog index...", flush=True)
+                con.execute("CREATE INDEX idx_d_inst_comlog ON dpoh(institution, comlog_id)")
+                con.commit()
+    except Exception as e:
+        print(f"Index migration failed: {e}", flush=True)
 
 
 def rows_to_list(rows):
@@ -340,6 +362,14 @@ def communications():
     limit  = min(int(request.args.get("limit", 50)), 200)
     offset = int(request.args.get("offset", 0))
 
+    # Serve pre-warmed result for the default unfiltered first page
+    filter_params = {k: v for k, v in request.args.items()
+                     if k not in ("limit", "offset") and v}
+    if offset == 0 and limit == 50 and _is_default_params(filter_params):
+        cached = _cache_get("__default_comms__")
+        if cached is not None:
+            return jsonify(cached)
+
     cte, binds = build_filtered_cte(request.args)
 
     with get_db() as con:
@@ -457,8 +487,7 @@ def trigger_update():
 # ── Pre-warm cache on startup ─────────────────────────────────────────────────
 
 def _prewarm():
-    """Load subjects, institutions, and pre-computed stats into cache from the DB."""
-    time.sleep(2)
+    """Pre-compute all expensive queries so the first page load is instant."""
     try:
         print("Pre-warming cache...", flush=True)
         now = datetime.datetime.utcnow()
@@ -467,17 +496,44 @@ def _prewarm():
             subj = rows_to_list(con.execute(
                 "SELECT subject_code, description FROM subject_types ORDER BY description"
             ).fetchall())
+
             inst = rows_to_list(con.execute(
                 """SELECT institution, COUNT(DISTINCT comlog_id) AS comm_count
                    FROM dpoh WHERE institution != ''
                    GROUP BY institution ORDER BY comm_count DESC"""
             ).fetchall())
+
             stats_row = con.execute(
                 "SELECT value FROM meta WHERE key = 'default_stats'"
             ).fetchone()
 
+            # Pre-warm the default communications page — the slowest query on first load
+            default_comms = rows_to_list(con.execute("""
+                SELECT
+                    c.comlog_id, c.comm_date, c.client_name,
+                    c.reg_first || ' ' || c.reg_last AS lobbyist,
+                    c.reg_type, c.is_amendment,
+                    GROUP_CONCAT(DISTINCT
+                        CASE WHEN d.dpoh_first != '' THEN d.dpoh_first || ' ' || d.dpoh_last
+                             ELSE d.dpoh_last END
+                    ) AS dpoh_names,
+                    GROUP_CONCAT(DISTINCT d.institution) AS institutions,
+                    GROUP_CONCAT(DISTINCT st.description) AS subjects,
+                    GROUP_CONCAT(sd.detail_text, ' || ') AS subject_details
+                FROM communications c
+                LEFT JOIN dpoh d ON d.comlog_id = c.comlog_id
+                LEFT JOIN subjects s ON s.comlog_id = c.comlog_id
+                LEFT JOIN subject_types st ON st.subject_code = s.subject_code
+                LEFT JOIN subject_details sd ON sd.comlog_id = c.comlog_id
+                GROUP BY c.comlog_id
+                ORDER BY c.comm_date DESC
+                LIMIT 50 OFFSET 0
+            """).fetchall())
+            total_comms = con.execute("SELECT COUNT(*) FROM communications").fetchone()[0]
+
         _cache_set("__subjects__", subj)
         _cache_set("__institutions__", inst)
+        _cache_set("__default_comms__", {"total": total_comms, "rows": default_comms})
 
         if stats_row:
             default_stats = json.loads(stats_row[0])
@@ -492,6 +548,7 @@ def _prewarm():
         print(f"Pre-warm failed: {e}", flush=True)
 
 
+_ensure_indexes()
 threading.Thread(target=_prewarm, daemon=True).start()
 
 

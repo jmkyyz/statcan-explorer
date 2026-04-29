@@ -389,8 +389,10 @@ def build():
         CREATE INDEX idx_c_cnum    ON communications(client_num);
         CREATE INDEX idx_c_regtype ON communications(reg_type);
         CREATE INDEX idx_c_regnum  ON communications(reg_num);
+        CREATE INDEX idx_c_date    ON communications(comm_date DESC);
         CREATE INDEX idx_d_comlog  ON dpoh(comlog_id);
         CREATE INDEX idx_d_inst    ON dpoh(institution);
+        CREATE INDEX idx_d_inst_comlog ON dpoh(institution, comlog_id);
         CREATE INDEX idx_d_name    ON dpoh(dpoh_last, dpoh_first);
         CREATE INDEX idx_s_comlog  ON subjects(comlog_id);
         CREATE INDEX idx_s_code    ON subjects(subject_code);
