@@ -40,8 +40,7 @@ def get_db():
         raise RuntimeError("lobby.db not found — run build_db.py first")
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
-    con.execute("PRAGMA cache_size = -65536")   # 64 MB page cache
-    con.execute("PRAGMA mmap_size = 268435456")  # 256 MB memory-mapped I/O
+    con.execute("PRAGMA cache_size = -4096")   # 4 MB page cache (results cached in Python)
     con.execute("PRAGMA temp_store = MEMORY")
     try:
         yield con
