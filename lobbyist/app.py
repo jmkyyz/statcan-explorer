@@ -41,7 +41,6 @@ def get_db():
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA cache_size = -4096")   # 4 MB page cache (results cached in Python)
-    con.execute("PRAGMA temp_store = MEMORY")
     try:
         yield con
     finally:
@@ -75,7 +74,8 @@ def rows_to_list(rows):
 
 _cache: dict = {}
 _cache_lock = threading.Lock()
-CACHE_TTL = 1800  # 30 minutes
+CACHE_TTL = 1800   # 30 minutes
+CACHE_MAX = 100    # evict oldest entries beyond this limit
 
 
 def _cache_get(key: str):
@@ -89,6 +89,10 @@ def _cache_get(key: str):
 def _cache_set(key: str, val):
     with _cache_lock:
         _cache[key] = {"val": val, "exp": time.time() + CACHE_TTL}
+        if len(_cache) > CACHE_MAX:
+            # Evict the entry with the earliest expiry
+            oldest = min(_cache, key=lambda k: _cache[k]["exp"])
+            del _cache[oldest]
 
 
 # ── Filter helpers ───────────────────────────────────────────────────────────
