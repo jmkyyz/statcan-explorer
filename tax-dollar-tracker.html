@@ -352,6 +352,9 @@ body {
         Ranked by combined total (largest → smallest). Federal portion first, provincial stacked on top.
         Hover a segment for the exact amount.
       </div>
+      <div class="chart-note" style="margin-top:6px;">
+        <strong>Note on federal transfers:</strong> The Canada Health Transfer and Canada Social Transfer are federal payments to provinces — they fund provincial healthcare and social services and are reflected in provincial spending figures. Both are shown as federal-only items to avoid counting the same dollars twice.
+      </div>
     </div>
 
     <!-- Detail table -->
@@ -384,9 +387,15 @@ body {
       <li><strong>Federal spending:</strong> Government of Canada —
         <a href="https://www.canada.ca/en/public-services-procurement/services/payments-accounting/public-accounts/2024.html" target="_blank">Public Accounts of Canada 2023–24 (Volume I)</a>
         and <a href="https://budget.canada.ca/2025/home-accueil-en.html" target="_blank">Federal Budget 2025</a>.
-        Major line items include: Canada Health Transfer ($54.7B), elderly benefits ($83.1B),
+        Major line items include: Canada Health Transfer ($54.7B, shown as a separate federal transfer),
+        direct federal health programs — Health Canada, PHAC (~$11B), elderly benefits ($83.1B),
         EI + Canada Child Benefit ($60.6B), and public debt charges ($55.6B) from Budget 2025 projections.
-        Equalization and Territorial Formula Financing ($31.7B) are included in Govt Administration.</li>
+        Equalization and Territorial Formula Financing ($31.7B) are included in Govt Administration.
+        The CHT and CST rows have no provincial counterpart: both are federal transfer payments to provinces
+        already captured in provincial expenditure totals (Statistics Canada). Excluding them from the
+        provincial column prevents double-counting. "Fiscal Transfers &amp; Admin" also includes
+        Equalization ($21.9B) and Territorial Formula Financing ($4.2B) — unconditional transfers that
+        fund provincial/territorial programs across all categories.</li>
       <li><strong>Provincial spending:</strong> Statistics Canada —
         <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501" target="_blank">Table 10-10-0005-01, Government finance statistics (2023)</a>;
         individual provincial public accounts 2023–24</li>
@@ -504,13 +513,17 @@ const PROVINCES = {
 // fedPct = % of federal tax pool; provKey = key in province spending object (null = federal-only)
 const CATS = [
   // Federal % based on 2023-24 Public Accounts actuals + Budget 2025 projections
-  // Key line items: Elderly benefits 14.3%, CHT+bilateral 11.0%, PDC 9.6%,
-  // EI+CCB 10.4%, equalization+TFF+fiscal arrangements folded into admin.
-  { key:'health',       label:'Health',                     fedPct:12, provKey:'health'      },
-  { key:'socialEI',     label:'Social Assistance & EI',     fedPct:10, provKey:'socialEI'    },
+  // Key line items: Elderly benefits 14.3%, CHT 10.0% (transfer to provinces),
+  // direct federal health 2.0%, PDC 9.6%, EI+CCB 10.4%,
+  // CST 3.0% (transfer to provinces for social services + post-secondary),
+  // equalization+TFF+fiscal arrangements (~5.8%) folded into Fiscal Transfers & Admin.
+  { key:'cht',          label:'Canada Health Transfer',     fedPct:10, provKey:null          },
+  { key:'health',       label:'Direct Federal Health',      fedPct: 2, provKey:'health'      },
+  { key:'cst',          label:'Canada Social Transfer',      fedPct: 3, provKey:null          },
+  { key:'socialEI',     label:'Social Assistance & EI',     fedPct: 7, provKey:'socialEI'    },
   { key:'oas',          label:'OAS & Retirement',            fedPct:15, provKey:null          },
   { key:'debt',         label:'Debt Servicing',              fedPct:10, provKey:'debt'        },
-  { key:'admin',        label:'Govt Administration',         fedPct:12, provKey:'admin'       },
+  { key:'admin',        label:'Fiscal Transfers & Admin',    fedPct:12, provKey:'admin'       },
   { key:'education',    label:'Education',                   fedPct: 4, provKey:'education'   },
   { key:'transport',    label:'Transportation & Infra',      fedPct: 2, provKey:'transport'   },
   { key:'indigenous',   label:'Indigenous Services',         fedPct: 5, provKey:null          },
