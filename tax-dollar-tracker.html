@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tax Dollar Tracker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue:    #2563eb;
+  --blue-dk: #1d4ed8;
+  --blue-lt: #eff6ff;
+  --green:   #10b981;
+  --green-lt:#ecfdf5;
+  --gray-50: #f9fafb;
+  --gray-100:#f3f4f6;
+  --gray-200:#e5e7eb;
+  --gray-500:#6b7280;
+  --gray-700:#374151;
+  --gray-900:#111827;
+  --radius:  10px;
+  --shadow:  0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  background: var(--gray-50);
+  color: var(--gray-900);
+  min-height: 100vh;
+}
+
+/* ── Header ── */
+.site-header {
+  background: var(--blue);
+  color: white;
+  padding: 20px 24px;
+}
+.site-header h1 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.site-header p {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-top: 3px;
+}
+
+/* ── Layout ── */
+.container {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 28px 20px 60px;
+}
+
+/* ── Card ── */
+.card {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.card-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 16px;
+}
+
+/* ── Form ── */
+.form-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 160px;
+}
+.form-group label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--gray-700);
+}
+.form-group input,
+.form-group select {
+  height: 42px;
+  padding: 0 12px;
+  border: 1.5px solid var(--gray-200);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: var(--gray-900);
+  background: white;
+  outline: none;
+  transition: border-color .15s;
+}
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--blue);
+}
+.form-group input::placeholder { color: var(--gray-500); }
+
+.btn {
+  height: 42px;
+  padding: 0 28px;
+  background: var(--blue);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.btn:hover { background: var(--blue-dk); }
+
+/* ── Stat cards ── */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+@media (max-width: 600px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+}
+.stat-card {
+  background: white;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px 18px;
+}
+.stat-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 6px;
+}
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  line-height: 1.1;
+}
+.stat-value.blue  { color: var(--blue); }
+.stat-value.green { color: var(--green); }
+.stat-sub {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  margin-top: 3px;
+}
+
+/* ── Chart card ── */
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chart-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+.legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.82rem;
+  color: var(--gray-700);
+}
+.legend-dot {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  display: inline-block;
+  margin-right: 5px;
+  vertical-align: middle;
+}
+.chart-note {
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  margin-top: 12px;
+}
+
+/* ── Table ── */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.data-table th {
+  background: var(--blue);
+  color: white;
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  font-size: 0.8rem;
+}
+.data-table th:not(:first-child) { text-align: right; }
+.data-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--gray-100);
+}
+.data-table td:not(:first-child) { text-align: right; }
+.data-table tr:last-child td { border-bottom: none; }
+.data-table tr:nth-child(even) td { background: var(--gray-50); }
+.data-table .total-row td {
+  font-weight: 700;
+  background: var(--blue-lt) !important;
+  border-top: 2px solid var(--blue);
+}
+.fed-amt  { color: var(--blue); }
+.prov-amt { color: var(--green); }
+.dim      { color: var(--gray-500); font-size: 0.8rem; }
+
+/* ── Results section ── */
+#results { display: none; }
+
+/* ── Estimate banner ── */
+.estimate-banner {
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  color: #92400e;
+  margin-bottom: 20px;
+}
+
+/* ── Sources ── */
+.sources {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--gray-200);
+  font-size: 0.78rem;
+  color: var(--gray-500);
+  line-height: 1.6;
+}
+.sources h3 {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin-bottom: 8px;
+}
+.sources a { color: var(--blue); text-decoration: none; }
+.sources a:hover { text-decoration: underline; }
+.sources ul { padding-left: 16px; }
+.sources li { margin-bottom: 3px; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <h1>Tax Dollar Tracker</h1>
+  <p>See where your Canadian income tax dollars go — federal and provincial</p>
+</header>
+
+<div class="container">
+
+  <!-- Input form -->
+  <div class="card">
+    <div class="card-title">Calculate Your Tax</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label for="income">Annual Income</label>
+        <input type="number" id="income" placeholder="e.g. 80000" min="0" max="2000000">
+      </div>
+      <div class="form-group">
+        <label for="province">Province / Territory</label>
+        <select id="province">
+          <option value="">Select province…</option>
+          <option value="AB">Alberta</option>
+          <option value="BC">British Columbia</option>
+          <option value="MB">Manitoba</option>
+          <option value="NB">New Brunswick</option>
+          <option value="NL">Newfoundland and Labrador</option>
+          <option value="NS">Nova Scotia</option>
+          <option value="NT">Northwest Territories</option>
+          <option value="NU">Nunavut</option>
+          <option value="ON">Ontario</option>
+          <option value="PE">Prince Edward Island</option>
+          <option value="QC">Quebec</option>
+          <option value="SK">Saskatchewan</option>
+          <option value="YT">Yukon</option>
+        </select>
+      </div>
+      <button class="btn" onclick="handleCalculate()">Calculate</button>
+    </div>
+    <div id="form-error" style="color:#dc2626;font-size:0.83rem;margin-top:10px;display:none;"></div>
+  </div>
+
+  <!-- Results -->
+  <div id="results">
+
+    <div class="estimate-banner">
+      <strong>Estimates only.</strong> Income tax calculated using 2024 brackets and basic personal amount credit only.
+      CPP, EI, surtaxes, and additional credits are not applied.
+      Spending allocations are approximate percentages from 2023–24 public accounts.
+    </div>
+
+    <!-- Stat cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Tax</div>
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-sub" id="stat-income-sub">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Federal Tax</div>
+        <div class="stat-value blue" id="stat-federal">—</div>
+        <div class="stat-sub" id="stat-fed-pct">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Provincial Tax</div>
+        <div class="stat-value green" id="stat-provincial">—</div>
+        <div class="stat-sub" id="stat-prov-pct">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Effective Rate</div>
+        <div class="stat-value" id="stat-rate">—</div>
+        <div class="stat-sub">of gross income</div>
+      </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="card">
+      <div class="chart-header">
+        <div class="chart-title">Where your tax dollars go</div>
+        <div class="legend">
+          <span><span class="legend-dot" style="background:var(--blue)"></span>Federal</span>
+          <span><span class="legend-dot" style="background:var(--green)"></span>Provincial</span>
+        </div>
+      </div>
+      <div style="position:relative;" id="chart-wrap">
+        <canvas id="taxChart"></canvas>
+      </div>
+      <div class="chart-note">
+        Ranked by combined total (largest → smallest). Federal portion first, provincial stacked on top.
+        Hover a segment for the exact amount.
+      </div>
+    </div>
+
+    <!-- Detail table -->
+    <div class="card">
+      <div class="card-title">Detailed Breakdown</div>
+      <div style="overflow-x:auto">
+        <table class="data-table" id="detail-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Federal</th>
+              <th>Provincial</th>
+              <th>Combined</th>
+              <th>% of Total Tax</th>
+            </tr>
+          </thead>
+          <tbody id="table-body"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /results -->
+
+  <!-- Sources -->
+  <div class="sources">
+    <h3>Sources & Notes</h3>
+    <ul>
+      <li><strong>Tax brackets (2024):</strong> Canada Revenue Agency —
+        <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/frequently-asked-questions-individuals/canadian-income-tax-rates-individuals-current-previous-years.html" target="_blank">Federal and provincial/territorial rates</a></li>
+      <li><strong>Federal spending:</strong> Government of Canada —
+        <a href="https://www.tbs-sct.canada.ca/hgw-cgf/finances/pubs_po/dpr-rmr/index-eng.asp" target="_blank">Public Accounts of Canada 2023–24</a>
+        and <a href="https://budget.canada.ca" target="_blank">2024 Federal Budget</a></li>
+      <li><strong>Provincial spending:</strong> Statistics Canada —
+        <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501" target="_blank">Table 10-10-0005-01, Government finance statistics (2023)</a>;
+        individual provincial public accounts 2023–24</li>
+      <li>Spending allocations are approximate and rounded to the nearest 1%. Actual allocations vary year to year.</li>
+      <li>Ontario surtax not applied. Quebec federal abatement not applied. See methodology document for full list of simplifications.</li>
+    </ul>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// TAX DATA
+// ═══════════════════════════════════════════════════════════════
+
+const FED_BRACKETS = [
+  [55867,  0.15],
+  [111733, 0.205],
+  [154906, 0.26],
+  [220000, 0.29],
+  [Infinity, 0.33],
+];
+const FED_BPA = 15705;
+
+const PROVINCES = {
+  AB: {
+    name: 'Alberta',
+    brackets: [[148269,.10],[177922,.12],[237230,.13],[355845,.14],[Infinity,.15]],
+    bpa: 21003,
+    spending: { health:43, socialEI:7,  debt:3,  admin:5, education:18, transport:8,  justice:5, housing:3, environment:4, other:4 },
+  },
+  BC: {
+    name: 'British Columbia',
+    brackets: [[45654,.0506],[91310,.077],[104835,.105],[127299,.1229],[172602,.147],[240716,.168],[Infinity,.205]],
+    bpa: 11981,
+    spending: { health:39, socialEI:10, debt:5,  admin:5, education:18, transport:7,  justice:5, housing:3, environment:4, other:4 },
+  },
+  MB: {
+    name: 'Manitoba',
+    brackets: [[36842,.108],[79625,.1275],[Infinity,.174]],
+    bpa: 15780,
+    spending: { health:37, socialEI:11, debt:8,  admin:5, education:20, transport:7,  justice:5, housing:2, environment:3, other:2 },
+  },
+  NB: {
+    name: 'New Brunswick',
+    brackets: [[47715,.1482],[95431,.1652],[176756,.195],[Infinity,.203]],
+    bpa: 12458,
+    spending: { health:42, socialEI:8,  debt:9,  admin:4, education:17, transport:7,  justice:5, housing:2, environment:4, other:2 },
+  },
+  NL: {
+    name: 'Newfoundland and Labrador',
+    brackets: [[43198,.087],[86395,.145],[154244,.158],[215943,.178],[275870,.198],[Infinity,.213]],
+    bpa: 10818,
+    spending: { health:42, socialEI:6,  debt:9,  admin:4, education:16, transport:9,  justice:5, housing:2, environment:5, other:2 },
+  },
+  NS: {
+    name: 'Nova Scotia',
+    brackets: [[29590,.0879],[59180,.1495],[93000,.1667],[150000,.175],[Infinity,.21]],
+    bpa: 8481,
+    spending: { health:43, socialEI:8,  debt:8,  admin:4, education:17, transport:7,  justice:5, housing:2, environment:4, other:2 },
+  },
+  NT: {
+    name: 'Northwest Territories',
+    brackets: [[50597,.059],[101198,.086],[164525,.122],[Infinity,.1405]],
+    bpa: 16593,
+    spending: { health:30, socialEI:7,  debt:2,  admin:5, education:22, transport:14, justice:8, housing:3, environment:7, other:2 },
+  },
+  NU: {
+    name: 'Nunavut',
+    brackets: [[53268,.04],[106537,.07],[173205,.09],[Infinity,.115]],
+    bpa: 17925,
+    spending: { health:29, socialEI:8,  debt:1,  admin:5, education:25, transport:12, justice:8, housing:4, environment:6, other:2 },
+  },
+  ON: {
+    name: 'Ontario',
+    brackets: [[51446,.0505],[102894,.0915],[150000,.1116],[220000,.1216],[Infinity,.1316]],
+    bpa: 11865,
+    spending: { health:40, socialEI:11, debt:9,  admin:5, education:18, transport:5,  justice:5, housing:3, environment:3, other:1 },
+  },
+  PE: {
+    name: 'Prince Edward Island',
+    brackets: [[32656,.0965],[64313,.1363],[105000,.1665],[140000,.18],[Infinity,.1875]],
+    bpa: 12000,
+    spending: { health:40, socialEI:7,  debt:7,  admin:5, education:20, transport:8,  justice:5, housing:2, environment:4, other:2 },
+  },
+  QC: {
+    name: 'Quebec',
+    brackets: [[51780,.14],[103545,.19],[126000,.24],[Infinity,.2575]],
+    bpa: 17183,
+    spending: { health:40, socialEI:12, debt:7,  admin:4, education:20, transport:6,  justice:4, housing:2, environment:3, other:2 },
+  },
+  SK: {
+    name: 'Saskatchewan',
+    brackets: [[49720,.105],[142058,.125],[Infinity,.145]],
+    bpa: 17661,
+    spending: { health:38, socialEI:6,  debt:3,  admin:6, education:19, transport:10, justice:6, housing:3, environment:5, other:4 },
+  },
+  YT: {
+    name: 'Yukon',
+    brackets: [[55867,.064],[111733,.09],[154906,.109],[500000,.128],[Infinity,.15]],
+    bpa: 15705,
+    spending: { health:28, socialEI:7,  debt:2,  admin:5, education:24, transport:16, justice:8, housing:1, environment:7, other:2 },
+  },
+};
+
+// Shared spending taxonomy — 18 categories
+// fedPct = % of federal tax pool; provKey = key in province spending object (null = federal-only)
+const CATS = [
+  { key:'health',       label:'Health',                     fedPct:10, provKey:'health'      },
+  { key:'socialEI',     label:'Social Assistance & EI',     fedPct:13, provKey:'socialEI'    },
+  { key:'oas',          label:'OAS & Retirement',            fedPct:15, provKey:null          },
+  { key:'debt',         label:'Debt Servicing',              fedPct:10, provKey:'debt'        },
+  { key:'admin',        label:'Govt Administration',         fedPct:10, provKey:'admin'       },
+  { key:'education',    label:'Education',                   fedPct: 3, provKey:'education'   },
+  { key:'transport',    label:'Transportation & Infra',      fedPct: 4, provKey:'transport'   },
+  { key:'indigenous',   label:'Indigenous Services',         fedPct: 6, provKey:null          },
+  { key:'justice',      label:'Justice & Public Safety',     fedPct: 3, provKey:'justice'     },
+  { key:'defence',      label:'National Defence',            fedPct: 5, provKey:null          },
+  { key:'housing',      label:'Housing & Communities',       fedPct: 3, provKey:'housing'     },
+  { key:'environment',  label:'Environment & Climate',       fedPct: 2, provKey:'environment' },
+  { key:'science',      label:'Science & Innovation',        fedPct: 3, provKey:null          },
+  { key:'intlDev',      label:'International Development',   fedPct: 2, provKey:null          },
+  { key:'immigration',  label:'Immigration & Settlement',    fedPct: 2, provKey:null          },
+  { key:'agriculture',  label:'Agriculture & Food',          fedPct: 1, provKey:null          },
+  { key:'veterans',     label:'Veterans Affairs',            fedPct: 1, provKey:null          },
+  { key:'other',        label:'Other',                       fedPct: 7, provKey:'other'       },
+];
+
+// ═══════════════════════════════════════════════════════════════
+// TAX CALCULATION
+// ═══════════════════════════════════════════════════════════════
+
+function calcTax(income, brackets, bpa) {
+  let tax = 0;
+  let prev = 0;
+  for (const [limit, rate] of brackets) {
+    if (income <= prev) break;
+    const slice = Math.min(income, limit === Infinity ? income : limit) - prev;
+    tax += slice * rate;
+    if (limit === Infinity) break;
+    prev = limit;
+  }
+  tax -= bpa * brackets[0][1]; // BPA credit at lowest rate
+  return Math.max(0, Math.round(tax));
+}
+
+function calculate(income, provKey) {
+  const prov   = PROVINCES[provKey];
+  const fedTax = calcTax(income, FED_BRACKETS, FED_BPA);
+  const provTax = calcTax(income, prov.brackets, prov.bpa);
+  const total   = fedTax + provTax;
+
+  const catData = CATS.map(cat => {
+    const fedAmt  = Math.round((cat.fedPct / 100) * fedTax);
+    const provAmt = cat.provKey
+      ? Math.round(((prov.spending[cat.provKey] || 0) / 100) * provTax)
+      : 0;
+    return {
+      label:    cat.label,
+      fedAmt,
+      provAmt,
+      combined: fedAmt + provAmt,
+      pct:      total > 0 ? (fedAmt + provAmt) / total : 0,
+    };
+  }).sort((a, b) => b.combined - a.combined);
+
+  return { fedTax, provTax, total, catData };
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FORMATTING
+// ═══════════════════════════════════════════════════════════════
+
+const fmt = n => '$' + Math.round(n).toLocaleString('en-CA');
+const fmtPct = n => (n * 100).toFixed(1) + '%';
+
+// ═══════════════════════════════════════════════════════════════
+// CHART
+// ═══════════════════════════════════════════════════════════════
+
+let chartInstance = null;
+
+const endLabelPlugin = {
+  id: 'endLabels',
+  afterDatasetsDraw(chart) {
+    const { ctx, scales: { x, y }, data } = chart;
+    ctx.save();
+    ctx.font = '11px -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+    ctx.fillStyle = '#6b7280';
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    data.labels.forEach((_, i) => {
+      const fedAmt  = data.datasets[0].data[i];
+      const provAmt = data.datasets[1].data[i];
+      const total   = fedAmt + provAmt;
+      const pct     = chart._totalTax > 0 ? (total / chart._totalTax * 100).toFixed(1) : '0.0';
+      const barRight = x.getPixelForValue(total);
+      const midY     = y.getPixelForValue(i);
+      ctx.fillText(`${fmt(total)} (${pct}%)`, barRight + 8, midY);
+    });
+    ctx.restore();
+  }
+};
+
+function renderChart(catData, totalTax) {
+  const wrap = document.getElementById('chart-wrap');
+  const height = Math.max(320, catData.length * 36 + 60);
+  wrap.style.height = height + 'px';
+
+  const canvas = document.getElementById('taxChart');
+
+  if (chartInstance) {
+    chartInstance.destroy();
+    chartInstance = null;
+  }
+
+  chartInstance = new Chart(canvas, {
+    type: 'bar',
+    plugins: [endLabelPlugin],
+    data: {
+      labels:   catData.map(c => c.label),
+      datasets: [
+        {
+          label: 'Federal',
+          data:  catData.map(c => c.fedAmt),
+          backgroundColor: '#2563eb',
+          barThickness: 22,
+          borderSkipped: false,
+        },
+        {
+          label: 'Provincial',
+          data:  catData.map(c => c.provAmt),
+          backgroundColor: '#10b981',
+          barThickness: 22,
+          borderSkipped: false,
+        },
+      ],
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      layout: { padding: { right: 140 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.x)}`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grid: { color: '#f3f4f6' },
+          ticks: {
+            callback: v => '$' + (v >= 1000 ? (v/1000).toFixed(0)+'k' : v),
+            font: { size: 11 },
+          },
+          title: {
+            display: true,
+            text: 'Estimated tax dollars allocated',
+            font: { size: 11 },
+            color: '#9ca3af',
+          },
+        },
+        y: {
+          stacked: true,
+          grid: { display: false },
+          ticks: { font: { size: 12 }, color: '#374151' },
+        },
+      },
+    },
+  });
+
+  // Attach total for the end-label plugin
+  chartInstance._totalTax = totalTax;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TABLE
+// ═══════════════════════════════════════════════════════════════
+
+function renderTable(catData, fedTax, provTax, total) {
+  const tbody = document.getElementById('table-body');
+  tbody.innerHTML = '';
+
+  catData.forEach(c => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${c.label}</td>
+      <td class="fed-amt">${c.fedAmt > 0 ? fmt(c.fedAmt) : '<span class="dim">—</span>'}</td>
+      <td class="prov-amt">${c.provAmt > 0 ? fmt(c.provAmt) : '<span class="dim">—</span>'}</td>
+      <td><strong>${fmt(c.combined)}</strong></td>
+      <td>${fmtPct(c.pct)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  // Total row
+  const totalRow = document.createElement('tr');
+  totalRow.className = 'total-row';
+  totalRow.innerHTML = `
+    <td>Total</td>
+    <td class="fed-amt">${fmt(fedTax)}</td>
+    <td class="prov-amt">${fmt(provTax)}</td>
+    <td>${fmt(total)}</td>
+    <td>100%</td>
+  `;
+  tbody.appendChild(totalRow);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MAIN HANDLER
+// ═══════════════════════════════════════════════════════════════
+
+function handleCalculate() {
+  const incomeRaw = document.getElementById('income').value.trim();
+  const provKey   = document.getElementById('province').value;
+  const errEl     = document.getElementById('form-error');
+
+  // Validate
+  errEl.style.display = 'none';
+  const income = parseFloat(incomeRaw);
+  if (!incomeRaw || isNaN(income) || income < 0) {
+    errEl.textContent = 'Please enter a valid annual income.';
+    errEl.style.display = 'block';
+    return;
+  }
+  if (!provKey) {
+    errEl.textContent = 'Please select a province or territory.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const { fedTax, provTax, total, catData } = calculate(income, provKey);
+  const effRate = income > 0 ? total / income : 0;
+  const prov    = PROVINCES[provKey];
+
+  // Stat cards
+  document.getElementById('stat-total').textContent     = fmt(total);
+  document.getElementById('stat-income-sub').textContent = `on ${fmt(income)} income`;
+  document.getElementById('stat-federal').textContent   = fmt(fedTax);
+  document.getElementById('stat-fed-pct').textContent   = fmtPct(fedTax / income) + ' of income';
+  document.getElementById('stat-provincial').textContent = fmt(provTax);
+  document.getElementById('stat-prov-pct').textContent  = fmtPct(provTax / income) + ' of income';
+  document.getElementById('stat-rate').textContent      = fmtPct(effRate);
+
+  // Render
+  renderChart(catData, total);
+  renderTable(catData, fedTax, provTax, total);
+
+  // Show results
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// Allow Enter key to trigger calculate
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleCalculate();
+});
+</script>
+</body>
+</html>

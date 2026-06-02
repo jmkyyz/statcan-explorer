@@ -50,6 +50,11 @@ def lab():
     here = os.path.dirname(os.path.abspath(__file__))
     return send_from_directory(here, "statcan-explorer-lab.html")
 
+@app.route("/tax")
+def tax_tracker():
+    here = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(here, "tax-dollar-tracker.html")
+
 STATCAN_BASE = "https://www150.statcan.gc.ca/t1/wds/rest"
 BOC_BASE     = "https://www.bankofcanada.ca/valet"
 CIMT_BASE    = "https://www150.statcan.gc.ca/t1/cimt/rest"
