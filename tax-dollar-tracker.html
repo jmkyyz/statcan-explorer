@@ -382,13 +382,16 @@ body {
       <li><strong>Tax brackets (2025):</strong> Canada Revenue Agency / TaxTips.ca —
         <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/frequently-asked-questions-individuals/canadian-income-tax-rates-individuals-current-previous-years.html" target="_blank">Federal and provincial/territorial rates</a></li>
       <li><strong>Federal spending:</strong> Government of Canada —
-        <a href="https://www.tbs-sct.canada.ca/hgw-cgf/finances/pubs_po/dpr-rmr/index-eng.asp" target="_blank">Public Accounts of Canada 2023–24</a>
-        and <a href="https://budget.canada.ca" target="_blank">2024 Federal Budget</a></li>
+        <a href="https://www.canada.ca/en/public-services-procurement/services/payments-accounting/public-accounts/2024.html" target="_blank">Public Accounts of Canada 2023–24 (Volume I)</a>
+        and <a href="https://budget.canada.ca/2025/home-accueil-en.html" target="_blank">Federal Budget 2025</a>.
+        Major line items include: Canada Health Transfer ($54.7B), elderly benefits ($83.1B),
+        EI + Canada Child Benefit ($60.6B), and public debt charges ($55.6B) from Budget 2025 projections.
+        Equalization and Territorial Formula Financing ($31.7B) are included in Govt Administration.</li>
       <li><strong>Provincial spending:</strong> Statistics Canada —
         <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501" target="_blank">Table 10-10-0005-01, Government finance statistics (2023)</a>;
         individual provincial public accounts 2023–24</li>
       <li>Spending allocations are approximate and rounded to the nearest 1%. Actual allocations vary year to year.</li>
-      <li>Ontario surtax not applied. Quebec federal abatement not applied. See methodology document for full list of simplifications.</li>
+      <li>Ontario surtax and Quebec federal abatement (16.5%) are applied. PEI surtax eliminated for 2025 (restructured into bracket rates). See methodology document for full list of simplifications.</li>
     </ul>
   </div>
 
@@ -500,24 +503,27 @@ const PROVINCES = {
 // Shared spending taxonomy — 18 categories
 // fedPct = % of federal tax pool; provKey = key in province spending object (null = federal-only)
 const CATS = [
-  { key:'health',       label:'Health',                     fedPct:10, provKey:'health'      },
-  { key:'socialEI',     label:'Social Assistance & EI',     fedPct:13, provKey:'socialEI'    },
+  // Federal % based on 2023-24 Public Accounts actuals + Budget 2025 projections
+  // Key line items: Elderly benefits 14.3%, CHT+bilateral 11.0%, PDC 9.6%,
+  // EI+CCB 10.4%, equalization+TFF+fiscal arrangements folded into admin.
+  { key:'health',       label:'Health',                     fedPct:12, provKey:'health'      },
+  { key:'socialEI',     label:'Social Assistance & EI',     fedPct:10, provKey:'socialEI'    },
   { key:'oas',          label:'OAS & Retirement',            fedPct:15, provKey:null          },
   { key:'debt',         label:'Debt Servicing',              fedPct:10, provKey:'debt'        },
-  { key:'admin',        label:'Govt Administration',         fedPct:10, provKey:'admin'       },
-  { key:'education',    label:'Education',                   fedPct: 3, provKey:'education'   },
-  { key:'transport',    label:'Transportation & Infra',      fedPct: 4, provKey:'transport'   },
-  { key:'indigenous',   label:'Indigenous Services',         fedPct: 6, provKey:null          },
-  { key:'justice',      label:'Justice & Public Safety',     fedPct: 3, provKey:'justice'     },
+  { key:'admin',        label:'Govt Administration',         fedPct:12, provKey:'admin'       },
+  { key:'education',    label:'Education',                   fedPct: 4, provKey:'education'   },
+  { key:'transport',    label:'Transportation & Infra',      fedPct: 2, provKey:'transport'   },
+  { key:'indigenous',   label:'Indigenous Services',         fedPct: 5, provKey:null          },
+  { key:'justice',      label:'Justice & Public Safety',     fedPct: 2, provKey:'justice'     },
   { key:'defence',      label:'National Defence',            fedPct: 5, provKey:null          },
-  { key:'housing',      label:'Housing & Communities',       fedPct: 3, provKey:'housing'     },
+  { key:'housing',      label:'Housing & Communities',       fedPct: 2, provKey:'housing'     },
   { key:'environment',  label:'Environment & Climate',       fedPct: 2, provKey:'environment' },
-  { key:'science',      label:'Science & Innovation',        fedPct: 3, provKey:null          },
-  { key:'intlDev',      label:'International Development',   fedPct: 2, provKey:null          },
-  { key:'immigration',  label:'Immigration & Settlement',    fedPct: 2, provKey:null          },
+  { key:'science',      label:'Science & Innovation',        fedPct: 2, provKey:null          },
+  { key:'intlDev',      label:'International Development',   fedPct: 1, provKey:null          },
+  { key:'immigration',  label:'Immigration & Settlement',    fedPct: 1, provKey:null          },
   { key:'agriculture',  label:'Agriculture & Food',          fedPct: 1, provKey:null          },
-  { key:'veterans',     label:'Veterans Affairs',            fedPct: 1, provKey:null          },
-  { key:'other',        label:'Other',                       fedPct: 7, provKey:'other'       },
+  { key:'veterans',     label:'Veterans Affairs',            fedPct: 2, provKey:null          },
+  { key:'other',        label:'Other',                       fedPct:12, provKey:'other'       },
 ];
 
 // ═══════════════════════════════════════════════════════════════
