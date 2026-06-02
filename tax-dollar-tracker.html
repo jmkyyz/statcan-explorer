@@ -307,8 +307,8 @@ body {
   <div id="results">
 
     <div class="estimate-banner">
-      <strong>Estimates only.</strong> Income tax calculated using 2024 brackets and basic personal amount credit only.
-      CPP, EI, surtaxes, and additional credits are not applied.
+      <strong>Estimates only.</strong> Income tax calculated using 2024 brackets, basic personal amount credit,
+      Ontario and PEI surtaxes, and Quebec federal abatement. CPP, EI, and other credits are not applied.
       Spending allocations are approximate percentages from 2023–24 public accounts.
     </div>
 
@@ -531,10 +531,38 @@ function calcTax(income, brackets, bpa) {
 }
 
 function calculate(income, provKey) {
-  const prov   = PROVINCES[provKey];
-  const fedTax = calcTax(income, FED_BRACKETS, FED_BPA);
-  const provTax = calcTax(income, prov.brackets, prov.bpa);
-  const total   = fedTax + provTax;
+  const prov = PROVINCES[provKey];
+
+  // ── Federal tax ───────────────────────────────────────────────
+  let fedTax = calcTax(income, FED_BRACKETS, FED_BPA);
+
+  // Quebec federal abatement: 16.5% reduction on net federal tax.
+  // Quebec operates its own tax system; Ottawa returns 16.5% of federal
+  // tax to compensate for the provincial tax room Quebec occupies.
+  if (provKey === 'QC') {
+    fedTax = Math.round(fedTax * (1 - 0.165));
+  }
+
+  // ── Provincial tax ────────────────────────────────────────────
+  let provTax = calcTax(income, prov.brackets, prov.bpa);
+
+  // Ontario surtax (2024 thresholds):
+  //   20% on Ontario tax over $5,315
+  // + 36% on Ontario tax over $6,802  (additional, so 56% total above $6,802)
+  if (provKey === 'ON') {
+    const surtax = Math.max(0, provTax - 5315) * 0.20
+                 + Math.max(0, provTax - 6802) * 0.36;
+    provTax = Math.round(provTax + surtax);
+  }
+
+  // PEI surtax (2024): 10% on PEI tax over $12,500
+  if (provKey === 'PE') {
+    const surtax = Math.max(0, provTax - 12500) * 0.10;
+    provTax = Math.round(provTax + surtax);
+  }
+
+  // ── Spending allocation ───────────────────────────────────────
+  const total = fedTax + provTax;
 
   const catData = CATS.map(cat => {
     const fedAmt  = Math.round((cat.fedPct / 100) * fedTax);
