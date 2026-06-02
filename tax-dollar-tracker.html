@@ -307,7 +307,7 @@ body {
   <div id="results">
 
     <div class="estimate-banner">
-      <strong>Estimates only.</strong> Income tax calculated using 2024 brackets, basic personal amount credit,
+      <strong>Estimates only.</strong> Income tax calculated using 2025 brackets, basic personal amount credit,
       Ontario and PEI surtaxes, and Quebec federal abatement. CPP, EI, and other credits are not applied.
       Spending allocations are approximate percentages from 2023–24 public accounts.
     </div>
@@ -379,7 +379,7 @@ body {
   <div class="sources">
     <h3>Sources & Notes</h3>
     <ul>
-      <li><strong>Tax brackets (2024):</strong> Canada Revenue Agency —
+      <li><strong>Tax brackets (2025):</strong> Canada Revenue Agency / TaxTips.ca —
         <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/frequently-asked-questions-individuals/canadian-income-tax-rates-individuals-current-previous-years.html" target="_blank">Federal and provincial/territorial rates</a></li>
       <li><strong>Federal spending:</strong> Government of Canada —
         <a href="https://www.tbs-sct.canada.ca/hgw-cgf/finances/pubs_po/dpr-rmr/index-eng.asp" target="_blank">Public Accounts of Canada 2023–24</a>
@@ -399,92 +399,100 @@ body {
 // TAX DATA
 // ═══════════════════════════════════════════════════════════════
 
+// 2025 federal brackets — lowest rate reduced 15% → 14.5% per 2025 federal budget
+// Source: TaxTips.ca / CRA 2025
 const FED_BRACKETS = [
-  [55867,  0.15],
-  [111733, 0.205],
-  [154906, 0.26],
-  [220000, 0.29],
+  [57375,    0.145],
+  [114750,   0.205],
+  [177882,   0.26],
+  [253414,   0.29],
   [Infinity, 0.33],
 ];
-const FED_BPA = 15705;
+const FED_BPA = 16129;  // BPA for income ≤ $177,882; phases down to $14,538 above that (not modelled)
 
 const PROVINCES = {
   AB: {
     name: 'Alberta',
-    brackets: [[148269,.10],[177922,.12],[237230,.13],[355845,.14],[Infinity,.15]],
-    bpa: 21003,
+    // New 8% entry bracket on first $60,000 introduced Jan 1 2025
+    brackets: [[60000,.08],[151234,.10],[181481,.12],[241974,.13],[362961,.14],[Infinity,.15]],
+    bpa: 22323,
     spending: { health:43, socialEI:7,  debt:3,  admin:5, education:18, transport:8,  justice:5, housing:3, environment:4, other:4 },
   },
   BC: {
     name: 'British Columbia',
-    brackets: [[45654,.0506],[91310,.077],[104835,.105],[127299,.1229],[172602,.147],[240716,.168],[Infinity,.205]],
-    bpa: 11981,
+    brackets: [[49279,.0506],[98560,.077],[113158,.105],[137407,.1229],[186306,.147],[259829,.168],[Infinity,.205]],
+    bpa: 12932,
     spending: { health:39, socialEI:10, debt:5,  admin:5, education:18, transport:7,  justice:5, housing:3, environment:4, other:4 },
   },
   MB: {
     name: 'Manitoba',
-    brackets: [[36842,.108],[79625,.1275],[Infinity,.174]],
+    // 2025 Manitoba Budget froze indexation; thresholds updated to $47k/$100k
+    brackets: [[47000,.108],[100000,.1275],[Infinity,.174]],
     bpa: 15780,
     spending: { health:37, socialEI:11, debt:8,  admin:5, education:20, transport:7,  justice:5, housing:2, environment:3, other:2 },
   },
   NB: {
     name: 'New Brunswick',
-    brackets: [[47715,.1482],[95431,.1652],[176756,.195],[Infinity,.203]],
-    bpa: 12458,
+    // Substantially restructured for 2025 — reduced top rate, new thresholds
+    brackets: [[51306,.094],[102614,.14],[190060,.16],[Infinity,.195]],
+    bpa: 13396,
     spending: { health:42, socialEI:8,  debt:9,  admin:4, education:17, transport:7,  justice:5, housing:2, environment:4, other:2 },
   },
   NL: {
     name: 'Newfoundland and Labrador',
-    brackets: [[43198,.087],[86395,.145],[154244,.158],[215943,.178],[275870,.198],[Infinity,.213]],
-    bpa: 10818,
+    brackets: [[44192,.087],[88382,.145],[157792,.158],[220910,.178],[282214,.198],[564429,.208],[1128858,.213],[Infinity,.218]],
+    bpa: 11067,
     spending: { health:42, socialEI:6,  debt:9,  admin:4, education:16, transport:9,  justice:5, housing:2, environment:5, other:2 },
   },
   NS: {
     name: 'Nova Scotia',
-    brackets: [[29590,.0879],[59180,.1495],[93000,.1667],[150000,.175],[Infinity,.21]],
-    bpa: 8481,
+    brackets: [[30507,.0879],[61015,.1495],[95883,.1667],[154650,.175],[Infinity,.21]],
+    bpa: 11744,
     spending: { health:43, socialEI:8,  debt:8,  admin:4, education:17, transport:7,  justice:5, housing:2, environment:4, other:2 },
   },
   NT: {
     name: 'Northwest Territories',
-    brackets: [[50597,.059],[101198,.086],[164525,.122],[Infinity,.1405]],
-    bpa: 16593,
+    brackets: [[51964,.059],[103930,.086],[168967,.122],[Infinity,.1405]],
+    bpa: 17842,
     spending: { health:30, socialEI:7,  debt:2,  admin:5, education:22, transport:14, justice:8, housing:3, environment:7, other:2 },
   },
   NU: {
     name: 'Nunavut',
-    brackets: [[53268,.04],[106537,.07],[173205,.09],[Infinity,.115]],
-    bpa: 17925,
+    brackets: [[54707,.04],[109413,.07],[177881,.09],[Infinity,.115]],
+    bpa: 19274,
     spending: { health:29, socialEI:8,  debt:1,  admin:5, education:25, transport:12, justice:8, housing:4, environment:6, other:2 },
   },
   ON: {
     name: 'Ontario',
-    brackets: [[51446,.0505],[102894,.0915],[150000,.1116],[220000,.1216],[Infinity,.1316]],
-    bpa: 11865,
+    brackets: [[52886,.0505],[105775,.0915],[150000,.1116],[220000,.1216],[Infinity,.1316]],
+    bpa: 12747,
     spending: { health:40, socialEI:11, debt:9,  admin:5, education:18, transport:5,  justice:5, housing:3, environment:3, other:1 },
   },
   PE: {
     name: 'Prince Edward Island',
-    brackets: [[32656,.0965],[64313,.1363],[105000,.1665],[140000,.18],[Infinity,.1875]],
-    bpa: 12000,
+    // Restructured for 2025 with new rates and thresholds; surtax eliminated
+    brackets: [[33328,.095],[64656,.1347],[105000,.166],[140000,.1762],[Infinity,.19]],
+    bpa: 14650,
     spending: { health:40, socialEI:7,  debt:7,  admin:5, education:20, transport:8,  justice:5, housing:2, environment:4, other:2 },
   },
   QC: {
     name: 'Quebec',
-    brackets: [[51780,.14],[103545,.19],[126000,.24],[Infinity,.2575]],
-    bpa: 17183,
+    brackets: [[53255,.14],[106495,.19],[129590,.24],[Infinity,.2575]],
+    bpa: 18571,
     spending: { health:40, socialEI:12, debt:7,  admin:4, education:20, transport:6,  justice:4, housing:2, environment:3, other:2 },
   },
   SK: {
     name: 'Saskatchewan',
-    brackets: [[49720,.105],[142058,.125],[Infinity,.145]],
-    bpa: 17661,
+    // BPA boosted by Dec 2024 Affordability Measures
+    brackets: [[53463,.105],[152750,.125],[Infinity,.145]],
+    bpa: 19491,
     spending: { health:38, socialEI:6,  debt:3,  admin:6, education:19, transport:10, justice:6, housing:3, environment:5, other:4 },
   },
   YT: {
     name: 'Yukon',
-    brackets: [[55867,.064],[111733,.09],[154906,.109],[500000,.128],[Infinity,.15]],
-    bpa: 15705,
+    // Mirrors federal bracket thresholds
+    brackets: [[57375,.064],[114750,.09],[177882,.109],[253414,.1293],[500000,.128],[Infinity,.15]],
+    bpa: 16129,
     spending: { health:28, socialEI:7,  debt:2,  admin:5, education:24, transport:16, justice:8, housing:1, environment:7, other:2 },
   },
 };
@@ -546,20 +554,16 @@ function calculate(income, provKey) {
   // ── Provincial tax ────────────────────────────────────────────
   let provTax = calcTax(income, prov.brackets, prov.bpa);
 
-  // Ontario surtax (2024 thresholds):
-  //   20% on Ontario tax over $5,315
-  // + 36% on Ontario tax over $6,802  (additional, so 56% total above $6,802)
+  // Ontario surtax (2025 thresholds):
+  //   20% on Ontario tax over $7,307
+  // + 36% on Ontario tax over $7,446  (additional, so 56% total above $7,446)
   if (provKey === 'ON') {
-    const surtax = Math.max(0, provTax - 5315) * 0.20
-                 + Math.max(0, provTax - 6802) * 0.36;
+    const surtax = Math.max(0, provTax - 7307) * 0.20
+                 + Math.max(0, provTax - 7446) * 0.36;
     provTax = Math.round(provTax + surtax);
   }
 
-  // PEI surtax (2024): 10% on PEI tax over $12,500
-  if (provKey === 'PE') {
-    const surtax = Math.max(0, provTax - 12500) * 0.10;
-    provTax = Math.round(provTax + surtax);
-  }
+  // PEI surtax eliminated for 2025 — replaced by restructured bracket rates
 
   // ── Spending allocation ───────────────────────────────────────
   const total = fedTax + provTax;
