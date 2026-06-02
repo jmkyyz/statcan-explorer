@@ -391,11 +391,20 @@ body {
         direct federal health programs — Health Canada, PHAC (~$11B), elderly benefits ($83.1B),
         EI + Canada Child Benefit ($60.6B), and public debt charges ($55.6B) from Budget 2025 projections.
         Equalization and Territorial Formula Financing ($31.7B) are included in Govt Administration.
-        The CHT and CST rows have no provincial counterpart: both are federal transfer payments to provinces
-        already captured in provincial expenditure totals (Statistics Canada). Excluding them from the
-        provincial column prevents double-counting. "Fiscal Transfers &amp; Admin" also includes
-        Equalization ($21.9B) and Territorial Formula Financing ($4.2B) — unconditional transfers that
-        fund provincial/territorial programs across all categories.</li>
+        The CHT row has no provincial counterpart. Additionally, the provincial health spending
+        percentages (Statistics Canada) include CHT-funded healthcare delivery. To correct for this,
+        each province's health share is reduced by its 2023-24 CHT allocation as a proportion of total
+        provincial expenditure (Finance Canada per-capita CHT data; provincial public accounts 2022-23),
+        and all provincial categories are renormalized so they continue to distribute the full provincial
+        tax paid. Territories (NT, NU, YT) receive equivalent health funding through Territorial Formula
+        Financing rather than CHT directly and are not adjusted.
+        The Canada Social Transfer ($15.9B) is a block transfer spent at provincial discretion across
+        social services and post-secondary education. Because the inter-category split is not publicly
+        reported per province, no equivalent adjustment is made; provincial social assistance and
+        education figures remain modestly elevated by CST funding in unknown proportions.
+        "Fiscal Transfers &amp; Admin" also includes Equalization ($21.9B) and Territorial Formula
+        Financing ($4.2B) — unconditional transfers that fund provincial/territorial programs across
+        all categories.</li>
       <li><strong>Provincial spending:</strong> Statistics Canada —
         <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501" target="_blank">Table 10-10-0005-01, Government finance statistics (2023)</a>;
         individual provincial public accounts 2023–24</li>
@@ -428,12 +437,16 @@ const PROVINCES = {
     // New 8% entry bracket on first $60,000 introduced Jan 1 2025
     brackets: [[60000,.08],[151234,.10],[181481,.12],[241974,.13],[362961,.14],[Infinity,.15]],
     bpa: 22323,
+    // chtPct: 2023-24 CHT allocation ($49.4B equal per-capita) as % of 2022-23 total provincial expenditure ($62.1B)
+    chtPct: 9.4,
     spending: { health:43, socialEI:7,  debt:3,  admin:5, education:18, transport:8,  justice:5, housing:3, environment:4, other:4 },
   },
   BC: {
     name: 'British Columbia',
     brackets: [[49279,.0506],[98560,.077],[113158,.105],[137407,.1229],[186306,.147],[259829,.168],[Infinity,.205]],
     bpa: 12932,
+    // chtPct: CHT $6.81B / total exp $82B
+    chtPct: 8.3,
     spending: { health:39, socialEI:10, debt:5,  admin:5, education:18, transport:7,  justice:5, housing:3, environment:4, other:4 },
   },
   MB: {
@@ -441,6 +454,8 @@ const PROVINCES = {
     // 2025 Manitoba Budget froze indexation; thresholds updated to $47k/$100k
     brackets: [[47000,.108],[100000,.1275],[Infinity,.174]],
     bpa: 15780,
+    // chtPct: CHT $1.77B / total exp ~$20B
+    chtPct: 8.9,
     spending: { health:37, socialEI:11, debt:8,  admin:5, education:20, transport:7,  justice:5, housing:2, environment:3, other:2 },
   },
   NB: {
@@ -448,36 +463,46 @@ const PROVINCES = {
     // Substantially restructured for 2025 — reduced top rate, new thresholds
     brackets: [[51306,.094],[102614,.14],[190060,.16],[Infinity,.195]],
     bpa: 13396,
+    // chtPct: CHT $1.05B / total exp $11.3B
+    chtPct: 9.3,
     spending: { health:42, socialEI:8,  debt:9,  admin:4, education:17, transport:7,  justice:5, housing:2, environment:4, other:2 },
   },
   NL: {
     name: 'Newfoundland and Labrador',
     brackets: [[44192,.087],[88382,.145],[157792,.158],[220910,.178],[282214,.198],[564429,.208],[1128858,.213],[Infinity,.218]],
     bpa: 11067,
+    // chtPct: CHT $0.68B / total exp $9.4B
+    chtPct: 7.2,
     spending: { health:42, socialEI:6,  debt:9,  admin:4, education:16, transport:9,  justice:5, housing:2, environment:5, other:2 },
   },
   NS: {
     name: 'Nova Scotia',
     brackets: [[30507,.0879],[61015,.1495],[95883,.1667],[154650,.175],[Infinity,.21]],
     bpa: 11744,
+    // chtPct: CHT $1.32B / total exp $13.2B
+    chtPct: 10.0,
     spending: { health:43, socialEI:8,  debt:8,  admin:4, education:17, transport:7,  justice:5, housing:2, environment:4, other:2 },
   },
   NT: {
     name: 'Northwest Territories',
     brackets: [[51964,.059],[103930,.086],[168967,.122],[Infinity,.1405]],
     bpa: 17842,
+    chtPct: 0, // territories receive equivalent health funding via TFF, not CHT directly
     spending: { health:30, socialEI:7,  debt:2,  admin:5, education:22, transport:14, justice:8, housing:3, environment:7, other:2 },
   },
   NU: {
     name: 'Nunavut',
     brackets: [[54707,.04],[109413,.07],[177881,.09],[Infinity,.115]],
     bpa: 19274,
+    chtPct: 0,
     spending: { health:29, socialEI:8,  debt:1,  admin:5, education:25, transport:12, justice:8, housing:4, environment:6, other:2 },
   },
   ON: {
     name: 'Ontario',
     brackets: [[52886,.0505],[105775,.0915],[150000,.1116],[220000,.1216],[Infinity,.1316]],
     bpa: 12747,
+    // chtPct: CHT $19.0B / total exp $187.1B
+    chtPct: 10.2,
     spending: { health:40, socialEI:11, debt:9,  admin:5, education:18, transport:5,  justice:5, housing:3, environment:3, other:1 },
   },
   PE: {
@@ -485,12 +510,16 @@ const PROVINCES = {
     // Restructured for 2025 with new rates and thresholds; surtax eliminated
     brackets: [[33328,.095],[64656,.1347],[105000,.166],[140000,.1762],[Infinity,.19]],
     bpa: 14650,
+    // chtPct: CHT $0.22B / total exp $2.7B
+    chtPct: 8.2,
     spending: { health:40, socialEI:7,  debt:7,  admin:5, education:20, transport:8,  justice:5, housing:2, environment:4, other:2 },
   },
   QC: {
     name: 'Quebec',
     brackets: [[53255,.14],[106495,.19],[129590,.24],[Infinity,.2575]],
     bpa: 18571,
+    // chtPct: CHT $11.2B / total exp $136.6B
+    chtPct: 8.2,
     spending: { health:40, socialEI:12, debt:7,  admin:4, education:20, transport:6,  justice:4, housing:2, environment:3, other:2 },
   },
   SK: {
@@ -498,6 +527,8 @@ const PROVINCES = {
     // BPA boosted by Dec 2024 Affordability Measures
     brackets: [[53463,.105],[152750,.125],[Infinity,.145]],
     bpa: 19491,
+    // chtPct: CHT $1.54B / total exp $19.0B
+    chtPct: 8.1,
     spending: { health:38, socialEI:6,  debt:3,  admin:6, education:19, transport:10, justice:6, housing:3, environment:5, other:4 },
   },
   YT: {
@@ -505,6 +536,7 @@ const PROVINCES = {
     // Mirrors federal bracket thresholds
     brackets: [[57375,.064],[114750,.09],[177882,.109],[253414,.1293],[500000,.128],[Infinity,.15]],
     bpa: 16129,
+    chtPct: 0,
     spending: { health:28, socialEI:7,  debt:2,  admin:5, education:24, transport:16, justice:8, housing:1, environment:7, other:2 },
   },
 };
@@ -587,17 +619,30 @@ function calculate(income, provKey) {
   // ── Spending allocation ───────────────────────────────────────
   const total = fedTax + provTax;
 
-  const catData = CATS.map(cat => {
-    const fedAmt  = Math.round((cat.fedPct / 100) * fedTax);
-    const provAmt = cat.provKey
-      ? Math.round(((prov.spending[cat.provKey] || 0) / 100) * provTax)
+  // Subtract CHT-funded portion from provincial health, then renormalize
+  // so provincial category amounts still distribute the full provTax.
+  // chtPct is CHT allocation as % of total provincial expenditure (2023-24 CHT / 2022-23 actuals).
+  const rawCats = CATS.map(cat => {
+    const fedAmt     = Math.round((cat.fedPct / 100) * fedTax);
+    const rawPct     = cat.provKey ? (prov.spending[cat.provKey] || 0) : 0;
+    const adjProvPct = (cat.key === 'health')
+      ? Math.max(0, rawPct - (prov.chtPct || 0))
+      : rawPct;
+    return { label: cat.label, fedAmt, adjProvPct };
+  });
+
+  const totalAdjPct = rawCats.reduce((s, c) => s + c.adjProvPct, 0);
+
+  const catData = rawCats.map(c => {
+    const provAmt = (totalAdjPct > 0 && c.adjProvPct > 0)
+      ? Math.round((c.adjProvPct / totalAdjPct) * provTax)
       : 0;
     return {
-      label:    cat.label,
-      fedAmt,
+      label:    c.label,
+      fedAmt:   c.fedAmt,
       provAmt,
-      combined: fedAmt + provAmt,
-      pct:      total > 0 ? (fedAmt + provAmt) / total : 0,
+      combined: c.fedAmt + provAmt,
+      pct:      total > 0 ? (c.fedAmt + provAmt) / total : 0,
     };
   }).sort((a, b) => b.combined - a.combined);
 
