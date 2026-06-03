@@ -55,6 +55,38 @@ def tax_tracker():
     here = os.path.dirname(os.path.abspath(__file__))
     return send_from_directory(here, "tax-dollar-tracker.html")
 
+EV_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ev-dashboard", "dist")
+
+@app.route("/ev")
+@app.route("/ev/")
+def ev_dashboard():
+    return send_from_directory(EV_DIST, "index.html")
+
+@app.route("/ev/<path:filename>")
+def ev_static(filename):
+    # Serve built assets; fall back to index.html for SPA client-side routes
+    target = os.path.join(EV_DIST, filename)
+    if os.path.isfile(target):
+        return send_from_directory(EV_DIST, filename)
+    return send_from_directory(EV_DIST, "index.html")
+
+@app.route("/ckan/<path:ckan_path>")
+def ckan_proxy(ckan_path):
+    """Proxy for open.canada.ca CKAN API — strips WAF-triggering headers."""
+    url = f"https://open.canada.ca/data/en/api/3/action/{ckan_path}"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "en-CA,en-US;q=0.9,en;q=0.8",
+    }
+    try:
+        resp = requests.get(url, params=request.args, headers=headers, timeout=30)
+        from flask import Response
+        return Response(resp.content, status=resp.status_code,
+                        content_type=resp.headers.get("Content-Type", "application/json"))
+    except requests.exceptions.RequestException as exc:
+        return jsonify({"error": str(exc)}), 502
+
 STATCAN_BASE = "https://www150.statcan.gc.ca/t1/wds/rest"
 BOC_BASE     = "https://www.bankofcanada.ca/valet"
 CIMT_BASE    = "https://www150.statcan.gc.ca/t1/cimt/rest"
