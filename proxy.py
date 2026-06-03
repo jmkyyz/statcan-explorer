@@ -13,10 +13,15 @@ Usage:
 The server will listen on http://localhost:5001
 """
 
+import csv
+import io
 import os
 import re
+import time
+import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, date
+from email.utils import formatdate, parsedate_to_datetime
 
 import requests
 from dotenv import load_dotenv
@@ -64,7 +69,6 @@ def ev_dashboard():
 
 @app.route("/ev/<path:filename>")
 def ev_static(filename):
-    # Serve built assets; fall back to index.html for SPA client-side routes
     target = os.path.join(EV_DIST, filename)
     if os.path.isfile(target):
         return send_from_directory(EV_DIST, filename)
@@ -87,10 +91,19 @@ def ckan_proxy(ckan_path):
     except requests.exceptions.RequestException as exc:
         return jsonify({"error": str(exc)}), 502
 
-STATCAN_BASE = "https://www150.statcan.gc.ca/t1/wds/rest"
-BOC_BASE     = "https://www.bankofcanada.ca/valet"
-CIMT_BASE    = "https://www150.statcan.gc.ca/t1/cimt/rest"
-CIMT_REF_BASE = "https://www150.statcan.gc.ca/n1/pub/71-607-x/2021004"
+STATCAN_BASE   = "https://www150.statcan.gc.ca/t1/wds/rest"
+BOC_BASE       = "https://www.bankofcanada.ca/valet"
+CIMT_REF_BASE  = "https://www150.statcan.gc.ca/n1/pub/71-607-x/2021004"
+CIMT_ZIP_BASE  = "https://www150.statcan.gc.ca/n1/pub/71-607-x/2021004/zip"
+CIMT_CACHE_DIR = "/tmp/cimt_cache"
+
+# CIMT province numeric ID → 2-letter CSV code  (1 = Canada total, no filter)
+PROVINCE_CODES: dict[str, str | None] = {
+    "1":  None,
+    "10": "NL", "11": "PE", "12": "NS", "13": "NB",
+    "24": "QC", "35": "ON", "46": "MB", "47": "SK",
+    "48": "AB", "59": "BC", "60": "YT", "61": "NT", "62": "NU",
+}
 
 # ---------------------------------------------------------------------------
 # Scalar factor multipliers (from StatCan codeset)
@@ -626,6 +639,103 @@ def get_fred():
 
 
 # ---------------------------------------------------------------------------
+# CIMT bulk-CSV helpers
+# StatCan removed the /t1/cimt/rest/getReport API; data is now distributed as
+# yearly ZIP files on the Open Government Portal.  Each ZIP contains CSV files
+# at different HS granularities.  We download, cache, and stream-filter them.
+#
+# Imports ZIP:  CIMT-CICM_Imp_{year}.zip
+#   ODPFN022_*N.csv  HS2  cols: YearMonth, HS2, Country, Province, State, Value
+#   ODPFN015_*N.csv  HS6  cols: YearMonth, HS6, Country, Province, State, Value, Qty, UOM
+#
+# Exports ZIP:  CIMT-CICM_Tot_Exp_{year}.zip
+#   ODPFN019_*N.csv  HS6  cols: YearMonth, HS6, Country, State, Value, Qty, UOM
+#   (no Province column in exports)
+#
+# Country IDs used by the frontend are numeric (from countriesF.js); the CSV
+# uses ISO 2-letter codes.  id=1000 (World) means no country filter.
+# ---------------------------------------------------------------------------
+
+_country_code_map: dict[int, str] | None = None   # CIMT numeric id → ISO code
+_cimt_zip_checked: dict[str, float] = {}          # fname → last freshness-check timestamp
+
+
+def _get_country_code_map() -> dict[int, str]:
+    global _country_code_map
+    if _country_code_map is not None:
+        return _country_code_map
+    try:
+        r = requests.get(f"{CIMT_REF_BASE}/countriesF.js", timeout=20)
+        r.raise_for_status()
+        pairs = re.findall(r'"id":\s*(\d+)[^}]*?"c_code":\s*"([^"]+)"', r.text, re.S)
+        _country_code_map = {int(cid): code for cid, code in pairs}
+    except Exception:
+        _country_code_map = {}
+    return _country_code_map
+
+
+def _get_cimt_zip_path(flow: str, year: int) -> str:
+    """Return local path to the cached ZIP, downloading only if StatCan has updated it.
+
+    Uses HTTP If-Modified-Since so a full re-download only happens when the file
+    actually changes (i.e. when StatCan publishes revised data).  A 1-hour
+    in-memory cooldown avoids hitting StatCan on every request.
+    """
+    os.makedirs(CIMT_CACHE_DIR, exist_ok=True)
+    fname = f"CIMT-CICM_{'Tot_Exp' if flow == '0' else 'Imp'}_{year}.zip"
+    path  = os.path.join(CIMT_CACHE_DIR, fname)
+    url   = f"{CIMT_ZIP_BASE}/{fname}"
+    now   = time.time()
+
+    # Skip network check entirely if we verified freshness within the last hour
+    if os.path.exists(path) and (now - _cimt_zip_checked.get(fname, 0)) < 3600:
+        return path
+
+    headers = {}
+    if os.path.exists(path):
+        # Send file's mtime as If-Modified-Since; server returns 304 if unchanged
+        headers["If-Modified-Since"] = formatdate(os.path.getmtime(path), usegmt=True)
+
+    resp = requests.get(url, headers=headers, timeout=180, stream=True)
+
+    if resp.status_code == 304:
+        _cimt_zip_checked[fname] = now
+        return path  # cached copy is still current — no download needed
+
+    resp.raise_for_status()
+    with open(path, "wb") as fh:
+        for chunk in resp.iter_content(chunk_size=65536):
+            fh.write(chunk)
+
+    # Set the file's mtime to the server's Last-Modified so the next
+    # If-Modified-Since comparison is accurate
+    last_mod = resp.headers.get("Last-Modified")
+    if last_mod:
+        try:
+            server_ts = parsedate_to_datetime(last_mod).timestamp()
+            os.utime(path, (server_ts, server_ts))
+        except Exception:
+            pass
+
+    _cimt_zip_checked[fname] = now
+    return path
+
+
+def _find_csv_name(zf: zipfile.ZipFile, flow: str, need_hs6: bool) -> str | None:
+    """Return the ZIP member name of the appropriate CSV."""
+    if flow == "0":       # exports: only HS6 available
+        prefix = "ODPFN019"
+    elif need_hs6:        # imports with HS4 filter → need HS6 detail
+        prefix = "ODPFN015"
+    else:                 # imports, all-HS query → use small HS2 file
+        prefix = "ODPFN022"
+    for name in zf.namelist():
+        if name.endswith(".csv") and os.path.basename(name).startswith(prefix):
+            return name
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Route: GET /api/cimt
 # Query params:
 #   flow       – 0=exports, 1=imports
@@ -636,21 +746,6 @@ def get_fred():
 #   start_date – YYYY-MM-DD
 #   end_date   – YYYY-MM-DD
 # ---------------------------------------------------------------------------
-def _cimt_fetch_year(province, country, hs4, flow, year):
-    """Fetch one calendar year from the CIMT API; return list of trade records."""
-    url = (f"{CIMT_BASE}/getReport/({province})/{country}/100/{hs4}/0"
-           f"/150000/{flow}/0/{year}-01-01/{year}-12-01")
-    try:
-        r = requests.get(url, timeout=45)
-        r.raise_for_status()
-        data = r.json()
-        if "message" in data:
-            return []          # non-fatal: skip years with no data
-        return data.get("trade", [])
-    except Exception:
-        return []
-
-
 @app.route("/api/cimt")
 def get_cimt():
     flow       = request.args.get("flow",       "0")
@@ -666,60 +761,85 @@ def get_cimt():
     except ValueError:
         return jsonify({"error": "Invalid start_date or end_date"}), 400
 
-    years = list(range(start_dt.year, end_dt.year + 1))
+    years    = list(range(start_dt.year, end_dt.year + 1))
+    start_ym = start_dt.strftime("%Y%m")   # "202001"
+    end_ym   = end_dt.strftime("%Y%m")     # "202412"
 
-    # For short ranges (≤3 years) try a single request first; fall back to
-    # per-year chunking if the CIMT API returns a system error.
-    def _single_fetch():
-        url = (f"{CIMT_BASE}/getReport/({province})/{country}/100/{hs4}/0"
-               f"/150000/{flow}/0/{start_date}/{end_date}")
-        r = requests.get(url, timeout=60)
-        r.raise_for_status()
-        data = r.json()
-        if "message" in data:
-            return None          # signal: fall back to chunking
-        return data.get("trade", [])
+    # Resolve province filter: None means no filter (all of Canada)
+    prov_code = PROVINCE_CODES.get(str(province))
 
-    all_records = []
+    # Resolve country filter: id=1000 (World) means no filter
+    iso_code: str | None = None
+    if country != "1000":
+        iso_code = _get_country_code_map().get(int(country))
 
-    if len(years) <= 3:
+    # Exports have no Province column, so always use HS6; imports use HS2 when
+    # hs4="0" (all commodities) to avoid streaming the larger HS6 file.
+    need_hs6 = (hs4 != "0") or (flow == "0")
+
+    def _process_year(year: int) -> dict[str, float]:
+        by_month: dict[str, float] = {}
         try:
-            records = _single_fetch()
-            if records is not None:
-                all_records = records
-            else:
-                all_records = []
-        except Exception:
-            all_records = []
+            zip_path = _get_cimt_zip_path(flow, year)
+        except requests.exceptions.HTTPError as exc:
+            if exc.response is not None and exc.response.status_code == 404:
+                return by_month   # year not yet published
+            raise
 
-    if not all_records and years:
-        # Chunk by year in parallel
-        with ThreadPoolExecutor(max_workers=min(8, len(years))) as pool:
-            futures = {
-                pool.submit(_cimt_fetch_year, province, country, hs4, flow, y): y
-                for y in years
-            }
-            for fut in as_completed(futures):
-                all_records.extend(fut.result())
+        with zipfile.ZipFile(zip_path, "r") as zf:
+            csv_name = _find_csv_name(zf, flow, need_hs6)
+            if not csv_name:
+                return by_month
 
-    if not all_records:
-        return jsonify({"error": "No data returned from CIMT API for this selection"}), 404
+            with zf.open(csv_name) as raw:
+                reader = csv.reader(io.TextIOWrapper(raw, encoding="utf-8", errors="replace"))
+                next(reader)  # skip header
 
-    # Filter to requested date window and aggregate by month
-    start_mk = start_dt.strftime("%Y-%m")
-    end_mk   = end_dt.strftime("%Y-%m")
+                # Column layout differs between flows:
+                #   imports HS2/HS6: YM(0), HS(1), Country(2), Province(3), State(4), Value(5)
+                #   exports HS6:     YM(0), HS(1), Country(2), State(3),    Value(4)
+                if flow == "0":
+                    cty_col, prov_col, val_col = 2, None, 4
+                else:
+                    cty_col, prov_col, val_col = 2, 3, 5
+
+                for row in reader:
+                    if len(row) <= val_col:
+                        continue
+                    ym = row[0].strip()
+                    if ym < start_ym or ym > end_ym:
+                        continue
+                    if iso_code and row[cty_col].strip() != iso_code:
+                        continue
+                    if prov_col is not None and prov_code and row[prov_col].strip() != prov_code:
+                        continue
+                    if hs4 != "0" and not row[1].strip().startswith(hs4):
+                        continue
+                    try:
+                        val = float(row[val_col])
+                    except (ValueError, IndexError):
+                        continue
+                    by_month[ym] = by_month.get(ym, 0.0) + val
+
+        return by_month
+
     by_date: dict[str, float] = {}
-    for rec in all_records:
-        month_key = rec["T"][:7]   # "YYYY-MM"
-        if month_key < start_mk or month_key > end_mk:
-            continue
-        by_date[month_key] = by_date.get(month_key, 0.0) + (rec.get("V") or 0.0)
+    with ThreadPoolExecutor(max_workers=min(4, len(years))) as pool:
+        futures = {pool.submit(_process_year, y): y for y in years}
+        for fut in as_completed(futures):
+            try:
+                for ym, val in fut.result().items():
+                    by_date[ym] = by_date.get(ym, 0.0) + val
+            except Exception:
+                pass
+
+    if not by_date:
+        return jsonify({"error": "No data returned for this selection"}), 404
 
     series = [
-        {"label": mk, "date": mk + "-01", "value": v}
-        for mk, v in sorted(by_date.items())
+        {"label": f"{ym[:4]}-{ym[4:6]}", "date": f"{ym[:4]}-{ym[4:6]}-01", "value": v}
+        for ym, v in sorted(by_date.items())
     ]
-
     return jsonify({
         "series":        series,
         "uom":           "dollars",
@@ -737,7 +857,7 @@ _cimt_ref_cache: dict | None = None
 
 @app.route("/api/cimt-ref")
 def get_cimt_ref():
-    global _cimt_ref_cache
+    global _cimt_ref_cache, _country_code_map
     if _cimt_ref_cache is not None:
         return jsonify(_cimt_ref_cache)
 
@@ -750,21 +870,27 @@ def get_cimt_ref():
         return jsonify({"error": f"Failed to fetch CIMT reference data: {exc}"}), 502
 
     # hs4F.js format: {"HS": "0101", "EN": "Live horses...", "FR": "..."}
-    hs4_pairs  = re.findall(r'"HS":\s*"(\d+)"[^}]*?"EN":\s*"([^"]+)"', hs4_resp.text, re.S)
-    hs4_list   = [{"hs": h, "en": e} for h, e in hs4_pairs]
+    hs4_pairs = re.findall(r'"HS":\s*"(\d+)"[^}]*?"EN":\s*"([^"]+)"', hs4_resp.text, re.S)
+    hs4_list  = [{"hs": h, "en": e} for h, e in hs4_pairs]
 
-    # countriesF.js format: {"id": 9, ..., "en": "United States..."}
-    # Exclude id=1 (Canada — not a trade partner in this context)
-    cnt_pairs   = re.findall(r'"id":\s*(\d+).*?"en":\s*"([^"]+)"', cnt_resp.text, re.S)
+    # countriesF.js: extract id, c_code (ISO), and English name
+    # Also populate _country_code_map so /api/cimt doesn't need a separate fetch.
+    cnt_entries = re.findall(
+        r'"id":\s*(\d+)[^}]*?"c_code":\s*"([^"]+)"[^}]*?"en":\s*"([^"]+)"',
+        cnt_resp.text, re.S,
+    )
     seen_ids: set[int] = set()
     country_list = []
-    for raw_id, en in cnt_pairs:
+    code_map: dict[int, str] = {}
+    for raw_id, c_code, en in cnt_entries:
         cid = int(raw_id)
+        code_map[cid] = c_code
         if cid == 1 or cid in seen_ids:
             continue
         seen_ids.add(cid)
         country_list.append({"id": cid, "en": en})
     country_list.sort(key=lambda x: x["en"])
+    _country_code_map = code_map   # cache for /api/cimt use
 
     _cimt_ref_cache = {"hs4": hs4_list, "countries": country_list}
     return jsonify(_cimt_ref_cache)
