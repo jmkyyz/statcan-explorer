@@ -7,3 +7,13 @@ services:
     envVars:
       - key: PORT
         value: 10000
+
+  - type: web
+    name: statcan-explorer-ev
+    runtime: node
+    rootDir: ev-dashboard
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: 10000
