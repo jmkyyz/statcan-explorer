@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useFilterState } from './hooks/useFilterState'
+import { useFreshness } from './hooks/useEVData'
 import FreshnessBanner from './components/FreshnessBanner'
 import FilterPanel from './components/FilterPanel'
 import StatsCards from './components/StatsCards'
@@ -15,9 +16,31 @@ function useDebounced(value, delay = 300) {
   return debounced
 }
 
+// "Apr, 26" → "2026-04"
+function parseLatestToYYYYMM(str) {
+  if (!str) return null
+  const match = str.trim().match(/^([A-Za-z]+),?\s*(\d+)$/)
+  if (!match) return null
+  const yr = parseInt(match[2]) + (parseInt(match[2]) < 50 ? 2000 : 1900)
+  const mo = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
+    .indexOf(match[1].toLowerCase().slice(0, 3)) + 1
+  if (mo === 0) return null
+  return `${yr}-${String(mo).padStart(2, '0')}`
+}
+
 export default function App() {
   const { filters, setFilters } = useFilterState()
   const debouncedFilters = useDebounced(filters, 300)
+  const { latestMonthYear } = useFreshness()
+
+  // Auto-set endMonth to the API's latest available month, but only if the
+  // user hasn't explicitly set it via the URL (i.e. it's not in the query string)
+  useEffect(() => {
+    const parsed = parseLatestToYYYYMM(latestMonthYear)
+    if (!parsed) return
+    const urlHasEndMonth = new URLSearchParams(window.location.search).has('endMonth')
+    if (!urlHasEndMonth) setFilters({ endMonth: parsed })
+  }, [latestMonthYear])
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">

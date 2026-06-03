@@ -1,12 +1,14 @@
 import { useState, useCallback, useEffect } from 'react'
-import { subMonths, format } from 'date-fns'
 
+// Program launched March 2026 — no data exists before this
 function defaultStartMonth() {
-  return format(subMonths(new Date(), 12), 'yyyy-MM')
+  return '2026-03'
 }
 
 function defaultEndMonth() {
-  return format(new Date(), 'yyyy-MM')
+  // Placeholder until the API returns the real latest month
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
 }
 
 function readFiltersFromURL() {
