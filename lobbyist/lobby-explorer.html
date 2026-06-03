@@ -880,7 +880,7 @@ document.getElementById("main").addEventListener("mouseover", e => {
   const cell = e.target.closest(".subj-cell");
   if (!cell || !cell.dataset.detail) { subjTooltip.style.display = "none"; return; }
 
-  subjTooltip.innerHTML = cell.dataset.detail.split(" || ").map(d => `• ${d}`).join("<br>");
+  subjTooltip.innerHTML = [...new Set(cell.dataset.detail.split(" || "))].map(d => `• ${d}`).join("<br>");
   subjTooltip.style.display = "block";
 
   const rect = cell.getBoundingClientRect();
