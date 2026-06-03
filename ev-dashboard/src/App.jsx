@@ -51,10 +51,10 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 leading-tight">
-              EV Affordability Dashboard
+              EV Incentive Tracker
             </h1>
             <p className="text-xs text-slate-400 dark:text-slate-500">
-              Canada's Electric Vehicle Affordability Program
+              Canada's Electric Vehicle Incentive Program
             </p>
           </div>
         </div>
