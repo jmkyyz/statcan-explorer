@@ -455,7 +455,8 @@ async function loadCatalog() {
         list.map(s => `<option value="${esc(s.seriesId)}">${esc(s.seriesName || s.seriesId)} (${s.rowCount} rows)</option>`).join('') +
         '</optgroup>').join('');
   } catch (e) {
-    $('extendSelect').innerHTML = '<option value="">Catalog unavailable</option>';
+    state.catalog = null;
+    $('extendSelect').innerHTML = '<option value="">Catalog unavailable — reopen this tab to retry</option>';
     toast(`Could not load catalog: ${e.message}`, 'error');
   }
 }
@@ -472,9 +473,17 @@ function setMode(m) {
 }
 
 // ── manage mode: list + delete ───────────────────────────
-function renderManageList() {
+async function renderManageList() {
+  if (!state.catalog || !state.catalog.series) {
+    $('manageList').innerHTML = '<span class="spinner"></span>Loading catalog…';
+    await loadCatalog();
+  }
   const cat = state.catalog;
-  if (!cat || !cat.series) { $('manageList').textContent = 'Catalog unavailable.'; return; }
+  if (!cat || !cat.series) {
+    $('manageList').innerHTML = `Catalog unavailable — the server may be restarting after a recent save.
+      <a href="#" onclick="renderManageList(); return false" style="color:var(--accent2)">Retry</a>`;
+    return;
+  }
   const byCat = {};
   for (const s of cat.series) (byCat[s.category] = byCat[s.category] || []).push(s);
 
@@ -977,6 +986,7 @@ async function doSave() {
     $('saveResult').innerHTML = html;
     $('step4Detail').textContent = '';
     toast(`Added ${data.added} rows to the catalog`, 'success');
+    loadCatalog();   // refresh extend/manage lists with the new rows
   } catch (e) {
     $('saveResult').innerHTML = `<span class="err">Save failed: ${esc(e.message)}</span>`;
     $('saveBtn').disabled = false;
