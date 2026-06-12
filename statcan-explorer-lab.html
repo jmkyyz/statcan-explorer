@@ -809,6 +809,18 @@ function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
+// Build <option> tags for a breakdown dropdown, indenting sub-categories
+// according to the optional dim*_level columns (em-space per level).
+function dimOptionsHtml(series, dimIdx, values) {
+  const lvls = series.dimLevels?.[dimIdx] || {};
+  const known = values.map(v => lvls[v]).filter(x => x != null);
+  const base = known.length ? Math.min(...known) : 0;
+  return values.map(v => {
+    const lv = lvls[v] != null ? Math.max(0, lvls[v] - base) : 0;
+    return `<option value="${v}">${' '.repeat(lv)}${v}</option>`;
+  }).join('');
+}
+
 // ═══════════════════════════════════════════════════════════
 // EXCEL PARSER
 // ═══════════════════════════════════════════════════════════
@@ -881,6 +893,16 @@ function parseExcel(workbook) {
     series.labels[key]  = { full: fullLbl, short: shortLbl };
     const dim1Group = (row['dim1_group'] || '').trim();
     if (dim1Group && dim1Val) series.dim1Groups[dim1Val] = dim1Group;
+
+    // Optional hierarchy depth per dim value (dim1_level..dim5_level columns)
+    const dimVals = [dim1Val, dim2Val, dim3Val, dim4Val, dim5Val];
+    for (let k = 1; k <= 5; k++) {
+      const lv = parseInt((row[`dim${k}_level`] || '').toString().trim(), 10);
+      if (!isNaN(lv) && dimVals[k - 1]) {
+        series.dimLevels = series.dimLevels || {};
+        (series.dimLevels[k] = series.dimLevels[k] || {})[dimVals[k - 1]] = lv;
+      }
+    }
   }
 
   return catMap;
@@ -1317,13 +1339,13 @@ function addSeries(id) {
     let html = `<option value="">— select ${series.dim1Name || 'option'} —</option>`;
     for (const grp of seenGrps) {
       if (grp) html += `<optgroup label="${grp}">`;
-      for (const v of groupedItems[grp]) html += `<option value="${v}">${v}</option>`;
+      html += dimOptionsHtml(series, 1, groupedItems[grp]);
       if (grp) html += `</optgroup>`;
     }
     dim1Sel.innerHTML = html;
   } else {
     dim1Sel.innerHTML = `<option value="">— select ${series.dim1Name || 'option'} —</option>`
-      + dim1Values.map(v => `<option value="${v}">${v}</option>`).join('');
+      + dimOptionsHtml(series, 1, dim1Values);
   }
   dim1Sel.value = '';
 
@@ -1371,7 +1393,7 @@ function onDim1Change(val) {
 
     const dim2Sel = document.getElementById('dim2Dropdown');
     dim2Sel.innerHTML = `<option value="">— select ${series.dim2Name || 'option'} —</option>`
-      + availDim2.map(v => `<option value="${v}">${v}</option>`).join('');
+      + dimOptionsHtml(series, 2, availDim2);
     dim2Sel.value = '';
 
     document.getElementById('dim2Label').textContent = series.dim2Name || 'Dimension 2';
@@ -1419,7 +1441,7 @@ function onDim2Change(val) {
 
   const dim3Sel = document.getElementById('dim3Dropdown');
   dim3Sel.innerHTML = `<option value="">— select ${series.dim3Name || 'option'} —</option>`
-    + availDim3.map(v => `<option value="${v}">${v}</option>`).join('');
+    + dimOptionsHtml(series, 3, availDim3);
   dim3Sel.value = '';
   document.getElementById('dim3Label').textContent = series.dim3Name || 'Dimension 3';
   document.getElementById('dim3Group').style.display = '';
@@ -1463,7 +1485,7 @@ function _showDim4OrAdd(series) {
   }
   const dim4Sel = document.getElementById('dim4Dropdown');
   dim4Sel.innerHTML = `<option value="">— select ${series.dim4Name || 'option'} —</option>`
-    + availDim4.map(v => `<option value="${v}">${v}</option>`).join('');
+    + dimOptionsHtml(series, 4, availDim4);
   dim4Sel.value = '';
   document.getElementById('dim4Label').textContent = series.dim4Name || 'Dimension 4';
   document.getElementById('dim4Group').style.display = '';
@@ -1501,7 +1523,7 @@ function _showDim5OrAdd(series) {
   }
   const dim5Sel = document.getElementById('dim5Dropdown');
   dim5Sel.innerHTML = `<option value="">— select ${series.dim5Name || 'option'} —</option>`
-    + availDim5.map(v => `<option value="${v}">${v}</option>`).join('');
+    + dimOptionsHtml(series, 5, availDim5);
   dim5Sel.value = '';
   document.getElementById('dim5Label').textContent = series.dim5Name || 'Dimension 5';
   document.getElementById('dim5Group').style.display = '';

@@ -15,3 +15,6 @@ ev_detector.log
 # Credentials — never commit these
 gmail_app_password.txt.rtf
 anthropic_api_key.txt.rtf
+
+# Wizard catalog backups
+backups/

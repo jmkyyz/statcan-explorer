@@ -13,10 +13,13 @@ Usage:
 The server will listen on http://localhost:5001
 """
 
+import base64
 import csv
 import io
+import json
 import os
 import re
+import shutil
 import time
 import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -894,6 +897,509 @@ def get_cimt_ref():
 
     _cimt_ref_cache = {"hs4": hs4_list, "countries": country_list}
     return jsonify(_cimt_ref_cache)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# SERIES WIZARD — admin tool for adding categories/series to Vectors.xlsx
+# ═══════════════════════════════════════════════════════════════════════════
+
+VECTORS_PATH    = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Vectors.xlsx")
+BACKUP_DIR      = os.path.join(os.path.dirname(os.path.abspath(__file__)), "backups")
+CUBES_CACHE     = "/tmp/statcan_cubes_lite.json"
+CUBES_TTL       = 24 * 3600          # refresh table list daily
+GITHUB_REPO     = os.environ.get("GITHUB_REPO", "jmkyyz/statcan-explorer")
+
+CATALOG_COLUMNS = [
+    "category", "freq", "series_id", "series_name", "table_id",
+    "dim1_name", "dim1_value", "dim2_name", "dim2_value",
+    "dim3_name", "dim3_value", "dim4_name", "dim4_value",
+    "dim5_name", "dim5_value", "vector", "full_label", "short_label",
+    "dim1_group",
+]
+
+_cubes_cache_mem: list | None = None
+_cubes_cache_ts: float = 0
+
+
+@app.route("/wizard")
+def wizard():
+    here = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(here, "wizard.html")
+
+
+# ---------------------------------------------------------------------------
+# Route: GET /api/wizard-info
+# Tells the wizard frontend whether an admin key is required and whether
+# GitHub persistence is configured on this server.
+# ---------------------------------------------------------------------------
+@app.route("/api/wizard-info")
+def wizard_info():
+    return jsonify({
+        "adminRequired":    _admin_required(),
+        "keyConfigured":    bool(os.environ.get("ADMIN_KEY")),
+        "githubConfigured": bool(os.environ.get("GITHUB_TOKEN")),
+        "repo":             GITHUB_REPO if os.environ.get("GITHUB_TOKEN") else None,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Route: POST /api/verify-key
+# Lets the wizard's lock screen validate a key before unlocking the UI.
+# ---------------------------------------------------------------------------
+@app.route("/api/verify-key", methods=["POST"])
+def verify_key():
+    return jsonify({"ok": _check_admin()})
+
+
+def _admin_required() -> bool:
+    """Admin auth is in force when a key is configured, or always in
+    production (Render sets the RENDER env var) as a fail-safe so the
+    catalog can never be modified before ADMIN_KEY is configured."""
+    return bool(os.environ.get("ADMIN_KEY")) or bool(os.environ.get("RENDER"))
+
+
+def _check_admin() -> bool:
+    """True if the request is authorized to use protected wizard endpoints."""
+    if not _admin_required():
+        return True   # local dev, no key configured → open
+    admin_key = os.environ.get("ADMIN_KEY", "")
+    if not admin_key:
+        return False  # production without a configured key → locked
+    import hmac
+    return hmac.compare_digest(request.headers.get("X-Admin-Key", ""), admin_key)
+
+
+# ---------------------------------------------------------------------------
+# Route: GET /api/cubes-list
+# Slimmed list of every StatCan table (English), cached for 24h.
+# ---------------------------------------------------------------------------
+@app.route("/api/cubes-list")
+def cubes_list():
+    global _cubes_cache_mem, _cubes_cache_ts
+    now = time.time()
+
+    if _cubes_cache_mem is not None and now - _cubes_cache_ts < CUBES_TTL:
+        return jsonify({"cubes": _cubes_cache_mem})
+
+    # Try the on-disk cache before hitting StatCan
+    if os.path.exists(CUBES_CACHE) and now - os.path.getmtime(CUBES_CACHE) < CUBES_TTL:
+        try:
+            with open(CUBES_CACHE) as fh:
+                _cubes_cache_mem = json.load(fh)
+            _cubes_cache_ts = now
+            return jsonify({"cubes": _cubes_cache_mem})
+        except Exception:
+            pass
+
+    try:
+        r = requests.get(f"{STATCAN_BASE}/getAllCubesListLite", timeout=90)
+        r.raise_for_status()
+        raw = r.json()
+    except requests.exceptions.RequestException as exc:
+        # Fall back to a stale disk cache if the fetch fails
+        if os.path.exists(CUBES_CACHE):
+            with open(CUBES_CACHE) as fh:
+                return jsonify({"cubes": json.load(fh), "stale": True})
+        return jsonify({"error": f"StatCan API error: {exc}"}), 502
+
+    slim = [
+        {
+            "pid":      c.get("productId"),
+            "title":    c.get("cubeTitleEn", ""),
+            "start":    (c.get("cubeStartDate") or "")[:7],
+            "end":      (c.get("cubeEndDate") or "")[:7],
+            "freq":     FREQ_LABEL.get(c.get("frequencyCode"), ""),
+            "archived": str(c.get("archived", "")) == "1",
+        }
+        for c in raw
+        if c.get("productId") and c.get("cubeTitleEn")
+    ]
+    _cubes_cache_mem = slim
+    _cubes_cache_ts  = now
+    try:
+        with open(CUBES_CACHE, "w") as fh:
+            json.dump(slim, fh)
+    except Exception:
+        pass
+    return jsonify({"cubes": slim})
+
+
+# ---------------------------------------------------------------------------
+# Route: POST /api/resolve-vectors
+# Body: {"productId": 18100004, "coordinates": ["2.2.0.0.0.0.0.0.0.0", ...]}
+# Resolves dimension-member coordinates to vector IDs via WDS
+# getSeriesInfoFromCubePidCoord, in batches.  Combinations that don't exist
+# in the cube come back with vectorId null so the frontend can skip them.
+# ---------------------------------------------------------------------------
+@app.route("/api/resolve-vectors", methods=["POST"])
+def resolve_vectors():
+    if not _check_admin():
+        return jsonify({"error": "Invalid or missing admin key"}), 401
+
+    body = request.get_json(force=True, silent=True) or {}
+    pid    = body.get("productId")
+    coords = body.get("coordinates", [])
+
+    if not pid or not isinstance(coords, list) or not coords:
+        return jsonify({"error": "productId and coordinates are required"}), 400
+    if len(coords) > 8000:
+        return jsonify({"error": "Too many coordinates in one request (max 8000)"}), 400
+
+    BATCH = 100
+
+    def _resolve_batch(batch: list[str]) -> list[dict]:
+        payload = [{"productId": int(pid), "coordinate": c} for c in batch]
+        r = requests.post(
+            f"{STATCAN_BASE}/getSeriesInfoFromCubePidCoord",
+            json=payload, timeout=60,
+            headers={"Content-Type": "application/json"},
+        )
+        r.raise_for_status()
+        out = []
+        for item in r.json():
+            obj = item.get("object", {}) if isinstance(item, dict) else {}
+            ok  = (item.get("status") == "SUCCESS"
+                   and obj.get("responseStatusCode") == 0
+                   and obj.get("vectorId"))
+            out.append({
+                "coordinate": obj.get("coordinate"),
+                "vectorId":   int(obj["vectorId"]) if ok else None,
+                "title":      obj.get("SeriesTitleEn") or "",
+                "terminated": obj.get("terminated") or 0,
+            })
+        return out
+
+    batches = [coords[i:i + BATCH] for i in range(0, len(coords), BATCH)]
+    results_by_coord: dict[str, dict] = {}
+    errors = 0
+
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(_resolve_batch, b) for b in batches]
+        for fut in as_completed(futures):
+            try:
+                for res in fut.result():
+                    if res.get("coordinate"):
+                        results_by_coord[res["coordinate"]] = res
+            except Exception:
+                errors += 1
+
+    # Preserve request order; coordinates StatCan never echoed back count as misses
+    results = [
+        results_by_coord.get(c, {"coordinate": c, "vectorId": None, "title": "", "terminated": 0})
+        for c in coords
+    ]
+    resp = {"results": results}
+    if errors:
+        resp["warning"] = f"{errors} batch(es) failed — some vectors may be missing"
+    return jsonify(resp)
+
+
+# ---------------------------------------------------------------------------
+# Catalog helpers
+# ---------------------------------------------------------------------------
+def _read_catalog():
+    """Parse Vectors.xlsx → (header, list-of-row-dicts)."""
+    import openpyxl
+    wb = openpyxl.load_workbook(VECTORS_PATH, read_only=True)
+    ws = wb["series"] if "series" in wb.sheetnames else wb[wb.sheetnames[0]]
+    rows_iter = ws.iter_rows(values_only=True)
+    header = [str(h or "").strip() for h in next(rows_iter)]
+    rows = []
+    for r in rows_iter:
+        d = {header[i]: ("" if r[i] is None else str(r[i]).strip())
+             for i in range(min(len(header), len(r)))}
+        if d.get("series_id"):
+            rows.append(d)
+    wb.close()
+    return header, rows
+
+
+def _dim_key(row: dict) -> str:
+    return "__".join(row.get(f"dim{i}_value", "") for i in range(1, 6))
+
+
+# ---------------------------------------------------------------------------
+# Route: GET /api/catalog
+#   (no params)        → summary: categories + series list
+#   ?series_id=cpi_nsa → that series' rows (for the wizard's extend mode)
+# ---------------------------------------------------------------------------
+@app.route("/api/catalog")
+def get_catalog():
+    try:
+        _, rows = _read_catalog()
+    except Exception as exc:
+        return jsonify({"error": f"Could not read Vectors.xlsx: {exc}"}), 500
+
+    series_id = request.args.get("series_id", "").strip()
+    if series_id:
+        s_rows = [r for r in rows if r["series_id"] == series_id]
+        if not s_rows:
+            return jsonify({"error": f"series_id '{series_id}' not found"}), 404
+        first = s_rows[0]
+        return jsonify({
+            "seriesId":   series_id,
+            "seriesName": first.get("series_name", ""),
+            "category":   first.get("category", ""),
+            "tableId":    first.get("table_id", ""),
+            "freq":       first.get("freq", "M"),
+            "dimNames":   [first.get(f"dim{i}_name", "") for i in range(1, 6)],
+            "rows": [
+                {
+                    "dimValues": [r.get(f"dim{i}_value", "") for i in range(1, 6)],
+                    "vector":     r.get("vector", ""),
+                    "fullLabel":  r.get("full_label", ""),
+                    "shortLabel": r.get("short_label", ""),
+                    "dim1Group":  r.get("dim1_group", ""),
+                }
+                for r in s_rows
+            ],
+        })
+
+    categories: list[str] = []
+    series: dict[str, dict] = {}
+    for r in rows:
+        cat = r.get("category", "")
+        if cat and cat not in categories:
+            categories.append(cat)
+        sid = r["series_id"]
+        if sid not in series:
+            series[sid] = {
+                "seriesId":   sid,
+                "seriesName": r.get("series_name", ""),
+                "category":   cat,
+                "tableId":    r.get("table_id", ""),
+                "freq":       r.get("freq", "M"),
+                "dimNames":   [n for n in (r.get(f"dim{i}_name", "") for i in range(1, 6)) if n],
+                "rowCount":   0,
+            }
+        series[sid]["rowCount"] += 1
+
+    return jsonify({"categories": categories, "series": list(series.values())})
+
+
+# ---------------------------------------------------------------------------
+# GitHub persistence: commit the updated Vectors.xlsx so Render redeploys
+# and the change survives ephemeral-disk restarts.
+# ---------------------------------------------------------------------------
+def _github_commit_vectors(message: str) -> str | None:
+    token = os.environ.get("GITHUB_TOKEN", "")
+    if not token:
+        return None
+    api = f"https://api.github.com/repos/{GITHUB_REPO}/contents/Vectors.xlsx"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github+json",
+    }
+    sha = None
+    r = requests.get(api, headers=headers, params={"ref": "main"}, timeout=30)
+    if r.status_code == 200:
+        sha = r.json().get("sha")
+    with open(VECTORS_PATH, "rb") as fh:
+        content = base64.b64encode(fh.read()).decode()
+    payload = {"message": message, "content": content, "branch": "main"}
+    if sha:
+        payload["sha"] = sha
+    r = requests.put(api, headers=headers, json=payload, timeout=60)
+    r.raise_for_status()
+    return r.json().get("commit", {}).get("sha")
+
+
+# ---------------------------------------------------------------------------
+# Route: POST /api/catalog/append
+# Headers: X-Admin-Key (required when ADMIN_KEY env var is set)
+# Body: {"rows": [{category, freq, series_id, ... vector, full_label, ...}],
+#        "dryRun": false}
+# Appends new rows to Vectors.xlsx (deduplicated against existing rows),
+# after writing a timestamped backup.  Commits to GitHub when configured.
+# ---------------------------------------------------------------------------
+@app.route("/api/catalog/append", methods=["POST"])
+def catalog_append():
+    if not _check_admin():
+        return jsonify({"error": "Invalid or missing admin key"}), 401
+
+    body = request.get_json(force=True, silent=True) or {}
+    rows = body.get("rows", [])
+    dry  = bool(body.get("dryRun"))
+
+    if not isinstance(rows, list) or not rows:
+        return jsonify({"error": "No rows provided"}), 400
+    if len(rows) > 10000:
+        return jsonify({"error": "Too many rows in one request (max 10000)"}), 400
+
+    for i, r in enumerate(rows):
+        for req_col in ("category", "freq", "series_id", "vector"):
+            if not str(r.get(req_col, "")).strip():
+                return jsonify({"error": f"Row {i + 1} is missing '{req_col}'"}), 400
+
+    import openpyxl
+    try:
+        wb = openpyxl.load_workbook(VECTORS_PATH)
+        ws = wb["series"] if "series" in wb.sheetnames else wb[wb.sheetnames[0]]
+    except Exception as exc:
+        return jsonify({"error": f"Could not open Vectors.xlsx: {exc}"}), 500
+
+    header = [str(c.value or "").strip() for c in ws[1]]
+    col_of = {name: idx for idx, name in enumerate(header)}
+
+    existing_vec: set[tuple] = set()
+    existing_dim: set[tuple] = set()
+    for r in ws.iter_rows(min_row=2, values_only=True):
+        d = {header[i]: ("" if r[i] is None else str(r[i]).strip())
+             for i in range(min(len(header), len(r)))}
+        sid = d.get("series_id", "")
+        if not sid:
+            continue
+        existing_vec.add((sid, d.get("vector", "").lstrip("vV")))
+        existing_dim.add((sid, _dim_key(d)))
+
+    new_rows, skipped = [], 0
+    for r in rows:
+        sid = str(r["series_id"]).strip()
+        vec = str(r["vector"]).strip().lstrip("vV")
+        if (sid, vec) in existing_vec or (sid, _dim_key(r)) in existing_dim:
+            skipped += 1
+            continue
+        existing_vec.add((sid, vec))
+        existing_dim.add((sid, _dim_key(r)))
+        new_rows.append(r)
+
+    result = {
+        "added":   len(new_rows),
+        "skipped": skipped,
+        "dryRun":  dry,
+    }
+
+    if dry or not new_rows:
+        wb.close()
+        return jsonify(result)
+
+    # Backup before touching the file
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    backup_name = f"Vectors-{datetime.now().strftime('%Y%m%d-%H%M%S')}.xlsx"
+    shutil.copy2(VECTORS_PATH, os.path.join(BACKUP_DIR, backup_name))
+    result["backup"] = f"backups/{backup_name}"
+
+    # Add optional hierarchy-level columns to the header when rows carry them
+    for lvl_col in (f"dim{i}_level" for i in range(1, 6)):
+        if lvl_col not in col_of and any(str(r.get(lvl_col, "")).strip() for r in new_rows):
+            ws.cell(row=1, column=len(header) + 1, value=lvl_col)
+            header.append(lvl_col)
+            col_of[lvl_col] = len(header) - 1
+
+    for r in new_rows:
+        out = [""] * len(header)
+        for col, idx in col_of.items():
+            val = str(r.get(col, "") or "")
+            if col == "vector":
+                val = val.lstrip("vV")
+            out[idx] = val
+        ws.append(out)
+
+    try:
+        wb.save(VECTORS_PATH)
+    except Exception as exc:
+        return jsonify({"error": f"Could not save Vectors.xlsx: {exc}"}), 500
+    finally:
+        wb.close()
+
+    # Persist via GitHub when configured (Render's disk is ephemeral)
+    if os.environ.get("GITHUB_TOKEN"):
+        sids = sorted({str(r["series_id"]) for r in new_rows})
+        msg = f"Wizard: add {len(new_rows)} rows to {', '.join(sids[:5])}"
+        if len(sids) > 5:
+            msg += f" (+{len(sids) - 5} more)"
+        try:
+            commit_sha = _github_commit_vectors(msg)
+            result["committed"] = True
+            result["commitSha"] = commit_sha
+        except Exception as exc:
+            result["committed"] = False
+            result["commitError"] = str(exc)
+
+    return jsonify(result)
+
+
+# ---------------------------------------------------------------------------
+# Route: POST /api/catalog/delete
+# Headers: X-Admin-Key (required when ADMIN_KEY env var is set)
+# Body: {"seriesId": "cpi_nsa"}  or  {"category": "Prices"}
+# Removes all matching rows from Vectors.xlsx after a timestamped backup.
+# Commits to GitHub when configured.
+# ---------------------------------------------------------------------------
+@app.route("/api/catalog/delete", methods=["POST"])
+def catalog_delete():
+    if not _check_admin():
+        return jsonify({"error": "Invalid or missing admin key"}), 401
+
+    body      = request.get_json(force=True, silent=True) or {}
+    series_id = str(body.get("seriesId", "") or "").strip()
+    category  = str(body.get("category", "") or "").strip()
+
+    if bool(series_id) == bool(category):
+        return jsonify({"error": "Provide exactly one of seriesId or category"}), 400
+
+    import openpyxl
+    try:
+        wb = openpyxl.load_workbook(VECTORS_PATH)
+        ws = wb["series"] if "series" in wb.sheetnames else wb[wb.sheetnames[0]]
+    except Exception as exc:
+        return jsonify({"error": f"Could not open Vectors.xlsx: {exc}"}), 500
+
+    header = [str(c.value or "").strip() for c in ws[1]]
+    col_of = {name: idx for idx, name in enumerate(header)}
+    if "series_id" not in col_of or "category" not in col_of:
+        wb.close()
+        return jsonify({"error": "Unexpected Vectors.xlsx format"}), 500
+
+    target_idx = col_of["series_id"] if series_id else col_of["category"]
+    target_val = series_id or category
+
+    doomed = [
+        row_num for row_num, r in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2)
+        if str((r[target_idx] if target_idx < len(r) else None) or "").strip() == target_val
+    ]
+    if not doomed:
+        wb.close()
+        return jsonify({"error": f"No rows found for {'series' if series_id else 'category'} '{target_val}'"}), 404
+
+    # Backup before touching the file
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    backup_name = f"Vectors-{datetime.now().strftime('%Y%m%d-%H%M%S')}.xlsx"
+    shutil.copy2(VECTORS_PATH, os.path.join(BACKUP_DIR, backup_name))
+
+    # Delete contiguous runs bottom-up so row numbers stay valid
+    runs = []
+    start = prev = doomed[0]
+    for n in doomed[1:]:
+        if n == prev + 1:
+            prev = n
+        else:
+            runs.append((start, prev - start + 1))
+            start = prev = n
+    runs.append((start, prev - start + 1))
+    for run_start, count in reversed(runs):
+        ws.delete_rows(run_start, count)
+
+    try:
+        wb.save(VECTORS_PATH)
+    except Exception as exc:
+        return jsonify({"error": f"Could not save Vectors.xlsx: {exc}"}), 500
+    finally:
+        wb.close()
+
+    result = {"deleted": len(doomed), "backup": f"backups/{backup_name}"}
+
+    if os.environ.get("GITHUB_TOKEN"):
+        what = f"series {series_id}" if series_id else f"category {category}"
+        try:
+            commit_sha = _github_commit_vectors(f"Wizard: delete {what} ({len(doomed)} rows)")
+            result["committed"] = True
+            result["commitSha"] = commit_sha
+        except Exception as exc:
+            result["committed"] = False
+            result["commitError"] = str(exc)
+
+    return jsonify(result)
 
 
 # ---------------------------------------------------------------------------
