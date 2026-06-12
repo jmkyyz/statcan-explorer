@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StatCan Explorer — Lab</title>
+<title>StatCan Explorer</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -809,6 +809,18 @@ function slugify(str) {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 }
 
+// Build <option> tags for a breakdown dropdown, indenting sub-categories
+// according to the optional dim*_level columns (em-space per level).
+function dimOptionsHtml(series, dimIdx, values) {
+  const lvls = series.dimLevels?.[dimIdx] || {};
+  const known = values.map(v => lvls[v]).filter(x => x != null);
+  const base = known.length ? Math.min(...known) : 0;
+  return values.map(v => {
+    const lv = lvls[v] != null ? Math.max(0, lvls[v] - base) : 0;
+    return `<option value="${v}">${' '.repeat(lv)}${v}</option>`;
+  }).join('');
+}
+
 // ═══════════════════════════════════════════════════════════
 // EXCEL PARSER
 // ═══════════════════════════════════════════════════════════
@@ -842,7 +854,7 @@ function parseExcel(workbook) {
     if (!catName || !seriesId || !vectorId) continue;
 
     const catId = slugify(catName);
-    const freq  = freqRaw === 'Q' ? 'quarterly' : 'monthly';
+    const freq  = freqRaw === 'Q' ? 'quarterly' : freqRaw === 'D' ? 'daily' : 'monthly';
 
     if (!catMap[catId]) {
       catMap[catId] = { id: catId, label: catName, sourceFreq: freq, series: [] };
@@ -855,6 +867,7 @@ function parseExcel(workbook) {
         id: seriesId,
         name: serName,
         tableId,
+        freq,
         dims: numDims,
         dim1Name: dim1Name || null,
         dim2Name: dim2Name || null,
@@ -880,6 +893,16 @@ function parseExcel(workbook) {
     series.labels[key]  = { full: fullLbl, short: shortLbl };
     const dim1Group = (row['dim1_group'] || '').trim();
     if (dim1Group && dim1Val) series.dim1Groups[dim1Val] = dim1Group;
+
+    // Optional hierarchy depth per dim value (dim1_level..dim5_level columns)
+    const dimVals = [dim1Val, dim2Val, dim3Val, dim4Val, dim5Val];
+    for (let k = 1; k <= 5; k++) {
+      const lv = parseInt((row[`dim${k}_level`] || '').toString().trim(), 10);
+      if (!isNaN(lv) && dimVals[k - 1]) {
+        series.dimLevels = series.dimLevels || {};
+        (series.dimLevels[k] = series.dimLevels[k] || {})[dimVals[k - 1]] = lv;
+      }
+    }
   }
 
   return catMap;
@@ -901,7 +924,7 @@ function buildSeriesMap() {
           category:   cat.label,
           vectorId,
           tableId:    s.tableId,
-          sourceFreq: cat.sourceFreq,
+          sourceFreq: s.freq || cat.sourceFreq,
         };
       } else {
         // Has breakdowns: register compound IDs when breakdowns are selected
@@ -940,7 +963,7 @@ function buildSeriesMap() {
             category:   cat.label,
             vectorId,
             tableId:    s.tableId,
-            sourceFreq: cat.sourceFreq,
+            sourceFreq: s.freq || cat.sourceFreq,
           };
         }
       }
@@ -1157,9 +1180,11 @@ function resetFile() {
 function updateFreqDropdown() {
   const cat = CATEGORIES[state.category];
   if (!cat) return;
-  // Use coarsest freq across all active series (so cross-category mixes work correctly)
-  const allFreqs = [cat.sourceFreq, ...state.activeSeries.map(sid => SERIES_MAP[sid]?.sourceFreq)].filter(Boolean);
-  const srcFreq = allFreqs.includes('quarterly') ? 'quarterly' : 'monthly';
+  // Base on active series only; treat 'daily' as 'monthly' (proxy aggregates to monthly sums)
+  const activeFreqs = state.activeSeries
+    .map(sid => SERIES_MAP[sid]?.sourceFreq).filter(Boolean)
+    .map(f => f === 'daily' ? 'monthly' : f);
+  const srcFreq = activeFreqs.includes('quarterly') ? 'quarterly' : 'monthly';
   const freqSel = document.getElementById('freqSelect');
   freqSel.querySelectorAll('option').forEach(opt => {
     opt.hidden = (opt.value === 'monthly_sum' && srcFreq === 'monthly') ||
@@ -1197,6 +1222,7 @@ function renderSeriesList() {
   countEl.textContent = `${state.activeSeries.length} / ${maxSeries}`;
 
   if (cat.isCimt) {
+    // CIMT categories use the query builder — skip dropdown, just render chips below
     document.getElementById('cimtAddBtn').disabled = state.activeSeries.length >= maxSeries;
     renderChips(chipsEl);
     return;
@@ -1233,11 +1259,11 @@ function renderChips(chipsEl) {
     const letter = LETTERS[i];
     const curT   = state.seriesTransforms[sid] || 'level';
     const tOpts  = T_OPTS.map(([v,l]) => `<option value="${v}"${curT===v?' selected':''}>${l}</option>`).join('');
-    const linkHref  = s.tableId === 'FRED' ? `https://fred.stlouisfed.org/series/${s.vectorId}`
-                    : s.tableId === 'CIMT' ? 'https://www150.statcan.gc.ca/n1/pub/71-607-x/71-607-x2021004-eng.htm'
+    const linkHref  = s.tableId === 'FRED'  ? `https://fred.stlouisfed.org/series/${s.vectorId}`
+                    : s.tableId === 'CIMT'  ? 'https://www150.statcan.gc.ca/n1/pub/71-607-x/71-607-x2021004-eng.htm'
                     : cansimUrl(s.tableId);
-    const linkTitle = s.tableId === 'FRED' ? `View ${s.vectorId} on FRED`
-                    : s.tableId === 'CIMT' ? 'Open CIMT web app'
+    const linkTitle = s.tableId === 'FRED'  ? `View ${s.vectorId} on FRED`
+                    : s.tableId === 'CIMT'  ? 'Open CIMT web app'
                     : `View table ${s.tableId} on StatCan`;
     return `<div class="series-chip" style="border-left-color:${color};">
       <div class="chip-dot" style="background:${color};margin-top:3px;"></div>
@@ -1313,13 +1339,13 @@ function addSeries(id) {
     let html = `<option value="">— select ${series.dim1Name || 'option'} —</option>`;
     for (const grp of seenGrps) {
       if (grp) html += `<optgroup label="${grp}">`;
-      for (const v of groupedItems[grp]) html += `<option value="${v}">${v}</option>`;
+      html += dimOptionsHtml(series, 1, groupedItems[grp]);
       if (grp) html += `</optgroup>`;
     }
     dim1Sel.innerHTML = html;
   } else {
     dim1Sel.innerHTML = `<option value="">— select ${series.dim1Name || 'option'} —</option>`
-      + dim1Values.map(v => `<option value="${v}">${v}</option>`).join('');
+      + dimOptionsHtml(series, 1, dim1Values);
   }
   dim1Sel.value = '';
 
@@ -1367,7 +1393,7 @@ function onDim1Change(val) {
 
     const dim2Sel = document.getElementById('dim2Dropdown');
     dim2Sel.innerHTML = `<option value="">— select ${series.dim2Name || 'option'} —</option>`
-      + availDim2.map(v => `<option value="${v}">${v}</option>`).join('');
+      + dimOptionsHtml(series, 2, availDim2);
     dim2Sel.value = '';
 
     document.getElementById('dim2Label').textContent = series.dim2Name || 'Dimension 2';
@@ -1415,7 +1441,7 @@ function onDim2Change(val) {
 
   const dim3Sel = document.getElementById('dim3Dropdown');
   dim3Sel.innerHTML = `<option value="">— select ${series.dim3Name || 'option'} —</option>`
-    + availDim3.map(v => `<option value="${v}">${v}</option>`).join('');
+    + dimOptionsHtml(series, 3, availDim3);
   dim3Sel.value = '';
   document.getElementById('dim3Label').textContent = series.dim3Name || 'Dimension 3';
   document.getElementById('dim3Group').style.display = '';
@@ -1459,7 +1485,7 @@ function _showDim4OrAdd(series) {
   }
   const dim4Sel = document.getElementById('dim4Dropdown');
   dim4Sel.innerHTML = `<option value="">— select ${series.dim4Name || 'option'} —</option>`
-    + availDim4.map(v => `<option value="${v}">${v}</option>`).join('');
+    + dimOptionsHtml(series, 4, availDim4);
   dim4Sel.value = '';
   document.getElementById('dim4Label').textContent = series.dim4Name || 'Dimension 4';
   document.getElementById('dim4Group').style.display = '';
@@ -1497,7 +1523,7 @@ function _showDim5OrAdd(series) {
   }
   const dim5Sel = document.getElementById('dim5Dropdown');
   dim5Sel.innerHTML = `<option value="">— select ${series.dim5Name || 'option'} —</option>`
-    + availDim5.map(v => `<option value="${v}">${v}</option>`).join('');
+    + dimOptionsHtml(series, 5, availDim5);
   dim5Sel.value = '';
   document.getElementById('dim5Label').textContent = series.dim5Name || 'Dimension 5';
   document.getElementById('dim5Group').style.display = '';
@@ -1737,13 +1763,16 @@ async function fetchData() {
 
     // ── StatCan fetch ──────────────────────────────────────────────────────
     if (statcanMeta.length) {
-      const vectors  = statcanMeta.map(s => s.vectorId).join(',');
-      const srcFreq  = statcanMeta.some(sm => sm.sourceFreq === 'quarterly') ? 'quarterly' : 'monthly';
-      const yearSpan = state.toYear - state.fromYear + 1;
-      const periods  = Math.ceil(yearSpan * (srcFreq === 'quarterly' ? 4 : 12) * 1.3) + 24;
+      const vectors    = statcanMeta.map(s => s.vectorId).join(',');
+      const hasDaily   = statcanMeta.some(sm => sm.sourceFreq === 'daily');
+      const srcFreq    = statcanMeta.some(sm => sm.sourceFreq === 'quarterly') ? 'quarterly' : 'monthly';
+      const yearSpan   = state.toYear - state.fromYear + 1;
+      const perYear    = hasDaily ? 365 : (srcFreq === 'quarterly' ? 4 : 12);
+      const periods    = Math.ceil(yearSpan * perYear * 1.3) + 30;
 
       const url  = `${PROXY_URL}/api/series?vectors=${encodeURIComponent(vectors)}`
-                 + `&fromDate=${fromDate}&toDate=${toDate}&periods=${periods}`;
+                 + `&fromDate=${fromDate}&toDate=${toDate}&periods=${periods}`
+                 + (hasDaily ? '&agg=monthly_sum' : '');
       const resp = await fetch(url);
       if (!resp.ok) {
         const err = await resp.json().catch(() => ({}));
@@ -2540,6 +2569,7 @@ function loadConfigObj(config) {
   // Restore state
   state.category         = config.category;
   state.activeSeries     = [...(config.activeSeries || [])];
+  // Rebuild SERIES_MAP entries for any CIMT series in the saved config
   state.activeSeries.filter(id => id.startsWith('cimt_')).forEach(ensureCimtSeriesInMap);
   state.seriesTransforms = { ...(config.seriesTransforms || {}) };
   state.formula          = config.formula || '';
