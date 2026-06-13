@@ -147,8 +147,12 @@ UOM_INFO = {
     224: ("dollars",         1_000),      # thousands of dollars → dollars
     229: ("dollars",     1_000_000),      # millions of dollars  → dollars
     246: ("dollars", 1_000_000_000),      # billions of dollars  → dollars
-    300: ("ppts",                1),
-    301: ("percent",             1),
+    239: ("percent",             1),      # "Percent"
+    242: ("percent",             1),      # "Percentage"
+    300: ("units",               1),      # "Units" (e.g. vehicle registrations)
+    301: ("vehicle-km",          1),      # "Vehicle-kilometres"
+    302: ("vehicles",            1),      # "Vehicles"
+    396: ("ppts",                1),      # "Percentage point"
     428: ("persons",             1),      # persons (scalar handles scale)
 }
 
