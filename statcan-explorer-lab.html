@@ -2435,7 +2435,9 @@ function renderChart() {
               const sPct = t === 'pop' || t === 'yoy';
               const sChg = sPct || t === 'pop_abs' || t === 'yoy_abs';
               const sfx  = sPct ? '%' : '';
-              return ` ${ctx.dataset.label}: ${sChg && v > 0 ? '+' : ''}${fmt}${sfx}`;
+              // Value only — the colored swatch + legend identify the series.
+              // (Full series names made the tooltip so wide the value scrolled off-screen.)
+              return ` ${sChg && v > 0 ? '+' : ''}${fmt}${sfx}`;
             }
           }
         }
