@@ -510,12 +510,59 @@
   ::-webkit-scrollbar-track { background: transparent; }
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
   ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+  /* ── Mobile: controls become a slide-in drawer (phones ≤640px) ── */
+  .nav-toggle { display: none; }
+  .drawer-backdrop { display: none; }
+
+  @media (max-width: 640px) {
+    header { padding: 12px 14px; gap: 10px; }
+    header h1 { font-size: 17px; }
+    header span { display: none; }          /* hide subtitle to save room */
+    .maple { font-size: 16px; }
+    .nav-toggle {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 36px; height: 36px; flex-shrink: 0;
+      border: 1px solid var(--border); border-radius: 7px;
+      background: var(--surface2); color: var(--text);
+      font-size: 17px; cursor: pointer; padding: 0;
+    }
+
+    /* Single column — the chart/main fills the screen */
+    .app { grid-template-columns: 1fr; }
+
+    /* Sidebar slides in from the left over the chart */
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0;
+      width: 86vw; max-width: 340px; z-index: 100;
+      border-right: 1px solid var(--border);
+      transform: translateX(-100%);
+      transition: transform 0.25s ease;
+    }
+    body.drawer-open .sidebar {
+      transform: translateX(0);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.35);
+    }
+    .drawer-backdrop {
+      position: fixed; inset: 0; z-index: 90;
+      background: rgba(0,0,0,0.45); display: none;
+    }
+    body.drawer-open .drawer-backdrop { display: block; }
+
+    /* Roomier tap targets + breathing room in the chart area */
+    .toolbar { padding: 10px 14px; }
+    .toolbar-title { font-size: 15px; }
+    .chart-area { padding: 10px 12px; gap: 10px; }
+    .chart-container { padding: 10px; min-height: 300px; }
+    .data-table-wrap { overflow-x: auto; }
+  }
 </style>
 </head>
 <body>
 <div id="series-tooltip"></div>
 
 <header>
+  <button class="nav-toggle" onclick="toggleDrawer()" aria-label="Toggle controls">☰</button>
   <h1>StatCan Explorer</h1>
   <span>Statistics Canada · Data Workbench</span>
   <div class="maple" aria-hidden="true">
@@ -524,6 +571,8 @@
     </svg>
   </div>
 </header>
+
+<div class="drawer-backdrop" onclick="toggleDrawer(false)" aria-hidden="true"></div>
 
 <div class="app">
 
@@ -2005,6 +2054,7 @@ function computeDateRange() {
 // FETCH
 // ═══════════════════════════════════════════════════════════
 async function fetchData() {
+  toggleDrawer(false);   // on mobile, reveal the chart behind the drawer
   state.fromYear  = parseInt(document.getElementById('fromYear').value);
   state.fromMonth = parseInt(document.getElementById('fromMonth').value);
   state.toYear    = parseInt(document.getElementById('toYear').value);
@@ -2901,6 +2951,14 @@ function tryLoadFromUrl() {
   if (!config || !Array.isArray(config.activeSeries)) return;
   loadConfigObj(config);
   fetchData();
+}
+
+// ═══════════════════════════════════════════════════════════
+// MOBILE DRAWER (controls sidebar on phones ≤640px)
+// ═══════════════════════════════════════════════════════════
+function toggleDrawer(open) {
+  const want = open === undefined ? !document.body.classList.contains('drawer-open') : open;
+  document.body.classList.toggle('drawer-open', want);
 }
 
 // ═══════════════════════════════════════════════════════════
