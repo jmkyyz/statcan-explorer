@@ -1369,24 +1369,16 @@ def catalog_append():
             if not str(r.get(req_col, "")).strip():
                 return jsonify({"error": f"Row {i + 1} is missing '{req_col}'"}), 400
 
-    import openpyxl
+    # Read existing rows (read_only, streaming ~50MB) to dedup against.
     try:
-        wb = openpyxl.load_workbook(VECTORS_PATH)
-        ws = wb["series"] if "series" in wb.sheetnames else wb[wb.sheetnames[0]]
+        header, existing = _read_catalog()
     except Exception as exc:
-        return jsonify({"error": f"Could not open Vectors.xlsx: {exc}"}), 500
-
-    header = [str(c.value or "").strip() for c in ws[1]]
-    col_of = {name: idx for idx, name in enumerate(header)}
+        return jsonify({"error": f"Could not read Vectors.xlsx: {exc}"}), 500
 
     existing_vec: set[tuple] = set()
     existing_dim: set[tuple] = set()
-    for r in ws.iter_rows(min_row=2, values_only=True):
-        d = {header[i]: ("" if r[i] is None else str(r[i]).strip())
-             for i in range(min(len(header), len(r)))}
+    for d in existing:
         sid = d.get("series_id", "")
-        if not sid:
-            continue
         existing_vec.add((sid, d.get("vector", "").lstrip("vV")))
         existing_dim.add((sid, _dim_key(d)))
 
@@ -1401,59 +1393,25 @@ def catalog_append():
         existing_dim.add((sid, _dim_key(r)))
         new_rows.append(r)
 
-    result = {
-        "added":   len(new_rows),
-        "skipped": skipped,
-        "dryRun":  dry,
-    }
-
+    result = {"added": len(new_rows), "skipped": skipped, "dryRun": dry}
     if dry or not new_rows:
-        wb.close()
         return jsonify(result)
 
-    # Backup before touching the file
-    os.makedirs(BACKUP_DIR, exist_ok=True)
-    backup_name = f"Vectors-{datetime.now().strftime('%Y%m%d-%H%M%S')}.xlsx"
-    shutil.copy2(VECTORS_PATH, os.path.join(BACKUP_DIR, backup_name))
-    result["backup"] = f"backups/{backup_name}"
-
-    # Add optional hierarchy-level columns to the header when rows carry them
+    # Extend the header with any new dim*_level columns the incoming rows carry.
     for lvl_col in (f"dim{i}_level" for i in range(1, 6)):
-        if lvl_col not in col_of and any(str(r.get(lvl_col, "")).strip() for r in new_rows):
-            ws.cell(row=1, column=len(header) + 1, value=lvl_col)
+        if lvl_col not in header and any(str(r.get(lvl_col, "")).strip() for r in new_rows):
             header.append(lvl_col)
-            col_of[lvl_col] = len(header) - 1
 
-    for r in new_rows:
-        out = [""] * len(header)
-        for col, idx in col_of.items():
-            val = str(r.get(col, "") or "")
-            if col == "vector":
-                val = val.lstrip("vV")
-            out[idx] = val
-        ws.append(out)
+    sids = sorted({str(r["series_id"]) for r in new_rows})
+    msg = f"Wizard: add {len(new_rows)} rows to {', '.join(sids[:5])}"
+    if len(sids) > 5:
+        msg += f" (+{len(sids) - 5} more)"
 
-    try:
-        wb.save(VECTORS_PATH)
-    except Exception as exc:
-        return jsonify({"error": f"Could not save Vectors.xlsx: {exc}"}), 500
-    finally:
-        wb.close()
-
-    # Persist via GitHub when configured (Render's disk is ephemeral)
-    if os.environ.get("GITHUB_TOKEN"):
-        sids = sorted({str(r["series_id"]) for r in new_rows})
-        msg = f"Wizard: add {len(new_rows)} rows to {', '.join(sids[:5])}"
-        if len(sids) > 5:
-            msg += f" (+{len(sids) - 5} more)"
-        try:
-            commit_sha = _github_commit_vectors(msg)
-            result["committed"] = True
-            result["commitSha"] = commit_sha
-        except Exception as exc:
-            result["committed"] = False
-            result["commitError"] = str(exc)
-
+    save = _save_catalog(header, existing + new_rows, msg)
+    result["backup"] = save.get("backup")
+    for k in ("committed", "commitSha", "commitError"):
+        if k in save:
+            result[k] = save[k]
     return jsonify(result)
 
 
@@ -1476,76 +1434,35 @@ def catalog_delete():
     if bool(series_id) == bool(category):
         return jsonify({"error": "Provide exactly one of seriesId or category"}), 400
 
-    import openpyxl
+    # Stream the catalog (read_only ~50MB) and keep everything that doesn't match.
     try:
-        wb = openpyxl.load_workbook(VECTORS_PATH)
-        ws = wb["series"] if "series" in wb.sheetnames else wb[wb.sheetnames[0]]
+        header, rows = _read_catalog()
     except Exception as exc:
-        return jsonify({"error": f"Could not open Vectors.xlsx: {exc}"}), 500
+        return jsonify({"error": f"Could not read Vectors.xlsx: {exc}"}), 500
 
-    header = [str(c.value or "").strip() for c in ws[1]]
-    col_of = {name: idx for idx, name in enumerate(header)}
-    if "series_id" not in col_of or "category" not in col_of:
-        wb.close()
-        return jsonify({"error": "Unexpected Vectors.xlsx format"}), 500
-
-    target_idx = col_of["series_id"] if series_id else col_of["category"]
+    key = "series_id" if series_id else "category"
     target_val = series_id or category
-
-    doomed = [
-        row_num for row_num, r in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2)
-        if str((r[target_idx] if target_idx < len(r) else None) or "").strip() == target_val
-    ]
-    if not doomed:
-        wb.close()
+    kept = [r for r in rows if r.get(key, "") != target_val]
+    deleted = len(rows) - len(kept)
+    if not deleted:
         return jsonify({"error": f"No rows found for {'series' if series_id else 'category'} '{target_val}'"}), 404
 
-    # Backup before touching the file
-    os.makedirs(BACKUP_DIR, exist_ok=True)
-    backup_name = f"Vectors-{datetime.now().strftime('%Y%m%d-%H%M%S')}.xlsx"
-    shutil.copy2(VECTORS_PATH, os.path.join(BACKUP_DIR, backup_name))
-
-    # Delete contiguous runs bottom-up so row numbers stay valid
-    runs = []
-    start = prev = doomed[0]
-    for n in doomed[1:]:
-        if n == prev + 1:
-            prev = n
-        else:
-            runs.append((start, prev - start + 1))
-            start = prev = n
-    runs.append((start, prev - start + 1))
-    for run_start, count in reversed(runs):
-        ws.delete_rows(run_start, count)
-
-    try:
-        wb.save(VECTORS_PATH)
-    except Exception as exc:
-        return jsonify({"error": f"Could not save Vectors.xlsx: {exc}"}), 500
-    finally:
-        wb.close()
-
-    result = {"deleted": len(doomed), "backup": f"backups/{backup_name}"}
-
-    if os.environ.get("GITHUB_TOKEN"):
-        what = f"series {series_id}" if series_id else f"category {category}"
-        try:
-            commit_sha = _github_commit_vectors(f"Wizard: delete {what} ({len(doomed)} rows)")
-            result["committed"] = True
-            result["commitSha"] = commit_sha
-        except Exception as exc:
-            result["committed"] = False
-            result["commitError"] = str(exc)
-
+    what = f"series {series_id}" if series_id else f"category {category}"
+    result = _save_catalog(header, kept, f"Wizard: delete {what} ({deleted} rows)")
+    result["deleted"] = deleted
     return jsonify(result)
 
 
 # ---------------------------------------------------------------------------
-# Shared writer for in-place catalog edits (reorder / rename). Rewrites
-# Vectors.xlsx from an ordered list of row-dicts after a timestamped backup,
+# Shared writer for every catalog mutation (append / delete / reorder / rename).
+# Rewrites Vectors.xlsx from a list of row-dicts after a timestamped backup,
 # invalidates the /api/catalog-rows cache, and commits to GitHub when
-# configured. Rebuilds the sheet fresh (fast for 50k+ rows; avoids openpyxl's
-# slow delete_rows).
+# configured.
+#
+# CRITICAL: uses openpyxl write_only mode, which streams rows to disk instead
+# of holding the whole sheet in memory. A normal/writable workbook of the 50k+
+# row catalog peaks at ~770MB and OOM-kills Render's 512MB instance; write_only
+# (paired with read_only reads everywhere else) keeps it well under ~150MB.
 # ---------------------------------------------------------------------------
 def _save_catalog(header, rows, commit_msg):
     global _catalog_rows_cache
@@ -1554,22 +1471,26 @@ def _save_catalog(header, rows, commit_msg):
     backup_name = f"Vectors-{datetime.now().strftime('%Y%m%d-%H%M%S')}.xlsx"
     shutil.copy2(VECTORS_PATH, os.path.join(BACKUP_DIR, backup_name))
 
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "series"
+    n = 0
+    wb = openpyxl.Workbook(write_only=True)
+    ws = wb.create_sheet("series")
     ws.append(header)
     col_of = {name: i for i, name in enumerate(header)}
+    vec_idx = col_of.get("vector")
     for r in rows:
         out = [""] * len(header)
         for col, idx in col_of.items():
             out[idx] = str(r.get(col, "") or "")
+        if vec_idx is not None:
+            out[vec_idx] = out[vec_idx].lstrip("vV")
         ws.append(out)
+        n += 1
     wb.save(VECTORS_PATH)
     wb.close()
 
     _catalog_rows_cache = None   # force /api/catalog-rows to rebuild on next read
 
-    result = {"rows": len(rows), "backup": f"backups/{backup_name}"}
+    result = {"rows": n, "backup": f"backups/{backup_name}"}
     if os.environ.get("GITHUB_TOKEN"):
         try:
             result["commitSha"] = _github_commit_vectors(commit_msg)
