@@ -119,6 +119,13 @@
     font-size: 11px; line-height: 1.3; color: var(--text); flex: 1; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
+  .health-badge {
+    display: inline-block; margin-bottom: 4px; padding: 1px 6px;
+    font-size: 9.5px; font-weight: 600; letter-spacing: 0.3px;
+    text-transform: uppercase; border-radius: 3px; cursor: default;
+  }
+  .health-terminated { color: #92400e; background: rgba(245,158,11,0.20); border: 1px solid rgba(245,158,11,0.5); }
+  .health-empty      { color: #991b1b; background: rgba(220,38,38,0.16);  border: 1px solid rgba(220,38,38,0.45); }
   #series-tooltip {
     position: fixed;
     background: var(--surface);
@@ -823,6 +830,7 @@ const state = {
   rawData: {},
   processedData: {},
   seriesUnits: {},
+  vectorHealth: {},       // vectorId → { status, terminated, empty, lastRefPer }
   formula: '',
   formulaResult: null,
   autoUpdateTo: true,
@@ -1342,6 +1350,7 @@ function renderChips(chipsEl) {
       <div style="flex:1;min-width:0;overflow:hidden;">
         <div class="chip-name" data-full="${label}">${label}</div>
         <div style="font-size:10px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.3;margin-bottom:3px;">${s.category || ''}</div>
+        ${healthBadgeHtml(sid)}
         <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;">
           <select class="chip-transform" onclick="event.stopPropagation()"
                   onchange="setSeriesTransform('${sid}', this.value)">${tOpts}</select>
@@ -1627,10 +1636,54 @@ function doAddSeries(id) {
   if (!state.activeSeries.includes(id)) {
     state.activeSeries.push(id);
     state.autoUpdateTo = true;
+    checkVectorHealth(id);   // async — flags terminated/empty StatCan vectors
   }
   document.getElementById('seriesDropdown').value = '';
   renderSeriesList();
   updateEmptyState();
+}
+
+// ═══════════════════════════════════════════════════════════
+// VECTOR HEALTH CHECK — flag terminated / empty StatCan vectors inline
+// ═══════════════════════════════════════════════════════════
+// Only StatCan WDS vectors are checked; FRED / CIMT / BOC use other data
+// sources with their own liveness, so they're skipped. Results are cached by
+// vectorId so re-adding the same series doesn't re-query StatCan.
+async function checkVectorHealth(id) {
+  const s = SERIES_MAP[id];
+  if (!s || !s.vectorId) return;
+  if (['FRED', 'CIMT', 'BOC'].includes(s.tableId)) return;
+  const vid = String(s.vectorId).replace(/^[vV]/, '');
+  if (!vid || state.vectorHealth[vid]) return;   // cached or in flight
+
+  state.vectorHealth[vid] = { status: 'checking' };
+  try {
+    const resp = await fetch(`${PROXY_URL}/api/vector-health?vectors=${encodeURIComponent(vid)}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+    const h = (json.health || []).find(x => String(x.vectorId) === vid) || {};
+    state.vectorHealth[vid] = {
+      status: h.terminated ? 'terminated' : h.empty ? 'empty' : 'ok',
+      lastRefPer: h.lastRefPer || null,
+    };
+  } catch (e) {
+    state.vectorHealth[vid] = { status: 'unknown' };   // never false-flag on error
+  }
+  // Re-render chips so the badge appears once the result lands
+  renderSeriesList();
+}
+
+// Returns the badge HTML for a series chip, or '' when healthy/unknown.
+function healthBadgeHtml(sid) {
+  const s = SERIES_MAP[sid];
+  if (!s || !s.vectorId) return '';
+  const vid = String(s.vectorId).replace(/^[vV]/, '');
+  const h = state.vectorHealth[vid];
+  if (!h || h.status === 'ok' || h.status === 'unknown' || h.status === 'checking') return '';
+  const tip = h.status === 'terminated'
+    ? `Discontinued series${h.lastRefPer ? ` — last data ${h.lastRefPer}` : ''}`
+    : 'No data available for this vector';
+  return `<span class="health-badge health-${h.status}" title="${tip}">⚠ ${h.status === 'terminated' ? 'discontinued' : 'no data'}</span>`;
 }
 
 // ═══════════════════════════════════════════════════════════

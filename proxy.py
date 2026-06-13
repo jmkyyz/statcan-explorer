@@ -443,6 +443,93 @@ def get_metadata():
 
 
 # ---------------------------------------------------------------------------
+# Route: GET /api/vector-health
+# Query params:
+#   vectors – comma-separated vector IDs (small set: the user's active series)
+# Lightweight liveness probe so the UI can flag dead series the moment they're
+# added.  Reports two conditions per vector:
+#   • terminated – StatCan has discontinued the series
+#   • empty      – the vector returns no usable observations
+# Also returns the latest reference period (handy for the "last data" tooltip).
+# ---------------------------------------------------------------------------
+def _is_terminated(val):
+    # StatCan's `terminated` field is inconsistent across vectors (0/1, "0"/"1",
+    # null, or a termination date string).  Treat any "non-zero / non-empty"
+    # value as terminated; verified against live vectors.
+    return val not in (None, "", 0, "0", False)
+
+
+@app.route("/api/vector-health")
+def vector_health():
+    raw_vectors = request.args.get("vectors", "")
+    if not raw_vectors:
+        return jsonify({"error": "No vectors specified"}), 400
+
+    vector_ids = [v.strip().lstrip("vV") for v in raw_vectors.split(",") if v.strip()]
+    if not vector_ids:
+        return jsonify({"error": "No valid vector IDs"}), 400
+
+    info_payload = [{"vectorId": int(v)} for v in vector_ids]
+    data_payload = [{"vectorId": int(v), "latestN": 1} for v in vector_ids]
+
+    def _post(endpoint, payload):
+        r = requests.post(
+            f"{STATCAN_BASE}/{endpoint}",
+            json=payload, timeout=30,
+            headers={"Content-Type": "application/json"},
+        )
+        r.raise_for_status()
+        return r.json()
+
+    try:
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            fut_info = pool.submit(_post, "getSeriesInfoFromVector", info_payload)
+            fut_data = pool.submit(_post, "getDataFromVectorsAndLatestNPeriods", data_payload)
+            info_raw = fut_info.result()
+            data_raw = fut_data.result()
+    except requests.exceptions.RequestException as exc:
+        return jsonify({"error": f"StatCan API error: {exc}"}), 502
+
+    # terminated flag + title from the series-info endpoint
+    terminated_by, title_by = {}, {}
+    for item in (info_raw or []):
+        if item.get("status") == "SUCCESS":
+            o = item["object"]
+            vid = o.get("vectorId")
+            if vid is not None:
+                terminated_by[int(vid)] = _is_terminated(o.get("terminated"))
+                title_by[int(vid)] = o.get("SeriesTitleEn", "")
+
+    # empty? + latest reference period from the data endpoint (latestN=1)
+    has_data_by, last_ref_by = {}, {}
+    for item in (data_raw or []):
+        if item.get("status") == "SUCCESS":
+            o = item["object"]
+            vid = o.get("vectorId")
+            dps = [dp for dp in o.get("vectorDataPoint", [])
+                   if dp.get("value") is not None and dp.get("statusCode") not in (1, 8, 9)]
+            if vid is not None:
+                has_data_by[int(vid)] = len(dps) > 0
+                if dps:
+                    last_ref_by[int(vid)] = max(dp.get("refPer", "")[:10] for dp in dps)
+
+    results = []
+    for v in vector_ids:
+        vid = int(v)
+        # If a fetch failed for a vector, default to "healthy" so we never
+        # false-flag a working series on a transient API hiccup.
+        results.append({
+            "vectorId":   vid,
+            "terminated": terminated_by.get(vid, False),
+            "empty":      not has_data_by.get(vid, True),
+            "lastRefPer": last_ref_by.get(vid),
+            "title":      title_by.get(vid, ""),
+        })
+
+    return jsonify({"health": results})
+
+
+# ---------------------------------------------------------------------------
 # Route: GET /api/table-metadata
 # Query params:
 #   pid – product/table ID, e.g. "36100104"  (digits only, no dashes)
