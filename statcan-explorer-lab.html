@@ -193,6 +193,59 @@
   select:focus, input:focus { border-color: var(--accent2); }
   select option { background: var(--surface2); }
 
+  /* ── Global series search ── */
+  .search-box { position: relative; }
+  .search-box input[type="search"] {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 28px 8px 30px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 13px;
+    outline: none;
+    -webkit-appearance: none;
+    transition: border-color 0.15s;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%237d7060' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: left 9px center;
+  }
+  .search-box input[type="search"]::-webkit-search-cancel-button { -webkit-appearance: none; }
+  .search-box input[type="search"]:focus { border-color: var(--accent2); }
+  .search-clear {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    cursor: pointer; color: var(--muted); font-size: 16px; line-height: 1;
+    display: none; user-select: none;
+  }
+  .search-clear:hover { color: var(--accent3); }
+  .search-results {
+    position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 60;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    box-shadow: 0 8px 28px rgba(0,0,0,0.20);
+    max-height: 380px; overflow-y: auto; display: none;
+  }
+  .search-results.visible { display: block; }
+  .search-meta {
+    padding: 6px 10px; font-size: 10px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; background: var(--surface);
+  }
+  .search-result {
+    padding: 7px 10px; cursor: pointer; border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .search-result:last-child { border-bottom: none; }
+  .search-result:hover, .search-result.active { background: var(--surface2); }
+  .search-result.added { opacity: 0.55; }
+  .sr-label { font-size: 12px; color: var(--text); line-height: 1.35; }
+  .sr-cat { font-size: 9.5px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.4px; }
+  .sr-added { color: var(--success); font-size: 10px; margin-left: 4px; white-space: nowrap; }
+  .search-result mark { background: rgba(37,99,235,0.20); color: inherit; border-radius: 2px; padding: 0 1px; }
+  .search-empty { padding: 12px 10px; font-size: 12px; color: var(--muted); text-align: center; }
+
   .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
   .date-inputs { display: flex; flex-direction: column; gap: 5px; }
   .date-inputs select { width: 100%; }
@@ -475,6 +528,19 @@
       <h3 class="section-label">Series Configuration</h3>
       <div id="loadingState" style="font-size:12px;color:var(--muted);padding:8px 2px;">Loading series…</div>
       <div id="loadErrorState" style="display:none;font-size:12px;color:#dc2626;padding:8px 2px;line-height:1.5"></div>
+    </div>
+
+    <!-- ── Global series search ── -->
+    <div id="searchSection" style="display:none">
+      <h3 class="section-label">Search all series</h3>
+      <div class="search-box">
+        <input type="search" id="seriesSearch" placeholder="Type to search…"
+               autocomplete="off" spellcheck="false"
+               oninput="onSearchInput(this.value)" onkeydown="onSearchKey(event)"
+               onfocus="onSearchInput(this.value)">
+        <span class="search-clear" id="searchClear" onclick="clearSeriesSearch()">×</span>
+        <div class="search-results" id="searchResults"></div>
+      </div>
     </div>
 
     <!-- ── Saved Configurations ── -->
@@ -1141,8 +1207,11 @@ function activateUI(filename, count) {
     .map(c => `<option value="${c.id}">${c.label}</option>`)
     .join('');
 
+  // Build the global-search index now that SERIES_MAP is fully populated
+  buildSearchIndex();
+
   // Show all sidebar sections
-  ['categorySection','seriesSection','dateSection','outputSection',
+  ['searchSection','categorySection','seriesSection','dateSection','outputSection',
    'transformSection','formulaSection','btnSection'].forEach(id => {
     document.getElementById(id).style.display = '';
   });
@@ -1166,10 +1235,12 @@ function resetFile() {
   clearChart();
   document.getElementById('dropZoneWrap').style.display = '';
   document.getElementById('loadedFileInfo').style.display = 'none';
-  ['categorySection','seriesSection','dateSection','outputSection',
+  ['searchSection','categorySection','seriesSection','dateSection','outputSection',
    'transformSection','formulaSection','btnSection'].forEach(id => {
     document.getElementById(id).style.display = 'none';
   });
+  SEARCH_INDEX = [];
+  if (document.getElementById('seriesSearch')) clearSeriesSearch();
   document.getElementById('chartTitle').textContent = 'Load a series configuration to begin';
   document.getElementById('fileInput').value = '';
 }
@@ -1561,6 +1632,148 @@ function doAddSeries(id) {
   renderSeriesList();
   updateEmptyState();
 }
+
+// ═══════════════════════════════════════════════════════════
+// GLOBAL SERIES SEARCH
+// ═══════════════════════════════════════════════════════════
+let SEARCH_INDEX = [];     // [{ id, label, category, hay }]
+let searchMatches = [];    // current result objects
+let searchActiveIdx = -1;  // keyboard-highlighted row
+
+function buildSearchIndex() {
+  SEARCH_INDEX = Object.values(SERIES_MAP).map(s => {
+    const label = s.chipLabel || s.name || s.id;
+    const category = s.category || '';
+    return {
+      id: s.id,
+      label,
+      category,
+      hay: `${label} ${s.name || ''} ${category}`.toLowerCase(),
+    };
+  });
+}
+
+function runSeriesSearch(query) {
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!tokens.length) return [];
+  const out = [];
+  for (const item of SEARCH_INDEX) {
+    if (tokens.every(t => item.hay.includes(t))) {
+      out.push(item);
+      if (out.length >= 300) break;   // cap scan; we only render 50
+    }
+  }
+  return out;
+}
+
+function escapeHtml(str) {
+  return str.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+}
+
+function highlightTokens(text, tokens) {
+  let safe = escapeHtml(text);
+  for (const t of tokens) {
+    if (!t) continue;
+    const re = new RegExp(`(${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig');
+    safe = safe.replace(re, '<mark>$1</mark>');
+  }
+  return safe;
+}
+
+function onSearchInput(value) {
+  document.getElementById('searchClear').style.display = value ? 'block' : 'none';
+  const tokens = value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  if (!tokens.length) {
+    searchMatches = [];
+    searchActiveIdx = -1;
+    const el = document.getElementById('searchResults');
+    el.classList.remove('visible');
+    el.innerHTML = '';
+    return;
+  }
+  searchMatches = runSeriesSearch(value);
+  searchActiveIdx = -1;
+  renderSearchResults(tokens);
+}
+
+function renderSearchResults(tokens) {
+  const el = document.getElementById('searchResults');
+  if (!searchMatches.length) {
+    el.innerHTML = '<div class="search-empty">No matching series</div>';
+    el.classList.add('visible');
+    return;
+  }
+  const shown = searchMatches.slice(0, 50);
+  const active = new Set(state.activeSeries);
+  const meta = searchMatches.length > 50
+    ? `Top 50 of ${searchMatches.length} matches`
+    : `${searchMatches.length} match${searchMatches.length === 1 ? '' : 'es'}`;
+  el.innerHTML = `<div class="search-meta">${meta}</div>` + shown.map((m, i) => {
+    const added = active.has(m.id);
+    return `<div class="search-result${added ? ' added' : ''}${i === searchActiveIdx ? ' active' : ''}" data-idx="${i}">
+      <span class="sr-label">${highlightTokens(m.label, tokens)}${added ? '<span class="sr-added">✓ added</span>' : ''}</span>
+      ${m.category ? `<span class="sr-cat">${highlightTokens(m.category, tokens)}</span>` : ''}
+    </div>`;
+  }).join('');
+  el.classList.add('visible');
+}
+
+function pickSearchResult(idx) {
+  const m = searchMatches[idx];
+  if (!m) return;
+  doAddSeries(m.id);
+  // Keep the dropdown open so several series can be added from one search;
+  // re-render to reflect the new "✓ added" state.
+  const tokens = document.getElementById('seriesSearch').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  renderSearchResults(tokens);
+  document.getElementById('seriesSearch').focus();
+}
+
+function onSearchKey(e) {
+  const el = document.getElementById('searchResults');
+  const n = Math.min(searchMatches.length, 50);
+  if (e.key === 'ArrowDown' && n) {
+    e.preventDefault();
+    searchActiveIdx = (searchActiveIdx + 1) % n;
+    refreshSearchActive();
+  } else if (e.key === 'ArrowUp' && n) {
+    e.preventDefault();
+    searchActiveIdx = (searchActiveIdx - 1 + n) % n;
+    refreshSearchActive();
+  } else if (e.key === 'Enter' && n) {
+    e.preventDefault();
+    pickSearchResult(searchActiveIdx >= 0 ? searchActiveIdx : 0);
+  } else if (e.key === 'Escape') {
+    el.classList.remove('visible');
+    searchActiveIdx = -1;
+  }
+}
+
+function refreshSearchActive() {
+  const el = document.getElementById('searchResults');
+  el.querySelectorAll('.search-result').forEach(row => {
+    const on = Number(row.dataset.idx) === searchActiveIdx;
+    row.classList.toggle('active', on);
+    if (on) row.scrollIntoView({ block: 'nearest' });
+  });
+}
+
+function clearSeriesSearch() {
+  const input = document.getElementById('seriesSearch');
+  input.value = '';
+  onSearchInput('');
+  input.focus();
+}
+
+// Click a result (delegated so ids with special chars never touch inline HTML),
+// and close the dropdown when clicking elsewhere.
+document.addEventListener('click', e => {
+  const row = e.target.closest('#searchResults .search-result');
+  if (row) { pickSearchResult(Number(row.dataset.idx)); return; }
+  if (!e.target.closest('#searchSection')) {
+    document.getElementById('searchResults')?.classList.remove('visible');
+  }
+});
 
 // ── Series chip tooltip (body-level to escape sidebar overflow clipping) ──────
 (function() {
