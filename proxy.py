@@ -1280,23 +1280,31 @@ def get_catalog():
 _catalog_rows_cache = None   # (mtime, raw_bytes, gzipped_bytes)
 
 
-@app.route("/api/catalog-rows")
-def get_catalog_rows():
+def _build_catalog_cache():
+    """(Re)build the gzipped-JSON catalog cache from Vectors.xlsx if stale.
+    Returns the cache tuple (mtime, raw_bytes, gz_bytes), or None on failure.
+    Called on demand by the endpoint and pre-warmed at startup so the first
+    visitor after a deploy doesn't pay the ~10-20s spreadsheet parse."""
     global _catalog_rows_cache
     try:
         mtime = os.path.getmtime(VECTORS_PATH)
-    except OSError as exc:
-        return jsonify({"error": f"Vectors.xlsx not found: {exc}"}), 500
-
-    if _catalog_rows_cache is None or _catalog_rows_cache[0] != mtime:
-        try:
-            _, rows = _read_catalog()
-        except Exception as exc:
-            return jsonify({"error": f"Could not read Vectors.xlsx: {exc}"}), 500
+        if _catalog_rows_cache is not None and _catalog_rows_cache[0] == mtime:
+            return _catalog_rows_cache
+        _, rows = _read_catalog()
         raw = json.dumps({"rows": rows}, separators=(",", ":")).encode("utf-8")
         _catalog_rows_cache = (mtime, raw, gzip.compress(raw, 6))
+        return _catalog_rows_cache
+    except Exception:
+        return None
 
-    _, raw, gz = _catalog_rows_cache
+
+@app.route("/api/catalog-rows")
+def get_catalog_rows():
+    cache = _build_catalog_cache()
+    if cache is None:
+        return jsonify({"error": "Could not read Vectors.xlsx"}), 500
+
+    _, raw, gz = cache
     use_gzip = "gzip" in request.headers.get("Accept-Encoding", "")
     body = gz if use_gzip else raw
     resp = app.response_class(body, mimetype="application/json")
@@ -1533,6 +1541,137 @@ def catalog_delete():
 
 
 # ---------------------------------------------------------------------------
+# Shared writer for in-place catalog edits (reorder / rename). Rewrites
+# Vectors.xlsx from an ordered list of row-dicts after a timestamped backup,
+# invalidates the /api/catalog-rows cache, and commits to GitHub when
+# configured. Rebuilds the sheet fresh (fast for 50k+ rows; avoids openpyxl's
+# slow delete_rows).
+# ---------------------------------------------------------------------------
+def _save_catalog(header, rows, commit_msg):
+    global _catalog_rows_cache
+    import openpyxl
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+    backup_name = f"Vectors-{datetime.now().strftime('%Y%m%d-%H%M%S')}.xlsx"
+    shutil.copy2(VECTORS_PATH, os.path.join(BACKUP_DIR, backup_name))
+
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "series"
+    ws.append(header)
+    col_of = {name: i for i, name in enumerate(header)}
+    for r in rows:
+        out = [""] * len(header)
+        for col, idx in col_of.items():
+            out[idx] = str(r.get(col, "") or "")
+        ws.append(out)
+    wb.save(VECTORS_PATH)
+    wb.close()
+
+    _catalog_rows_cache = None   # force /api/catalog-rows to rebuild on next read
+
+    result = {"rows": len(rows), "backup": f"backups/{backup_name}"}
+    if os.environ.get("GITHUB_TOKEN"):
+        try:
+            result["commitSha"] = _github_commit_vectors(commit_msg)
+            result["committed"] = True
+        except Exception as exc:
+            result["committed"] = False
+            result["commitError"] = str(exc)
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Route: POST /api/catalog/reorder
+# Body: {"seriesOrder": ["sid1", "sid2", ...]}  — the full desired order of
+# series_ids. Category order falls out of where each category's series land
+# (categories stay contiguous blocks). Each series' rows keep their internal
+# order; any series_id omitted from the list is appended in its original spot.
+# ---------------------------------------------------------------------------
+@app.route("/api/catalog/reorder", methods=["POST"])
+def catalog_reorder():
+    if not _check_admin():
+        return jsonify({"error": "Invalid or missing admin key"}), 401
+
+    body = request.get_json(force=True, silent=True) or {}
+    order = body.get("seriesOrder")
+    if not isinstance(order, list) or not order:
+        return jsonify({"error": "seriesOrder (list of series_id) is required"}), 400
+
+    header, rows = _read_catalog()
+    by_sid: dict[str, list] = {}
+    original: list[str] = []
+    for r in rows:
+        sid = r.get("series_id", "")
+        if sid not in by_sid:
+            by_sid[sid] = []
+            original.append(sid)
+        by_sid[sid].append(r)
+
+    new_rows, used = [], set()
+    for sid in order:
+        if sid in by_sid and sid not in used:
+            new_rows.extend(by_sid[sid])
+            used.add(sid)
+    leftover = 0
+    for sid in original:          # safety: keep any series the client didn't list
+        if sid not in used:
+            new_rows.extend(by_sid[sid])
+            leftover += 1
+
+    result = _save_catalog(header, new_rows, "Wizard: reorder categories/series")
+    result["leftover"] = leftover
+    return jsonify(result)
+
+
+# ---------------------------------------------------------------------------
+# Route: POST /api/catalog/rename
+# Body: {"type": "category", "oldName": "...", "newName": "..."}
+#   or  {"type": "series",   "seriesId": "...", "newName": "..."}
+# Renames in place — series_id stays stable so saved configs/bookmarks survive.
+# ---------------------------------------------------------------------------
+@app.route("/api/catalog/rename", methods=["POST"])
+def catalog_rename():
+    if not _check_admin():
+        return jsonify({"error": "Invalid or missing admin key"}), 401
+
+    body = request.get_json(force=True, silent=True) or {}
+    kind = str(body.get("type", "")).strip()
+    new_name = str(body.get("newName", "")).strip()
+    if not new_name:
+        return jsonify({"error": "newName is required"}), 400
+
+    header, rows = _read_catalog()
+    changed = 0
+    if kind == "category":
+        old = str(body.get("oldName", "")).strip()
+        if not old:
+            return jsonify({"error": "oldName is required"}), 400
+        for r in rows:
+            if r.get("category", "") == old:
+                r["category"] = new_name
+                changed += 1
+        msg = f"Wizard: rename category '{old}' -> '{new_name}'"
+    elif kind == "series":
+        sid = str(body.get("seriesId", "")).strip()
+        if not sid:
+            return jsonify({"error": "seriesId is required"}), 400
+        for r in rows:
+            if r.get("series_id", "") == sid:
+                r["series_name"] = new_name
+                changed += 1
+        msg = f"Wizard: rename series '{sid}' -> '{new_name}'"
+    else:
+        return jsonify({"error": "type must be 'category' or 'series'"}), 400
+
+    if not changed:
+        return jsonify({"error": "No matching rows found"}), 404
+
+    result = _save_catalog(header, rows, msg)
+    result["updated"] = changed
+    return jsonify(result)
+
+
+# ---------------------------------------------------------------------------
 # Route: GET /api/health
 # ---------------------------------------------------------------------------
 @app.route("/api/health")
@@ -1542,8 +1681,12 @@ def health():
 
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
+    import threading
     port = int(os.environ.get("PORT", 5001))
     print("=" * 60)
     print(f"  StatCan WDS Proxy  →  http://localhost:{port}")
     print("=" * 60)
+    # Pre-warm the catalog cache in the background so the first request after a
+    # deploy doesn't pay the spreadsheet-parse cost. Port still binds instantly.
+    threading.Thread(target=_build_catalog_cache, daemon=True).start()
     app.run(host="0.0.0.0", port=port, debug=False)

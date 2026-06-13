@@ -156,6 +156,11 @@
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
   .btn-secondary { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
   .btn-secondary:hover { color: var(--text); border-color: var(--muted); }
+  .minibtn { padding: 1px 8px !important; font-size: 11px !important; font-weight: 500; }
+  .ord { display: inline-flex; flex-direction: column; line-height: 0; flex-shrink: 0; }
+  .ordbtn { border: none; background: none; cursor: pointer; font-size: 9px; color: var(--muted); padding: 0 2px; line-height: 1.15; }
+  .ordbtn:disabled { opacity: 0.25; cursor: default; }
+  .ordbtn:hover:not(:disabled) { color: var(--accent2); }
   .btn-save { background: var(--success); color: #fff; }
   .btn-save:hover { background: #15803d; }
   .btn-save:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -267,8 +272,14 @@
 
       <div id="manageModeBox" style="display:none">
         <div class="hint" style="margin-bottom:10px">
-          Deleting removes the rows from Vectors.xlsx (a backup is written first).
-          Charts already on screen keep working until the page is refreshed.
+          Reorder with ▲▼ then <b>Save order</b>; rename with ✎; or delete. Every change
+          writes a timestamped backup of Vectors.xlsx first. Charts already on screen keep
+          working until the page is refreshed.
+        </div>
+        <div id="manageSaveBar" style="display:none; margin-bottom:10px; align-items:center; gap:8px;">
+          <button class="btn btn-primary" id="saveOrderBtn" onclick="saveOrder()">Save order</button>
+          <button class="btn btn-secondary" onclick="renderManageList(true)">Discard</button>
+          <span class="hint" style="color:var(--accent3)">Order changed — not yet saved.</span>
         </div>
         <div id="manageList" class="hint">Loading catalog…</div>
       </div>
@@ -472,44 +483,134 @@ function setMode(m) {
   if (m === 'manage') renderManageList();
 }
 
-// ── manage mode: list + delete ───────────────────────────
-async function renderManageList() {
+// ── manage mode: reorder / rename / delete ───────────────────
+// A client-side working model (state.manageModel) backs reordering so the user
+// can shuffle ▲▼ freely and commit the final order in ONE file rewrite.
+function buildManageModel() {
+  const byCat = {}; const order = [];
+  for (const s of state.catalog.series) {
+    if (!byCat[s.category]) { byCat[s.category] = []; order.push(s.category); }
+    byCat[s.category].push({ seriesId: s.seriesId, seriesName: s.seriesName, tableId: s.tableId, rowCount: s.rowCount });
+  }
+  state.manageModel = order.map(name => ({ name, series: byCat[name] }));
+  state.manageOrig = manageSig();
+}
+function manageSig() {
+  return (state.manageModel || []).map(c => c.name + '>' + c.series.map(s => s.seriesId).join(',')).join('|');
+}
+function manageDirty() { return !!state.manageModel && manageSig() !== state.manageOrig; }
+
+async function renderManageList(rebuild) {
   if (!state.catalog || !state.catalog.series) {
     $('manageList').innerHTML = '<span class="spinner"></span>Loading catalog…';
     await loadCatalog();
   }
-  const cat = state.catalog;
-  if (!cat || !cat.series) {
+  if (!state.catalog || !state.catalog.series) {
     $('manageList').innerHTML = `Catalog unavailable — the server may be restarting after a recent save.
-      <a href="#" onclick="renderManageList(); return false" style="color:var(--accent2)">Retry</a>`;
+      <a href="#" onclick="renderManageList(true); return false" style="color:var(--accent2)">Retry</a>`;
     return;
   }
-  const byCat = {};
-  for (const s of cat.series) (byCat[s.category] = byCat[s.category] || []).push(s);
+  if (rebuild || !state.manageModel) buildManageModel();
+  const cats = state.manageModel;
+  const enc = v => JSON.stringify(v).replace(/"/g, '&quot;');
 
-  $('manageList').innerHTML = Object.entries(byCat).map(([catName, list]) => {
-    const catRows = list.reduce((n, s) => n + s.rowCount, 0);
+  $('manageList').innerHTML = cats.map((c, ci) => {
+    const catRows = c.series.reduce((n, s) => n + s.rowCount, 0);
     return `
     <div style="margin-bottom:14px">
-      <div style="display:flex; align-items:baseline; gap:10px; padding:6px 0; border-bottom:1px solid var(--border);">
-        <span style="font-weight:500; font-size:13px; color:var(--text)">${esc(catName)}</span>
-        <span style="font-size:11px">${list.length} series · ${catRows.toLocaleString()} rows</span>
-        <button class="btn btn-secondary" style="margin-left:auto; padding:2px 10px; font-size:11px; color:var(--accent3); border-color:var(--accent3)"
-          onclick="deleteTarget('category', ${JSON.stringify(catName).replace(/"/g, '&quot;')}, ${catRows})">Delete category</button>
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--border);">
+        <span class="ord">
+          <button class="ordbtn" ${ci === 0 ? 'disabled' : ''} onclick="moveCat(${ci},-1)" title="Move up">▲</button>
+          <button class="ordbtn" ${ci === cats.length - 1 ? 'disabled' : ''} onclick="moveCat(${ci},1)" title="Move down">▼</button>
+        </span>
+        <span style="font-weight:500; font-size:13px; color:var(--text)">${esc(c.name)}</span>
+        <span style="font-size:11px">${c.series.length} series · ${catRows.toLocaleString()} rows</span>
+        <button class="btn btn-secondary minibtn" onclick="renameTarget('category',${enc(c.name)},${enc(c.name)})" title="Rename category">✎</button>
+        <button class="btn btn-secondary minibtn" style="margin-left:auto; color:var(--accent3); border-color:var(--accent3)"
+          onclick="deleteTarget('category',${enc(c.name)},${catRows})">Delete</button>
       </div>
-      ${list.map(s => `
-      <div style="display:flex; align-items:baseline; gap:10px; padding:5px 0 5px 12px; border-bottom:1px solid rgba(0,0,0,0.05);">
+      ${c.series.map((s, si) => `
+      <div style="display:flex; align-items:center; gap:8px; padding:5px 0 5px 12px; border-bottom:1px solid rgba(0,0,0,0.05);">
+        <span class="ord">
+          <button class="ordbtn" ${si === 0 ? 'disabled' : ''} onclick="moveSeries(${ci},${si},-1)" title="Move up">▲</button>
+          <button class="ordbtn" ${si === c.series.length - 1 ? 'disabled' : ''} onclick="moveSeries(${ci},${si},1)" title="Move down">▼</button>
+        </span>
         <span style="font-size:12px; color:var(--text)">${esc(s.seriesName || s.seriesId)}</span>
         <span style="font-family:'DM Mono',monospace; font-size:10px;">${esc(s.seriesId)}</span>
         <span style="font-size:11px;">${esc(s.tableId)} · ${s.rowCount.toLocaleString()} rows</span>
-        <button class="btn btn-secondary" style="margin-left:auto; padding:1px 9px; font-size:11px"
-          onclick="deleteTarget('series', ${JSON.stringify(s.seriesId).replace(/"/g, '&quot;')}, ${s.rowCount})">Delete</button>
+        <button class="btn btn-secondary minibtn" onclick="renameTarget('series',${enc(s.seriesId)},${enc(s.seriesName || s.seriesId)})" title="Rename series">✎</button>
+        <button class="btn btn-secondary minibtn" style="margin-left:auto"
+          onclick="deleteTarget('series',${enc(s.seriesId)},${s.rowCount})">Delete</button>
       </div>`).join('')}
     </div>`;
   }).join('');
+
+  $('manageSaveBar').style.display = manageDirty() ? 'flex' : 'none';
+}
+
+function moveCat(ci, dir) {
+  const a = state.manageModel, j = ci + dir;
+  if (j < 0 || j >= a.length) return;
+  [a[ci], a[j]] = [a[j], a[ci]];
+  renderManageList();
+}
+function moveSeries(ci, si, dir) {
+  const s = state.manageModel[ci].series, j = si + dir;
+  if (j < 0 || j >= s.length) return;
+  [s[si], s[j]] = [s[j], s[si]];
+  renderManageList();
+}
+
+async function saveOrder() {
+  const seriesOrder = state.manageModel.flatMap(c => c.series.map(s => s.seriesId));
+  const btn = $('saveOrderBtn'); btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const r = await fetch(`${PROXY_URL}/api/catalog/reorder`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+      body: JSON.stringify({ seriesOrder }),
+    });
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+    let msg = 'Order saved';
+    if (data.committed) msg += ' — committed to GitHub';
+    else if (data.committed === false) msg += ` — GitHub commit FAILED: ${data.commitError || ''}`;
+    toast(msg, 'success');
+    await loadCatalog();
+    renderManageList(true);
+  } catch (e) {
+    toast(`Save failed: ${e.message}`, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save order';
+  }
+}
+
+async function renameTarget(type, id, current) {
+  if (manageDirty()) { toast('Save or discard your order changes first', 'error'); return; }
+  const next = prompt(`New name for this ${type}:`, current);
+  if (next == null) return;
+  const name = next.trim();
+  if (!name || name === current) return;
+  try {
+    const body = type === 'category' ? { type, oldName: id, newName: name } : { type, seriesId: id, newName: name };
+    const r = await fetch(`${PROXY_URL}/api/catalog/rename`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+      body: JSON.stringify(body),
+    });
+    const data = await r.json();
+    if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+    let msg = `Renamed (${data.updated.toLocaleString()} rows)`;
+    if (data.committed) msg += ' — committed to GitHub';
+    else if (data.committed === false) msg += ` — GitHub commit FAILED: ${data.commitError || ''}`;
+    toast(msg, 'success');
+    await loadCatalog();
+    renderManageList(true);
+  } catch (e) {
+    toast(`Rename failed: ${e.message}`, 'error');
+  }
 }
 
 async function deleteTarget(kind, value, rowCount) {
+  if (manageDirty()) { toast('Save or discard your order changes first', 'error'); return; }
   const label = kind === 'category' ? `the whole category “${value}”` : `series “${value}”`;
   if (!confirm(`Delete ${label}? This removes ${rowCount.toLocaleString()} rows from Vectors.xlsx.\n(A backup is written first.)`)) return;
 
@@ -526,7 +627,7 @@ async function deleteTarget(kind, value, rowCount) {
     else if (data.committed === false) msg += ` — GitHub commit FAILED: ${data.commitError || ''}`;
     toast(msg, 'success');
     await loadCatalog();
-    renderManageList();
+    renderManageList(true);
   } catch (e) {
     toast(`Delete failed: ${e.message}`, 'error');
   }
@@ -875,10 +976,32 @@ function renderPreview() {
 
 // ── step 4: resolve & save ───────────────────────────────
 async function startResolve() {
-  const sid = slugify($('fSeriesId').value || '');
+  let sid = slugify($('fSeriesId').value || '');
   if (!$('fCategory').value.trim()) { toast('Enter a category', 'error'); return; }
   if (!sid) { toast('Enter a series ID', 'error'); return; }
   $('fSeriesId').value = sid;
+
+  // Guard: series IDs must be unique. Reusing one makes the new series collapse
+  // into / hide behind the existing series with that id (the CPI NSA gotcha).
+  // Extending an existing series deliberately reuses its id, so skip then.
+  if (!state.extend) {
+    const all = state.catalog?.series || [];
+    const clash = all.find(s => s.seriesId === sid);
+    if (clash) {
+      const taken = new Set(all.map(s => s.seriesId));
+      let alt = sid, n = 2;
+      while (taken.has(alt)) alt = `${sid}_${n++}`;
+      const ok = confirm(
+        `A series with ID “${sid}” already exists` +
+        (clash.category ? ` in “${clash.category}”` : '') +
+        ` (“${clash.seriesName || clash.seriesId}”).\n\n` +
+        `Series IDs must be unique, or the new series gets hidden under the existing one.\n\n` +
+        `OK = use “${alt}” instead.\nCancel = go back and edit the ID yourself.`);
+      if (!ok) return;            // stay on step 3 so the user can edit fSeriesId
+      sid = alt;
+      $('fSeriesId').value = alt;
+    }
+  }
 
   goStep(4);
   $('saveBtn').disabled = true;
