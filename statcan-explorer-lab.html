@@ -901,8 +901,13 @@ function dimOptionsHtml(series, dimIdx, values) {
 function parseExcel(workbook) {
   const sheetName = workbook.SheetNames.find(n => n.toLowerCase() === 'series') || workbook.SheetNames[0];
   const ws = workbook.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(ws, { raw: false, defval: '' });
+  return parseRows(XLSX.utils.sheet_to_json(ws, { raw: false, defval: '' }));
+}
 
+// Build the category map from an array of plain row objects (keyed by column
+// name). Shared by the XLSX-upload path and the fast JSON catalog path — the
+// latter skips in-browser XLSX decoding, which dominates load time on big catalogs.
+function parseRows(rows) {
   const catMap = {};
 
   for (const row of rows) {
@@ -2901,11 +2906,26 @@ function tryLoadFromUrl() {
 // ═══════════════════════════════════════════════════════════
 async function autoLoadTemplate() {
   try {
-    const resp = await fetch('/vectors.xlsx');
-    if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
-    const buf  = await resp.arrayBuffer();
-    const wb   = XLSX.read(buf, { type: 'array' });
-    CATEGORIES = parseExcel(wb);
+    // Fast path: pre-built JSON catalog from the proxy. Avoids ~10s of
+    // in-browser XLSX decoding on large catalogs (JSON.parse is ~100x faster).
+    let rows = null;
+    try {
+      const r = await fetch('/api/catalog-rows');
+      if (r.ok) {
+        const j = await r.json();
+        if (Array.isArray(j.rows)) rows = j.rows;
+      }
+    } catch (_) { /* fall through to the XLSX path below */ }
+
+    if (rows) {
+      CATEGORIES = parseRows(rows);
+    } else {
+      // Fallback: decode the raw spreadsheet in-browser (older proxy, or
+      // /api/catalog unavailable).
+      const resp = await fetch('/vectors.xlsx');
+      if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
+      CATEGORIES = parseExcel(XLSX.read(await resp.arrayBuffer(), { type: 'array' }));
+    }
     buildSeriesMap();
     const count = Object.values(CATEGORIES).reduce((n, c) => n + c.series.length, 0);
     if (count === 0) throw new Error('No series found in template');

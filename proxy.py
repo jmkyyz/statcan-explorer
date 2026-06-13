@@ -15,6 +15,7 @@ The server will listen on http://localhost:5001
 
 import base64
 import csv
+import gzip
 import io
 import json
 import os
@@ -1133,8 +1134,8 @@ def resolve_vectors():
 
     if not pid or not isinstance(coords, list) or not coords:
         return jsonify({"error": "productId and coordinates are required"}), 400
-    if len(coords) > 8000:
-        return jsonify({"error": "Too many coordinates in one request (max 8000)"}), 400
+    if len(coords) > 12000:
+        return jsonify({"error": "Too many coordinates in one request (max 12000)"}), 400
 
     BATCH = 100
 
@@ -1269,6 +1270,44 @@ def get_catalog():
 
 
 # ---------------------------------------------------------------------------
+# Route: GET /api/catalog-rows
+# Full catalog as raw rows keyed by column name — the frontend's fast load
+# path. Lets the browser skip ~10s of in-browser XLSX decoding on large
+# catalogs (JSON.parse is ~100x faster than SheetJS). Cached in memory and
+# rebuilt only when Vectors.xlsx changes on disk; gzipped when the client
+# accepts it (multi-MB JSON → ~1MB on the wire).
+# ---------------------------------------------------------------------------
+_catalog_rows_cache = None   # (mtime, raw_bytes, gzipped_bytes)
+
+
+@app.route("/api/catalog-rows")
+def get_catalog_rows():
+    global _catalog_rows_cache
+    try:
+        mtime = os.path.getmtime(VECTORS_PATH)
+    except OSError as exc:
+        return jsonify({"error": f"Vectors.xlsx not found: {exc}"}), 500
+
+    if _catalog_rows_cache is None or _catalog_rows_cache[0] != mtime:
+        try:
+            _, rows = _read_catalog()
+        except Exception as exc:
+            return jsonify({"error": f"Could not read Vectors.xlsx: {exc}"}), 500
+        raw = json.dumps({"rows": rows}, separators=(",", ":")).encode("utf-8")
+        _catalog_rows_cache = (mtime, raw, gzip.compress(raw, 6))
+
+    _, raw, gz = _catalog_rows_cache
+    use_gzip = "gzip" in request.headers.get("Accept-Encoding", "")
+    body = gz if use_gzip else raw
+    resp = app.response_class(body, mimetype="application/json")
+    if use_gzip:
+        resp.headers["Content-Encoding"] = "gzip"
+        resp.headers["Vary"] = "Accept-Encoding"
+    resp.headers["Content-Length"] = str(len(body))
+    return resp
+
+
+# ---------------------------------------------------------------------------
 # GitHub persistence: commit the updated Vectors.xlsx so Render redeploys
 # and the change survives ephemeral-disk restarts.
 # ---------------------------------------------------------------------------
@@ -1314,8 +1353,8 @@ def catalog_append():
 
     if not isinstance(rows, list) or not rows:
         return jsonify({"error": "No rows provided"}), 400
-    if len(rows) > 10000:
-        return jsonify({"error": "Too many rows in one request (max 10000)"}), 400
+    if len(rows) > 12000:
+        return jsonify({"error": "Too many rows in one request (max 12000)"}), 400
 
     for i, r in enumerate(rows):
         for req_col in ("category", "freq", "series_id", "vector"):
