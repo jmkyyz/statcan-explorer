@@ -1665,10 +1665,17 @@ def health():
 if __name__ == "__main__":
     import threading
     port = int(os.environ.get("PORT", 5001))
+    # Network binding. Default 0.0.0.0 (all interfaces) so Render can route to it
+    # and so localhost testing on a phone works. Set HOST=127.0.0.1 to restrict
+    # the server to THIS machine only (e.g. on a shared office network) — then no
+    # one else on the LAN can reach the open-mode wizard.
+    host = os.environ.get("HOST", "0.0.0.0")
+    reach = "this machine only" if host in ("127.0.0.1", "localhost") else "all network interfaces"
     print("=" * 60)
     print(f"  StatCan WDS Proxy  →  http://localhost:{port}")
+    print(f"  bind: {host}  ({reach})")
     print("=" * 60)
     # Pre-warm the catalog cache in the background so the first request after a
     # deploy doesn't pay the spreadsheet-parse cost. Port still binds instantly.
     threading.Thread(target=_build_catalog_cache, daemon=True).start()
-    app.run(host="0.0.0.0", port=port, debug=False)
+    app.run(host=host, port=port, debug=False)
