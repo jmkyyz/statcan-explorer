@@ -1219,7 +1219,11 @@ def _read_catalog():
         if d.get("series_id"):
             rows.append(d)
     wb.close()
-    _parsed_catalog = (mtime, header, rows)
+    # Hold the ~273MB parse cache only off-Render (local dev has RAM to spare and
+    # benefits from the speed). On Render's 512MB instance, writes are blocked and
+    # serving uses the small gz cache, so we don't keep the big list resident.
+    if not os.environ.get("RENDER"):
+        _parsed_catalog = (mtime, header, rows)
     return header, rows
 
 
@@ -1361,6 +1365,27 @@ def _github_commit_vectors(message: str) -> str | None:
     return r.json().get("commit", {}).get("sha")
 
 
+# Safeguard: block catalog-modifying writes on the LIVE server once the catalog
+# is large. Rewriting a big workbook risks the 512MB memory limit, and editing
+# live also fragments the catalog vs. local work (causing divergence). Big
+# rebuilds belong on the local wizard. Local dev has no RENDER env → never blocked.
+LIVE_WRITE_MAX_BYTES = 8_000_000   # ~8MB ≈ ~85k rows
+
+
+def _live_write_blocked():
+    if not os.environ.get("RENDER"):
+        return None
+    try:
+        if os.path.getsize(VECTORS_PATH) <= LIVE_WRITE_MAX_BYTES:
+            return None
+    except OSError:
+        return None
+    return jsonify({"error": "This catalog is too large to edit on the live site. "
+                    "Rebuild on the local wizard (localhost:5001/wizard) and push — "
+                    "editing the live site risks crashing it and diverging from your "
+                    "local copy."}), 403
+
+
 # ---------------------------------------------------------------------------
 # Route: POST /api/catalog/append
 # Headers: X-Admin-Key (required when ADMIN_KEY env var is set)
@@ -1373,6 +1398,9 @@ def _github_commit_vectors(message: str) -> str | None:
 def catalog_append():
     if not _check_admin():
         return jsonify({"error": "Invalid or missing admin key"}), 401
+    blocked = _live_write_blocked()
+    if blocked:
+        return blocked
 
     body = request.get_json(force=True, silent=True) or {}
     rows = body.get("rows", [])
@@ -1445,6 +1473,9 @@ def catalog_append():
 def catalog_delete():
     if not _check_admin():
         return jsonify({"error": "Invalid or missing admin key"}), 401
+    blocked = _live_write_blocked()
+    if blocked:
+        return blocked
 
     body      = request.get_json(force=True, silent=True) or {}
     series_id = str(body.get("seriesId", "") or "").strip()
@@ -1536,6 +1567,9 @@ def _save_catalog(header, rows, commit_msg):
 def catalog_reorder():
     if not _check_admin():
         return jsonify({"error": "Invalid or missing admin key"}), 401
+    blocked = _live_write_blocked()
+    if blocked:
+        return blocked
 
     body = request.get_json(force=True, silent=True) or {}
     order = body.get("seriesOrder")
@@ -1578,6 +1612,9 @@ def catalog_reorder():
 def catalog_rename():
     if not _check_admin():
         return jsonify({"error": "Invalid or missing admin key"}), 401
+    blocked = _live_write_blocked()
+    if blocked:
+        return blocked
 
     body = request.get_json(force=True, silent=True) or {}
     kind = str(body.get("type", "")).strip()

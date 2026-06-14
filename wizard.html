@@ -208,6 +208,11 @@
   @keyframes spin { to { transform: rotate(360deg); } }
   .step-view { display: none; }
   .step-view.visible { display: block; }
+  #liveBanner {
+    display: none; background: #b91c1c; color: #fff; text-align: center;
+    padding: 9px 14px; font-size: 13px; font-weight: 600; letter-spacing: 0.2px;
+  }
+  body.is-live header { box-shadow: inset 0 -3px 0 #b91c1c; }
 </style>
 </head>
 <body>
@@ -222,6 +227,8 @@
     <a href="/lab">Lab</a>
   </div>
 </header>
+
+<div id="liveBanner">⚠ You are on the LIVE site. Large catalog edits are blocked here — do rebuilds on the local wizard (localhost:5001/wizard) and push.</div>
 
 <div id="lockScreen" style="display:none; position:fixed; inset:0; background:var(--bg); z-index:100; align-items:center; justify-content:center;">
   <div class="panel" style="width:340px; text-align:center;">
@@ -439,6 +446,12 @@ async function init() {
   $('adminStatus').textContent = state.info.adminRequired
     ? 'Admin access'
     : 'Open mode (local)';
+
+  // Loud LIVE indicator: adminRequired is only true on the deployed server.
+  if (state.info.adminRequired) {
+    $('liveBanner').style.display = 'block';
+    document.body.classList.add('is-live');
+  }
 
   if (state.info.adminRequired) {
     const stored = localStorage.getItem('wizardAdminKey') || '';
