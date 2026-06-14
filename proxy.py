@@ -1189,9 +1189,25 @@ def resolve_vectors():
 # ---------------------------------------------------------------------------
 # Catalog helpers
 # ---------------------------------------------------------------------------
+# Parsed-catalog cache (mtime, header, rows). Reading the 50-80k-row workbook
+# with openpyxl takes ~7s, and the summary / dedup / catalog-rows / reorder
+# paths all need it — so we parse once and reuse until the file changes.
+# Mutations refresh this in _save_catalog from the rows they just wrote, so a
+# wizard add/delete never re-parses the file (only the unavoidable ~5s write).
+_parsed_catalog = None   # (mtime, header, rows)
+
+
 def _read_catalog():
-    """Parse Vectors.xlsx → (header, list-of-row-dicts)."""
+    """Parse Vectors.xlsx → (header, list-of-row-dicts), cached by file mtime."""
+    global _parsed_catalog
     import openpyxl
+    try:
+        mtime = os.path.getmtime(VECTORS_PATH)
+    except OSError:
+        mtime = None
+    if _parsed_catalog is not None and _parsed_catalog[0] == mtime:
+        return _parsed_catalog[1], _parsed_catalog[2]
+
     wb = openpyxl.load_workbook(VECTORS_PATH, read_only=True)
     ws = wb["series"] if "series" in wb.sheetnames else wb[wb.sheetnames[0]]
     rows_iter = ws.iter_rows(values_only=True)
@@ -1203,6 +1219,7 @@ def _read_catalog():
         if d.get("series_id"):
             rows.append(d)
     wb.close()
+    _parsed_catalog = (mtime, header, rows)
     return header, rows
 
 
@@ -1465,18 +1482,18 @@ def catalog_delete():
 # (paired with read_only reads everywhere else) keeps it well under ~150MB.
 # ---------------------------------------------------------------------------
 def _save_catalog(header, rows, commit_msg):
-    global _catalog_rows_cache
+    global _catalog_rows_cache, _parsed_catalog
     import openpyxl
     os.makedirs(BACKUP_DIR, exist_ok=True)
     backup_name = f"Vectors-{datetime.now().strftime('%Y%m%d-%H%M%S')}.xlsx"
     shutil.copy2(VECTORS_PATH, os.path.join(BACKUP_DIR, backup_name))
 
-    n = 0
     wb = openpyxl.Workbook(write_only=True)
     ws = wb.create_sheet("series")
     ws.append(header)
     col_of = {name: i for i, name in enumerate(header)}
     vec_idx = col_of.get("vector")
+    cache_rows = []   # normalized rows, identical to what _read_catalog would yield
     for r in rows:
         out = [""] * len(header)
         for col, idx in col_of.items():
@@ -1484,13 +1501,19 @@ def _save_catalog(header, rows, commit_msg):
         if vec_idx is not None:
             out[vec_idx] = out[vec_idx].lstrip("vV")
         ws.append(out)
-        n += 1
+        cache_rows.append({header[i]: out[i] for i in range(len(header))})
     wb.save(VECTORS_PATH)
     wb.close()
 
-    _catalog_rows_cache = None   # force /api/catalog-rows to rebuild on next read
+    # Refresh caches from what we just wrote — no re-parse of the workbook.
+    try:
+        new_mtime = os.path.getmtime(VECTORS_PATH)
+    except OSError:
+        new_mtime = None
+    _parsed_catalog = (new_mtime, header, cache_rows)
+    _catalog_rows_cache = None   # gz cache rebuilds cheaply (~0.3s) from the parse cache
 
-    result = {"rows": n, "backup": f"backups/{backup_name}"}
+    result = {"rows": len(cache_rows), "backup": f"backups/{backup_name}"}
     if os.environ.get("GITHUB_TOKEN"):
         try:
             result["commitSha"] = _github_commit_vectors(commit_msg)
