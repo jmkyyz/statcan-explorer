@@ -518,8 +518,13 @@
   @media (max-width: 640px) {
     header { padding: 12px 14px; gap: 10px; }
     header h1 { font-size: 17px; }
-    header span { display: none; }          /* hide subtitle to save room */
+    header > span { display: none; }        /* hide subtitle to save room (direct child only) */
     .maple { font-size: 16px; }
+    .catalog-btn { padding: 6px 10px; }
+    /* scoped under .catalog-btn so these out-specify the base rule,
+       which sits later in the source (the catalog block is appended at end of <style>) */
+    .catalog-btn .catalog-btn-full { display: none; }   /* shorten CTA on narrow headers */
+    .catalog-btn .catalog-btn-short { display: inline; }
     .nav-toggle {
       display: inline-flex; align-items: center; justify-content: center;
       width: 36px; height: 36px; flex-shrink: 0;
@@ -556,6 +561,68 @@
     .chart-container { padding: 10px; min-height: 300px; }
     .data-table-wrap { overflow-x: auto; }
   }
+
+  /* ── Catalog browser ── */
+  .catalog-btn {
+    margin-left: auto;
+    font-family: inherit; font-size: 12px; font-weight: 600;
+    color: var(--accent); background: var(--surface2);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 12px; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .catalog-btn:hover { background: var(--bg); border-color: var(--accent); }
+  .catalog-btn-short { display: none; }
+  .catalog-overlay {
+    position: fixed; inset: 0; background: rgba(20,16,8,0.45);
+    display: none; z-index: 3000; align-items: center; justify-content: center; padding: 24px;
+  }
+  .catalog-overlay.open { display: flex; }
+  .catalog-modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    width: min(760px, 100%); max-height: min(82vh, 900px);
+    display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  }
+  .catalog-modal-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+  .catalog-modal-head .row1 { display: flex; align-items: baseline; gap: 10px; }
+  .catalog-modal-head h2 { font-family:'Fraunces',serif; font-size: 18px; color: var(--accent); margin: 0; }
+  .catalog-summary { font-size: 11px; color: var(--muted); }
+  .catalog-close {
+    margin-left: auto; background: none; border: none;
+    font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 4px;
+  }
+  .catalog-close:hover { color: var(--accent3); }
+  .catalog-search {
+    width: 100%; margin-top: 10px; padding: 8px 10px; font-size: 13px; font-family: inherit;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text);
+    box-sizing: border-box;
+  }
+  .catalog-body { overflow-y: auto; padding: 8px 12px 16px; }
+  .catalog-cat { margin-top: 14px; }
+  .catalog-cat:first-child { margin-top: 4px; }
+  .catalog-cat-head {
+    display: flex; align-items: baseline; gap: 8px; padding: 6px 8px; border-radius: 6px;
+    cursor: pointer; position: sticky; top: 0; background: var(--surface); z-index: 1;
+  }
+  .catalog-cat-head:hover { background: var(--surface2); }
+  .catalog-cat-head .name { font-weight: 700; font-size: 14px; color: var(--text); }
+  .catalog-cat-head .meta { font-size: 11px; color: var(--muted); }
+  .catalog-cat-head .jump { margin-left: auto; font-size: 11px; color: var(--accent); opacity: 0; }
+  .catalog-cat-head:hover .jump { opacity: 1; }
+  .catalog-series-row {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 4px 8px 4px 18px; font-size: 12.5px; border-bottom: 1px dashed var(--border);
+  }
+  .catalog-series-row .sname { color: var(--text); flex: 1; }
+  .catalog-series-row .vbadge {
+    font-size: 10px; color: var(--muted); background: var(--surface2);
+    border-radius: 10px; padding: 1px 7px; white-space: nowrap;
+  }
+  .catalog-series-row a.tbl { font-size: 11px; color: var(--accent); text-decoration: none; white-space: nowrap; }
+  .catalog-series-row a.tbl:hover { text-decoration: underline; }
+  .catalog-series-row .tbl-plain { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .catalog-empty { padding: 36px; text-align: center; color: var(--muted); font-size: 13px; }
 </style>
 </head>
 <body>
@@ -565,6 +632,7 @@
   <button class="nav-toggle" onclick="toggleDrawer()" aria-label="Toggle controls">☰</button>
   <h1>StatCan Explorer</h1>
   <span>Statistics Canada · Data Workbench</span>
+  <button class="catalog-btn" onclick="openCatalog()" title="Browse the full catalog of categories and series">📖 <span class="catalog-btn-full">View Full Catalog</span><span class="catalog-btn-short">Catalog</span></button>
   <div class="maple" aria-hidden="true">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--muted)" opacity="0.55" xmlns="http://www.w3.org/2000/svg">
       <path d="M12 2 L13.5 7 L18 5 L15 9.5 L20 10.5 L16 13 L18 18 L13 16 L12 22 L11 16 L6 18 L8 13 L4 10.5 L9 9.5 L6 5 L10.5 7 Z"/>
@@ -573,6 +641,22 @@
 </header>
 
 <div class="drawer-backdrop" onclick="toggleDrawer(false)" aria-hidden="true"></div>
+
+<div class="catalog-overlay" id="catalogOverlay" onclick="if(event.target===this)closeCatalog()">
+  <div class="catalog-modal" role="dialog" aria-label="Full catalog">
+    <div class="catalog-modal-head">
+      <div class="row1">
+        <h2>Full Catalog</h2>
+        <span class="catalog-summary" id="catalogSummary"></span>
+        <button class="catalog-close" onclick="closeCatalog()" aria-label="Close">×</button>
+      </div>
+      <input class="catalog-search" id="catalogSearch" type="text" autocomplete="off"
+             placeholder="Filter categories, series, or table IDs…"
+             oninput="renderCatalogBrowser(this.value)">
+    </div>
+    <div class="catalog-body" id="catalogBody"></div>
+  </div>
+</div>
 
 <div class="app">
 
@@ -2652,6 +2736,93 @@ function exportXlsx() {
   XLSX.writeFile(wb, `statcan_lab_${safeLabel}_${state.fromYear}${String(state.fromMonth).padStart(2,'0')}-${state.toYear}${String(state.toMonth).padStart(2,'0')}.xlsx`);
   toast('Spreadsheet exported ✓', 'success');
 }
+
+// ═══════════════════════════════════════════════════════════
+// CATALOG BROWSER
+// ═══════════════════════════════════════════════════════════
+function catalogStats() {
+  let nCat = 0, nSeries = 0, nVec = 0;
+  for (const cat of Object.values(CATEGORIES)) {
+    nCat++;
+    const series = cat.series || [];
+    nSeries += series.length;
+    for (const s of series) nVec += s.vectors ? Object.keys(s.vectors).length : 1;
+  }
+  return { nCat, nSeries, nVec };
+}
+
+function openCatalog() {
+  const { nCat, nSeries, nVec } = catalogStats();
+  document.getElementById('catalogSummary').textContent =
+    `${nCat} categories · ${nSeries} series · ${nVec.toLocaleString()} vectors`;
+  document.getElementById('catalogSearch').value = '';
+  renderCatalogBrowser('');
+  document.getElementById('catalogOverlay').classList.add('open');
+  document.getElementById('catalogSearch').focus();
+}
+
+function closeCatalog() {
+  document.getElementById('catalogOverlay').classList.remove('open');
+}
+
+function catalogJump(catId) {
+  closeCatalog();
+  if (!CATEGORIES[catId]) return;
+  const sel = document.getElementById('categorySelect');
+  if (sel) sel.value = catId;
+  selectCategory(catId);
+  toggleDrawer(false);
+}
+
+function renderCatalogBrowser(query) {
+  const tokens = (query || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const match = (txt) => tokens.every(t => txt.toLowerCase().includes(t));
+  let html = '';
+  for (const cat of Object.values(CATEGORIES)) {
+    const series = cat.series || [];
+    const catText = cat.label || cat.id || '';
+    const catMatches = match(catText);
+    let list;
+    if (!tokens.length || catMatches) list = series;
+    else list = series.filter(s => match(`${catText} ${s.name || ''} ${s.tableId || ''}`));
+    if (tokens.length && !catMatches && list.length === 0) continue;
+
+    const totalVec = series.reduce((n, s) => n + (s.vectors ? Object.keys(s.vectors).length : 1), 0);
+    html += `<div class="catalog-cat">
+      <div class="catalog-cat-head" onclick="catalogJump('${cat.id}')" title="Load this category in the explorer">
+        <span class="name">${escapeHtml(cat.label || cat.id)}</span>
+        <span class="meta">${series.length} series · ${totalVec.toLocaleString()} vectors</span>
+        <span class="jump">→ open</span>
+      </div>`;
+
+    if (cat.isCimt) {
+      html += `<div class="catalog-series-row"><span class="sname" style="color:var(--muted)">Interactive query builder — province × commodity × trading partner</span></div>`;
+    } else if (list.length === 0) {
+      html += `<div class="catalog-series-row"><span class="sname" style="color:var(--muted)">No series</span></div>`;
+    } else {
+      for (const s of list) {
+        const variants = s.vectors ? Object.keys(s.vectors).length : 1;
+        const tid = s.tableId || '';
+        const isStatcan = /^\d{2}-\d{2}-\d{4}/.test(tid);
+        const tblHtml = isStatcan
+          ? `<a class="tbl" href="${cansimUrl(tid)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${tid}</a>`
+          : (tid ? `<span class="tbl-plain">${escapeHtml(tid)}</span>` : '');
+        html += `<div class="catalog-series-row">
+          <span class="sname">${escapeHtml(s.name || s.id)}</span>
+          <span class="vbadge">${variants.toLocaleString()} vector${variants === 1 ? '' : 's'}</span>
+          ${tblHtml}
+        </div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  if (!html) html = `<div class="catalog-empty">No categories or series match “${escapeHtml(query)}”.</div>`;
+  document.getElementById('catalogBody').innerHTML = html;
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeCatalog();
+});
 
 // ═══════════════════════════════════════════════════════════
 // TOAST
