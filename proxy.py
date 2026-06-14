@@ -12,6 +12,7 @@ Usage:
 
 The server will listen on http://localhost:5001
 """
+from __future__ import annotations
 
 import base64
 import csv
