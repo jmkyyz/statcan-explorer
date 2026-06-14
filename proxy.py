@@ -1294,14 +1294,14 @@ def get_catalog():
 # rebuilt only when Vectors.xlsx changes on disk; gzipped when the client
 # accepts it (multi-MB JSON → ~1MB on the wire).
 # ---------------------------------------------------------------------------
-_catalog_rows_cache = None   # (mtime, raw_bytes, gzipped_bytes)
+_catalog_rows_cache = None   # (mtime, gz_bytes) — gz only; raw JSON (~70MB at 100k+
+                             # rows) is decompressed on demand for the rare non-gzip client
 
 
 def _build_catalog_cache():
     """(Re)build the gzipped-JSON catalog cache from Vectors.xlsx if stale.
-    Returns the cache tuple (mtime, raw_bytes, gz_bytes), or None on failure.
-    Called on demand by the endpoint and pre-warmed at startup so the first
-    visitor after a deploy doesn't pay the ~10-20s spreadsheet parse."""
+    Returns (mtime, gz_bytes), or None on failure. Pre-warmed at startup so the
+    first visitor after a deploy doesn't pay the spreadsheet parse."""
     global _catalog_rows_cache
     try:
         mtime = os.path.getmtime(VECTORS_PATH)
@@ -1309,7 +1309,9 @@ def _build_catalog_cache():
             return _catalog_rows_cache
         _, rows = _read_catalog()
         raw = json.dumps({"rows": rows}, separators=(",", ":")).encode("utf-8")
-        _catalog_rows_cache = (mtime, raw, gzip.compress(raw, 6))
+        gz = gzip.compress(raw, 6)
+        del raw                       # don't keep the ~70MB raw JSON resident
+        _catalog_rows_cache = (mtime, gz)
         return _catalog_rows_cache
     except Exception:
         return None
@@ -1321,9 +1323,9 @@ def get_catalog_rows():
     if cache is None:
         return jsonify({"error": "Could not read Vectors.xlsx"}), 500
 
-    _, raw, gz = cache
+    _, gz = cache
     use_gzip = "gzip" in request.headers.get("Accept-Encoding", "")
-    body = gz if use_gzip else raw
+    body = gz if use_gzip else gzip.decompress(gz)   # browsers accept gzip → no decompress
     resp = app.response_class(body, mimetype="application/json")
     if use_gzip:
         resp.headers["Content-Encoding"] = "gzip"
@@ -1488,12 +1490,12 @@ def _save_catalog(header, rows, commit_msg):
     backup_name = f"Vectors-{datetime.now().strftime('%Y%m%d-%H%M%S')}.xlsx"
     shutil.copy2(VECTORS_PATH, os.path.join(BACKUP_DIR, backup_name))
 
+    n = 0
     wb = openpyxl.Workbook(write_only=True)
     ws = wb.create_sheet("series")
     ws.append(header)
     col_of = {name: i for i, name in enumerate(header)}
     vec_idx = col_of.get("vector")
-    cache_rows = []   # normalized rows, identical to what _read_catalog would yield
     for r in rows:
         out = [""] * len(header)
         for col, idx in col_of.items():
@@ -1501,19 +1503,18 @@ def _save_catalog(header, rows, commit_msg):
         if vec_idx is not None:
             out[vec_idx] = out[vec_idx].lstrip("vV")
         ws.append(out)
-        cache_rows.append({header[i]: out[i] for i in range(len(header))})
+        n += 1
     wb.save(VECTORS_PATH)
     wb.close()
 
-    # Refresh caches from what we just wrote — no re-parse of the workbook.
-    try:
-        new_mtime = os.path.getmtime(VECTORS_PATH)
-    except OSError:
-        new_mtime = None
-    _parsed_catalog = (new_mtime, header, cache_rows)
-    _catalog_rows_cache = None   # gz cache rebuilds cheaply (~0.3s) from the parse cache
+    # Invalidate caches (don't rebuild a second in-memory copy here). At 100k+
+    # rows, building a normalized cache_rows list during the write doubled peak
+    # memory and OOM-killed Render's 512MB instance. The next read re-parses
+    # once (cached thereafter); a wizard write never holds two full copies.
+    _parsed_catalog = None
+    _catalog_rows_cache = None
 
-    result = {"rows": len(cache_rows), "backup": f"backups/{backup_name}"}
+    result = {"rows": n, "backup": f"backups/{backup_name}"}
     if os.environ.get("GITHUB_TOKEN"):
         try:
             result["commitSha"] = _github_commit_vectors(commit_msg)
