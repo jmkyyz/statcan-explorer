@@ -1825,6 +1825,57 @@ function healthBadgeHtml(sid) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// ACRONYM / SYNONYM RECOGNITION  (shared by both search boxes)
+// ═══════════════════════════════════════════════════════════
+// Type an acronym (or a common synonym) and it also matches the expanded
+// phrase — e.g. "cpi" finds "Consumer Price Index". One-directional and
+// predictable: typing a KEY also matches its expansions; typing any of the
+// expansions still works as an ordinary literal substring. Keys are lowercase.
+// To teach the search a new acronym, just add a line here.
+const SEARCH_SYNONYMS = {
+  // price indexes
+  cpi:   ['consumer price index', 'inflation'],
+  ppi:   ['producer price index', 'industrial product price'],
+  ippi:  ['industrial product price index'],
+  rmpi:  ['raw materials price index'],
+  fppi:  ['farm product price index'],
+  nhpi:  ['new housing price index'],
+  // national accounts
+  gdp:   ['gross domestic product'],
+  gfcf:  ['gross fixed capital formation'],
+  fdi:   ['foreign direct investment'],
+  // labour
+  lfs:   ['labour force survey'],
+  seph:  ['survey of employment, payrolls and hours'],
+  ei:    ['employment insurance'],
+  // classifications / geography / adjustment
+  naics: ['north american industry classification'],
+  cma:   ['census metropolitan area'],
+  sa:    ['seasonally adjusted'],
+  nsa:   ['not seasonally adjusted'],
+  // sources / trade
+  boc:   ['bank of canada'],
+  bcpi:  ['commodity price index'],
+  cimt:  ['international merchandise trade', 'merchandise trade'],
+  // plain-language synonyms (kept small to avoid surprises)
+  inflation:    ['consumer price index'],
+  jobs:         ['employment'],
+  unemployment: ['unemployment rate'],
+};
+
+// The terms to test/highlight for one typed token: the token itself plus any
+// synonym expansions.
+function searchTermsFor(token) {
+  const syns = SEARCH_SYNONYMS[token];
+  return syns ? [token, ...syns] : [token];
+}
+
+// True if a typed token matches the haystack literally OR via a synonym.
+function tokenMatchesHay(token, hay) {
+  return searchTermsFor(token).some(term => hay.includes(term));
+}
+
+// ═══════════════════════════════════════════════════════════
 // GLOBAL SERIES SEARCH
 // ═══════════════════════════════════════════════════════════
 let SEARCH_INDEX = [];     // [{ id, label, category, hay }]
@@ -1849,7 +1900,7 @@ function runSeriesSearch(query) {
   if (!tokens.length) return [];
   const out = [];
   for (const item of SEARCH_INDEX) {
-    if (tokens.every(t => item.hay.includes(t))) {
+    if (tokens.every(t => tokenMatchesHay(t, item.hay))) {
       out.push(item);
       if (out.length >= 300) break;   // cap scan; we only render 50
     }
@@ -1863,9 +1914,13 @@ function escapeHtml(str) {
 
 function highlightTokens(text, tokens) {
   let safe = escapeHtml(text);
-  for (const t of tokens) {
-    if (!t) continue;
-    const re = new RegExp(`(${t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig');
+  // Highlight each typed token AND any synonym expansion it matched, so an
+  // acronym search visibly marks the expanded phrase. Longest first, deduped,
+  // so phrase matches win and we avoid wrapping inside an existing match.
+  const terms = [...new Set(tokens.flatMap(searchTermsFor).filter(Boolean))]
+    .sort((a, b) => b.length - a.length);
+  for (const term of terms) {
+    const re = new RegExp(`(?![^<]*>)(${term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'ig');
     safe = safe.replace(re, '<mark>$1</mark>');
   }
   return safe;
@@ -2776,7 +2831,7 @@ function catalogJump(catId) {
 
 function renderCatalogBrowser(query) {
   const tokens = (query || '').toLowerCase().split(/\s+/).filter(Boolean);
-  const match = (txt) => tokens.every(t => txt.toLowerCase().includes(t));
+  const match = (txt) => { const hay = txt.toLowerCase(); return tokens.every(t => tokenMatchesHay(t, hay)); };
   let html = '';
   for (const cat of Object.values(CATEGORIES)) {
     const series = cat.series || [];
