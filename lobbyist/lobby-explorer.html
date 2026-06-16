@@ -162,7 +162,8 @@
   /* ── Main content ────────────────────────────────────────── */
   main {
     padding: 20px 24px;
-    overflow-y: auto;
+    /* No overflow-y here: it would become the sticky containing block and
+       stop #drillBar from pinning to the viewport (the window is the scroller). */
   }
 
   /* Stat cards */
@@ -347,6 +348,11 @@
     margin-bottom: 16px;
     font-size: 13px;
     color: #1e3a8a;
+    /* Stay visible after the drill-down scrolls the page to the records */
+    position: sticky;
+    top: 8px;
+    z-index: 50;
+    box-shadow: 0 2px 10px rgba(30,58,138,.18);
   }
   #drillBar.show { display: flex; }
   #drillBar .drill-label strong { font-weight: 700; }
@@ -939,8 +945,41 @@ document.getElementById("drillBack").addEventListener("click", () => {
 });
 
 // ── Chart-data export to Excel ───────────────────────────────────────────────
-function exportSheet(rows, sheetName, fileBase) {
-  const ws = XLSX.utils.aoa_to_sheet(rows);
+// Summary of the filters currently applied — prepended to every export
+function exportContextRows(chartTitle) {
+  const sEl = document.getElementById("subjectSelect");
+  const iEl = document.getElementById("institutionSelect");
+  const monthTxt = id => document.getElementById(id).selectedOptions[0].text;
+  const yr = id => document.getElementById(id).value;
+
+  const regCbs = [...document.querySelectorAll(".reg-type-cb")];
+  const regChecked = regCbs.filter(cb => cb.checked);
+  const regLabel = regChecked.length === regCbs.length
+    ? "All types"
+    : regChecked.map(cb => REG_LABELS[cb.value]).join(", ");
+
+  const client = clientSelected.exact
+    ? `${clientSelected.name} (exact match)`
+    : (clientSelected.name || document.getElementById("clientInput").value.trim());
+  const dpoh = document.getElementById("dpohInput").value.trim();
+
+  const rows = [
+    [`Canadian Lobbyist Registry Explorer — ${chartTitle}`],
+    ["Exported", new Date().toLocaleString("en-CA")],
+    ["Date range", `${monthTxt("monthFrom")} ${yr("yearFrom")} – ${monthTxt("monthTo")} ${yr("yearTo")}`],
+    ["Subject / topic", sEl.value ? sEl.selectedOptions[0].text : "All topics"],
+    ["Institution", iEl.value ? iEl.selectedOptions[0].text : "All institutions"],
+    ["Registration type", regLabel],
+  ];
+  if (client) rows.push(["Client", client]);
+  if (dpoh)   rows.push(["DPOH name", dpoh]);
+  rows.push([]);   // blank separator before the data table
+  return rows;
+}
+
+function exportSheet(dataRows, sheetName, fileBase, chartTitle) {
+  const ws = XLSX.utils.aoa_to_sheet([...exportContextRows(chartTitle), ...dataRows]);
+  ws["!cols"] = [{ wch: 42 }, { wch: 30 }, { wch: 16 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
   XLSX.writeFile(wb, `${fileBase}-${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -967,7 +1006,7 @@ document.querySelectorAll(".export-btn").forEach(btn => {
   btn.addEventListener("click", () => {
     const kind = btn.dataset.export;
     if (!lastStats || !EXPORTS[kind]) return;
-    exportSheet(EXPORTS[kind](), EXPORT_NAMES[kind], "lobby-" + kind);
+    exportSheet(EXPORTS[kind](), EXPORT_NAMES[kind], "lobby-" + kind, EXPORT_NAMES[kind]);
   });
 });
 
