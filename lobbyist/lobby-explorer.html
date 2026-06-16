@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Canadian Lobbyist Registry Explorer</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -333,6 +334,57 @@
   }
   .btn-update:hover { background: #b45309; }
   .btn-update:disabled { opacity: .6; cursor: default; }
+
+  /* ── Drill-down back bar ─────────────────────────────────────── */
+  #drillBar {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    border-radius: 8px;
+    padding: 9px 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    color: #1e3a8a;
+  }
+  #drillBar.show { display: flex; }
+  #drillBar .drill-label strong { font-weight: 700; }
+  #drillBack {
+    padding: 5px 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  #drillBack:hover { background: #1e40af; }
+
+  /* ── Card header with export ─────────────────────────────────── */
+  .card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    gap: 10px;
+  }
+  .card-head h3 { margin-bottom: 0; }
+  .export-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 11px;
+    padding: 4px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .export-btn:hover { color: var(--accent); border-color: var(--accent); }
+  .click-hint { font-size: 11px; color: var(--muted); font-weight: 400; }
+  .client-num { font-size: 11px; color: var(--muted); white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -426,6 +478,12 @@
   <!-- ── Main ───────────────────────────────────────────────── -->
   <main id="main">
 
+    <!-- Drill-down back bar -->
+    <div id="drillBar">
+      <button id="drillBack">← Back</button>
+      <span class="drill-label" id="drillLabel"></span>
+    </div>
+
     <!-- Stat cards -->
     <div class="stat-cards">
       <div class="stat-card">
@@ -457,7 +515,10 @@
 
     <!-- Time series -->
     <div class="card">
-      <h3>Communications over time</h3>
+      <div class="card-head">
+        <h3>Communications over time</h3>
+        <button class="export-btn" data-export="time">⤓ Excel</button>
+      </div>
       <div class="chart-wrap" style="height:220px">
         <canvas id="timeChart"></canvas>
       </div>
@@ -466,13 +527,19 @@
     <!-- Top clients + institutions -->
     <div class="two-col">
       <div class="card">
-        <h3>Top clients</h3>
+        <div class="card-head">
+          <h3>Top clients <span class="click-hint">· click to filter</span></h3>
+          <button class="export-btn" data-export="clients">⤓ Excel</button>
+        </div>
         <div class="chart-wrap" style="height:260px">
           <canvas id="clientChart"></canvas>
         </div>
       </div>
       <div class="card">
-        <h3>Top institutions lobbied</h3>
+        <div class="card-head">
+          <h3>Top institutions lobbied <span class="click-hint">· click to filter</span></h3>
+          <button class="export-btn" data-export="institutions">⤓ Excel</button>
+        </div>
         <div class="chart-wrap" style="height:260px">
           <canvas id="instChart"></canvas>
         </div>
@@ -481,7 +548,10 @@
 
     <!-- Top subjects -->
     <div class="card">
-      <h3>By subject matter</h3>
+      <div class="card-head">
+        <h3>By subject matter <span class="click-hint">· click to filter</span></h3>
+        <button class="export-btn" data-export="subjects">⤓ Excel</button>
+      </div>
       <div class="chart-wrap" style="height:260px">
         <canvas id="subjectChart"></canvas>
       </div>
@@ -518,7 +588,10 @@
 
     <!-- Top DPOHs -->
     <div class="card">
-      <h3>Most-lobbied officials (DPOHs)</h3>
+      <div class="card-head">
+        <h3>Most-lobbied officials (DPOHs)</h3>
+        <button class="export-btn" data-export="dpoh">⤓ Excel</button>
+      </div>
       <div class="table-wrap">
         <table id="dpohTable">
           <thead>
@@ -542,7 +615,9 @@ const REG_LABELS = { 1: "Consultant", 2: "In-house Corp", 3: "In-house Org" };
 let currentPage   = 0;
 let totalComms    = 0;
 let charts        = {};
-let clientSelected = { name: "", num: "" };
+let clientSelected = { name: "", num: "", exact: false };
+let lastStats     = null;   // most recent /api/stats payload (for chart export)
+let drillStack    = [];     // saved filter snapshots for the "← Back" button
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const fmt = n => n?.toLocaleString("en-CA") ?? "—";
@@ -565,15 +640,24 @@ function getFilters() {
                          .map(cb => cb.value);
   const mFrom = document.getElementById("monthFrom").value.padStart(2, "0");
   const mTo   = document.getElementById("monthTo").value.padStart(2, "0");
+
+  // Client filter: exact match (from a chart drill-down) wins; otherwise a
+  // picked-from-autocomplete name, otherwise the free-text substring search.
+  let client_q = "", client_exact = "";
+  if (clientSelected.exact && clientSelected.name) {
+    client_exact = clientSelected.name;
+  } else {
+    client_q = clientSelected.name || document.getElementById("clientInput").value.trim();
+  }
+
   return {
     date_from:   `${document.getElementById("yearFrom").value}-${mFrom}`,
     date_to:     `${document.getElementById("yearTo").value}-${mTo}`,
     reg_type:    checkedTypes.length === 1 ? checkedTypes[0] : "",
     subject:     document.getElementById("subjectSelect").value,
     institution: document.getElementById("institutionSelect").value,
-    client_q:    clientSelected.name
-                   ? clientSelected.name
-                   : document.getElementById("clientInput").value.trim(),
+    client_q,
+    client_exact,
     dpoh_q:      document.getElementById("dpohInput").value.trim(),
   };
 }
@@ -596,7 +680,7 @@ function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
 }
 
-function makeBarChart(id, labels, data, horizontal = false) {
+function makeBarChart(id, labels, data, horizontal = false, onBarClick = null) {
   destroyChart(id);
   const canvas = document.getElementById(id);
   // For horizontal charts, grow the container to fit all labels (≥28px per bar)
@@ -620,6 +704,11 @@ function makeBarChart(id, labels, data, horizontal = false) {
       indexAxis: horizontal ? "y" : "x",
       responsive: true,
       maintainAspectRatio: false,
+      onClick: (evt, els) => { if (onBarClick && els.length) onBarClick(els[0].index); },
+      onHover: (evt, els) => {
+        if (evt?.native?.target)
+          evt.native.target.style.cursor = (onBarClick && els.length) ? "pointer" : "default";
+      },
       plugins: { legend: { display: false } },
       scales: {
         x: { grid: { display: !horizontal }, ticks: { font: { size: 11 } } },
@@ -663,6 +752,7 @@ function makeLineChart(id, labels, data) {
 
 // ── Render stats ──────────────────────────────────────────────────────────
 function renderStats(d) {
+  lastStats = d;   // retained for the chart export buttons
   document.getElementById("statTotal").textContent     = fmt(d.total);
   document.getElementById("statClients").textContent   = fmt(d.unique_clients);
   document.getElementById("statLobbyists").textContent = fmt(d.unique_lobbyists);
@@ -676,17 +766,20 @@ function renderStats(d) {
     completeMonths.map(r => r.count),
   );
 
-  // Top clients
+  // Top clients — click a bar to drill into that exact client
   const tc = d.top_clients.slice(0, 15);
-  makeBarChart("clientChart", tc.map(r => r.client_name), tc.map(r => r.count), true);
+  makeBarChart("clientChart", tc.map(r => r.client_name), tc.map(r => r.count), true,
+    i => drillInto("client", tc[i].client_name, `Client: ${tc[i].client_name}`));
 
-  // Top institutions
+  // Top institutions — click to filter
   const ti = d.top_institutions.slice(0, 15);
-  makeBarChart("instChart", ti.map(r => r.institution), ti.map(r => r.count), true);
+  makeBarChart("instChart", ti.map(r => r.institution), ti.map(r => r.count), true,
+    i => drillInto("institution", ti[i].institution, `Institution: ${ti[i].institution}`));
 
-  // Top subjects
+  // Top subjects — click to filter (filter needs the code, label shows description)
   const ts = d.top_subjects.slice(0, 20);
-  makeBarChart("subjectChart", ts.map(r => r.description), ts.map(r => r.count), true);
+  makeBarChart("subjectChart", ts.map(r => r.description), ts.map(r => r.count), true,
+    i => drillInto("subject", ts[i].subject_code, `Subject: ${ts[i].description}`));
 
   // DPOH table
   const tbody = document.querySelector("#dpohTable tbody");
@@ -730,7 +823,7 @@ function renderTable(d) {
     return `<tr>
       <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/cmmLgPblcVw?comlogId=${r.comlog_id}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
       <td style="white-space:nowrap">${r.comm_date}</td>
-      <td><strong>${r.client_name}</strong></td>
+      <td><strong>${r.client_name}</strong>${r.client_num ? `<br><span class="client-num">reg #${r.client_num}</span>` : ""}</td>
       <td>${r.lobbyist}</td>
       <td>${dpohList || "—"}</td>
       <td>${instList || "—"}</td>
@@ -780,6 +873,104 @@ async function loadTable() {
   }
 }
 
+// ── Filter snapshot / restore (powers the drill-down "← Back") ───────────────
+function snapshotFilters() {
+  return {
+    monthFrom:   document.getElementById("monthFrom").value,
+    yearFrom:    document.getElementById("yearFrom").value,
+    monthTo:     document.getElementById("monthTo").value,
+    yearTo:      document.getElementById("yearTo").value,
+    regTypes:    [...document.querySelectorAll(".reg-type-cb")].map(cb => cb.checked),
+    subject:     document.getElementById("subjectSelect").value,
+    institution: document.getElementById("institutionSelect").value,
+    clientInput: document.getElementById("clientInput").value,
+    clientSelected: { ...clientSelected },
+    dpoh:        document.getElementById("dpohInput").value,
+  };
+}
+
+function restoreFilters(s) {
+  document.getElementById("monthFrom").value = s.monthFrom;
+  document.getElementById("yearFrom").value  = s.yearFrom;
+  document.getElementById("monthTo").value   = s.monthTo;
+  document.getElementById("yearTo").value    = s.yearTo;
+  document.querySelectorAll(".reg-type-cb").forEach((cb, i) => cb.checked = s.regTypes[i]);
+  document.getElementById("subjectSelect").value     = s.subject;
+  document.getElementById("institutionSelect").value = s.institution;
+  document.getElementById("clientInput").value = s.clientInput;
+  clientSelected = { ...s.clientSelected };
+  document.getElementById("dpohInput").value = s.dpoh;
+}
+
+// ── Drill-down: click a chart bar to filter, with a "← Back" trail ───────────
+function updateDrillBar() {
+  const bar = document.getElementById("drillBar");
+  if (drillStack.length === 0) { bar.classList.remove("show"); return; }
+  document.getElementById("drillLabel").innerHTML =
+    `Drilled into <strong>${drillStack[drillStack.length - 1].appliedLabel}</strong>`;
+  bar.classList.add("show");
+}
+
+function drillInto(dimension, value, label) {
+  // Save the current view so "← Back" returns to exactly where we were
+  const snap = snapshotFilters();
+  snap.appliedLabel = label;
+  drillStack.push(snap);
+
+  if (dimension === "client") {
+    clientSelected = { name: value, num: "", exact: true };
+    document.getElementById("clientInput").value = value;
+  } else if (dimension === "institution") {
+    document.getElementById("institutionSelect").value = value;
+  } else if (dimension === "subject") {
+    document.getElementById("subjectSelect").value = value;
+  }
+
+  updateDrillBar();
+  loadAll();
+  document.getElementById("comms-section").scrollIntoView({ behavior: "smooth" });
+}
+
+document.getElementById("drillBack").addEventListener("click", () => {
+  const snap = drillStack.pop();
+  if (snap) restoreFilters(snap);
+  updateDrillBar();
+  loadAll();
+});
+
+// ── Chart-data export to Excel ───────────────────────────────────────────────
+function exportSheet(rows, sheetName, fileBase) {
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.slice(0, 31));
+  XLSX.writeFile(wb, `${fileBase}-${new Date().toISOString().slice(0, 10)}.xlsx`);
+}
+
+const EXPORTS = {
+  time:         () => [["Month", "Communications"],
+                       ...lastStats.by_month.map(r => [r.month, r.count])],
+  clients:      () => [["Client", "Communications"],
+                       ...lastStats.top_clients.map(r => [r.client_name, r.count])],
+  institutions: () => [["Institution", "Communications"],
+                       ...lastStats.top_institutions.map(r => [r.institution, r.count])],
+  subjects:     () => [["Code", "Subject", "Communications"],
+                       ...lastStats.top_subjects.map(r => [r.subject_code, r.description, r.count])],
+  dpoh:         () => [["Name", "Title", "Institution", "Communications"],
+                       ...lastStats.top_dpoh.map(r => [r.name, r.title, r.institution, r.count])],
+};
+const EXPORT_NAMES = {
+  time: "Over time", clients: "Top clients", institutions: "Top institutions",
+  subjects: "Top subjects", dpoh: "Top DPOHs",
+};
+
+document.querySelectorAll(".export-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const kind = btn.dataset.export;
+    if (!lastStats || !EXPORTS[kind]) return;
+    exportSheet(EXPORTS[kind](), EXPORT_NAMES[kind], "lobby-" + kind);
+  });
+});
+
 // ── Populate date dropdowns (sync — must run before filtersToQS) ──────────
 function initDateDropdowns() {
   const now  = new Date();
@@ -814,7 +1005,7 @@ const clientInput = document.getElementById("clientInput");
 const clientList  = document.getElementById("clientList");
 
 clientInput.addEventListener("input", () => {
-  clientSelected = { name: "", num: "" };
+  clientSelected = { name: "", num: "", exact: false };
   clearTimeout(acTimer);
   const q = clientInput.value.trim();
   if (q.length < 2) { clientList.classList.remove("open"); return; }
@@ -830,7 +1021,7 @@ clientInput.addEventListener("input", () => {
 clientList.addEventListener("click", e => {
   const li = e.target.closest("li");
   if (!li) return;
-  clientSelected = { name: li.dataset.name, num: li.dataset.num };
+  clientSelected = { name: li.dataset.name, num: li.dataset.num, exact: false };
   clientInput.value = li.dataset.name;
   clientList.classList.remove("open");
 });
@@ -863,8 +1054,10 @@ document.getElementById("clearBtn").addEventListener("click", () => {
   document.getElementById("subjectSelect").value    = "";
   document.getElementById("institutionSelect").value = "";
   clientInput.value = "";
-  clientSelected    = { name: "", num: "" };
+  clientSelected    = { name: "", num: "", exact: false };
   document.getElementById("dpohInput").value = "";
+  drillStack = [];
+  updateDrillBar();
   loadAll();
 });
 

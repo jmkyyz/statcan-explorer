@@ -105,6 +105,7 @@ def build_filter_select(params: dict):
     date_from   = (params.get("date_from") or "2014-01").strip()
     date_to     = (params.get("date_to")   or "2099-12").strip()
     client_q    = (params.get("client_q")  or "").strip()
+    client_exact = (params.get("client_exact") or "").strip()
     reg_type    = (params.get("reg_type")  or "").strip()
     institution = (params.get("institution") or "").strip()
     subject     = (params.get("subject")   or "").strip()
@@ -114,7 +115,12 @@ def build_filter_select(params: dict):
     wheres = ["c.comm_month BETWEEN ? AND ?"]
     binds  = [date_from, date_to]
 
-    if client_q:
+    if client_exact:
+        # Exact match — reproduces the Top-Clients ranking (which groups by the
+        # full name string) and avoids LIKE over-matching short names.
+        wheres.append("c.client_name = ?")
+        binds.append(client_exact)
+    elif client_q:
         wheres.append("c.client_name LIKE ? COLLATE NOCASE")
         binds.append(f"%{client_q}%")
 
@@ -386,6 +392,7 @@ def communications():
                 c.comlog_id,
                 c.comm_date,
                 c.client_name,
+                c.client_num,
                 c.reg_first || ' ' || c.reg_last        AS lobbyist,
                 c.reg_type,
                 c.is_amendment,
@@ -513,7 +520,7 @@ def _prewarm():
             # Pre-warm the default communications page — the slowest query on first load
             default_comms = rows_to_list(con.execute("""
                 SELECT
-                    c.comlog_id, c.comm_date, c.client_name,
+                    c.comlog_id, c.comm_date, c.client_name, c.client_num,
                     c.reg_first || ' ' || c.reg_last AS lobbyist,
                     c.reg_type, c.is_amendment,
                     GROUP_CONCAT(DISTINCT
