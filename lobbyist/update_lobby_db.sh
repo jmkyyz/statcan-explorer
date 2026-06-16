@@ -12,6 +12,11 @@ DB="$SCRIPT_DIR/lobby.db"
 echo "==> Checking for new data ..."
 cd "$REPO_ROOT"
 
+# Keep this clone current so scheduled runs pick up the latest committed code.
+# Fast-forward only; if it can't (local edits / diverged), keep going with what we have.
+git pull --ff-only >/dev/null 2>&1 && echo "    Synced to latest ($(git rev-parse --short HEAD))." \
+    || echo "    (git pull skipped — running with current code)"
+
 # Fetch remote Last-Modified and Content-Length via Chrome TLS impersonation
 REMOTE=$(python3 - <<'EOF'
 from curl_cffi import requests
@@ -82,7 +87,8 @@ fi
 echo "==> Patching with recent live records ..."
 PATCH_OUTPUT=$(python3 -u lobbyist/patch_recent.py 2>&1)
 echo "$PATCH_OUTPUT"
-PATCH_NEW=$(echo "$PATCH_OUTPUT" | grep -oP 'New: \K[0-9]+' || echo "0")
+PATCH_NEW=$(echo "$PATCH_OUTPUT" | sed -n 's/.*New: \([0-9][0-9]*\).*/\1/p' | tail -1)
+PATCH_NEW="${PATCH_NEW:-0}"
 
 # Skip publish/redeploy if nothing changed at all
 if [ "$ZIP_CHANGED" = false ] && [ "$PATCH_NEW" = "0" ]; then
@@ -95,6 +101,7 @@ fi
 echo "==> Publishing to GitHub Releases (db-latest) ..."
 gh release delete db-latest --yes 2>/dev/null || true
 git push --delete origin db-latest 2>/dev/null || true
+git tag -d db-latest 2>/dev/null || true   # drop stale local tag so gh can recreate it
 gh release create db-latest lobbyist/lobby.db \
   --title "Latest Lobbyist DB" \
   --notes "Built $(date -u '+%Y-%m-%d %H:%M UTC') from lobbycanada.gc.ca open data"
