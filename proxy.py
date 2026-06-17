@@ -1306,17 +1306,46 @@ _catalog_rows_cache = None   # (mtime, gz_bytes) — gz only; raw JSON (~70MB at
 def _build_catalog_cache():
     """(Re)build the gzipped-JSON catalog cache from Vectors.xlsx if stale.
     Returns (mtime, gz_bytes), or None on failure. Pre-warmed at startup so the
-    first visitor after a deploy doesn't pay the spreadsheet parse."""
+    first visitor after a deploy doesn't pay the spreadsheet parse.
+
+    Streams rows straight from the workbook into a gzip writer rather than going
+    through _read_catalog. That avoids ever holding the full 131k-row list
+    (~273MB) or the full ~70MB JSON string resident at once — that transient
+    spike OOMs Render's 512MB instance and crash-loops the deploy. Peak here is
+    just openpyxl's read_only reader plus the growing ~1MB gzip buffer."""
     global _catalog_rows_cache
     try:
         mtime = os.path.getmtime(VECTORS_PATH)
         if _catalog_rows_cache is not None and _catalog_rows_cache[0] == mtime:
             return _catalog_rows_cache
-        _, rows = _read_catalog()
-        raw = json.dumps({"rows": rows}, separators=(",", ":")).encode("utf-8")
-        gz = gzip.compress(raw, 6)
-        del raw                       # don't keep the ~70MB raw JSON resident
-        _catalog_rows_cache = (mtime, gz)
+
+        import openpyxl
+        wb = openpyxl.load_workbook(VECTORS_PATH, read_only=True)
+        ws = wb["series"] if "series" in wb.sheetnames else wb[wb.sheetnames[0]]
+        rows_iter = ws.iter_rows(values_only=True)
+        header = [str(h or "").strip() for h in next(rows_iter)]
+        n_head = len(header)
+        sid_col = header.index("series_id") if "series_id" in header else None
+
+        buf = io.BytesIO()
+        gzf = gzip.GzipFile(fileobj=buf, mode="wb", compresslevel=6, mtime=0)
+        gzf.write(b'{"rows":[')
+        first = True
+        for r in rows_iter:
+            if sid_col is not None:
+                sid = r[sid_col] if sid_col < len(r) else None
+                if sid is None or str(sid).strip() == "":
+                    continue
+            d = {header[i]: ("" if r[i] is None else str(r[i]).strip())
+                 for i in range(min(n_head, len(r)))}
+            chunk = json.dumps(d, separators=(",", ":")).encode("utf-8")
+            gzf.write(chunk if first else b"," + chunk)
+            first = False
+        gzf.write(b"]}")
+        gzf.close()
+        wb.close()
+
+        _catalog_rows_cache = (mtime, buf.getvalue())
         return _catalog_rows_cache
     except Exception:
         return None
