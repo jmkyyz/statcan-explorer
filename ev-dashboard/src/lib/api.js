@@ -29,6 +29,24 @@ async function fetchJSON(url) {
   return parseResponse(await fetch(url))
 }
 
+// CKAN's datastore_search hard-caps each response at 32,000 records regardless of the
+// requested limit, so a single request silently drops the newest rows once the table
+// grows past that. Page through with offset (default _id-asc ordering is stable) and
+// concatenate to retrieve the complete result set.
+const PAGE_SIZE = 32000
+
+async function fetchAllPages(urlWithoutPaging) {
+  const all = []
+  let offset = 0
+  for (;;) {
+    const result = await fetchJSON(`${urlWithoutPaging}&limit=${PAGE_SIZE}&offset=${offset}`)
+    all.push(...result.records)
+    if (result.records.length < PAGE_SIZE || all.length >= result.total) break
+    offset += PAGE_SIZE
+  }
+  return all
+}
+
 // Build CKAN filters= JSON object from active non-EV-type filters
 function buildFilters(filters, evTypeOverride) {
   const obj = {}
@@ -46,19 +64,17 @@ function buildFilters(filters, evTypeOverride) {
 export async function fetchAllRecords(filters) {
   const evTypes = filters.evTypes ?? ['BEV', 'PHEV', 'FCEV']
   const allSelected = evTypes.length === 3
-  const base = `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&limit=32767&fields=${RECORD_FIELDS}`
+  const base = `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=${RECORD_FIELDS}`
 
   if (allSelected || evTypes.length === 0) {
-    const result = await fetchJSON(base + buildFilters(filters, null))
-    return result.records
+    return fetchAllPages(base + buildFilters(filters, null))
   }
   if (evTypes.length === 1) {
-    const result = await fetchJSON(base + buildFilters(filters, evTypes[0]))
-    return result.records
+    return fetchAllPages(base + buildFilters(filters, evTypes[0]))
   }
-  // 2 EV types: two parallel requests merged
+  // 2 EV types: two parallel paginated fetches merged
   const results = await Promise.all(
-    evTypes.map(t => fetchJSON(base + buildFilters(filters, t)).then(r => r.records))
+    evTypes.map(t => fetchAllPages(base + buildFilters(filters, t)))
   )
   return results.flat()
 }
@@ -84,35 +100,30 @@ export async function fetchResourceMeta() {
   return fetchJSON(`${BASE}/resource_show?id=${RESOURCE_ID}`)
 }
 
-// Latest Month and Year: distinct values sorted client-side (avoids ORDER BY _id which WAF may block)
+// Latest Month and Year = the most-recently-loaded record.
+// distinct=true silently drops values on this CKAN instance (the records array is
+// truncated and inconsistent with `total`), so read the newest record by _id instead.
 export async function fetchLatestMonthYear() {
   const result = await fetchJSON(
-    `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=Month%20and%20Year&distinct=true&limit=500`
+    `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=Month%20and%20Year&sort=_id%20desc&limit=1`
   )
-  const months = result.records.map(r => r['Month and Year']).filter(Boolean)
-  if (!months.length) return null
-  const MO = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
-  const ts = m => {
-    const match = m.trim().match(/^([A-Za-z]+),?\s*(\d+)$/)
-    if (!match) return 0
-    const yr = parseInt(match[2], 10) + (parseInt(match[2], 10) < 50 ? 2000 : 1900)
-    return yr * 12 + MO.indexOf(match[1].toLowerCase().slice(0, 3))
-  }
-  return months.sort((a, b) => ts(a) - ts(b)).at(-1) ?? null
+  return result.records[0]?.['Month and Year'] ?? null
 }
 
+// distinct=true is unreliable here (see fetchLatestMonthYear) — it returns fewer records
+// than `total`, so dropdowns silently lose values. Page the full column and de-dupe client-side.
 export async function fetchDistinct(field) {
-  const result = await fetchJSON(
-    `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=${encodeURIComponent(field)}&distinct=true&limit=500`
+  const records = await fetchAllPages(
+    `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=${encodeURIComponent(field)}`
   )
-  return result.records.map(r => r[field]).filter(Boolean).sort()
+  return [...new Set(records.map(r => r[field]).filter(Boolean))].sort()
 }
 
 // Uses datastore_search filters param (JSON key) — handles commas in field names correctly
 export async function fetchDistinctModels(make) {
   const filters = encodeURIComponent(JSON.stringify({ 'Vehicle Make': make }))
-  const result = await fetchJSON(
-    `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=Vehicle%20Model&distinct=true&limit=500&filters=${filters}`
+  const records = await fetchAllPages(
+    `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=Vehicle%20Model&filters=${filters}`
   )
-  return result.records.map(r => r['Vehicle Model']).filter(Boolean).sort()
+  return [...new Set(records.map(r => r['Vehicle Model']).filter(Boolean))].sort()
 }
