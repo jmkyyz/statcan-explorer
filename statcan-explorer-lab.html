@@ -7,26 +7,33 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=DM+Sans:wght@300;400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap');
-
   :root {
-    --bg: #f0ead6;
-    --surface: #faf7ee;
-    --surface2: #e6dfc8;
-    --border: #d0c8a8;
-    --accent: #2563eb;
-    --accent2: #1d4ed8;
-    --accent3: #dc2626;
-    --text: #2a2010;
-    --muted: #7d7060;
-    --success: #16a34a;
+    /* Microsoft 365 / Fluent neutrals */
+    --bg: #faf9f8;        /* page canvas */
+    --surface: #ffffff;   /* header, sidebar, cards, chart */
+    --surface2: #f3f2f1;  /* input fills, secondary buttons, chips */
+    --border: #e1dfdd;    /* fluent neutral border */
+    --text: #242424;      /* fluent primary text */
+    --muted: #605e5c;     /* fluent secondary text */
+    /* Fluent blue — interactive accent (links, focus, selected states) */
+    --accent: #0f6cbd;
+    --accent2: #0c5aa6;
+    --accent3: #c50f1f;   /* destructive (remove/clear) */
+    --success: #107c41;   /* office green (export) */
+    /* Globe & Mail identity */
+    --brand: #e2001a;     /* masthead rule, app mark, primary action */
+    --brand-dark: #b80016;
     --lab: #7c3aed;
+    /* Type */
+    --font-ui: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --font-serif: 'Pratt-Bold', Georgia, Palatino, 'Book Antiqua', 'Times New Roman', serif;
+    --font-mono: 'Cascadia Code', Consolas, ui-monospace, 'SFMono-Regular', monospace;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-ui);
     background: var(--bg);
     color: var(--text);
     height: 100vh;
@@ -37,19 +44,32 @@
   }
 
   header {
+    border-top: 3px solid var(--brand);
     border-bottom: 1px solid var(--border);
-    padding: 18px 28px;
+    padding: 16px 28px 15px;
     display: flex;
     align-items: baseline;
     gap: 14px;
     background: var(--surface);
   }
+  .brand { display: flex; align-items: center; gap: 11px; }
+  .app-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 7px;
+    background: var(--brand);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .app-icon svg { display: block; }
   header h1 {
-    font-family: 'Fraunces', serif;
+    font-family: var(--font-serif);
     font-size: 21px;
     font-weight: 700;
-    color: var(--accent);
-    letter-spacing: -0.5px;
+    color: var(--text);
+    letter-spacing: -0.3px;
   }
   header span { color: var(--muted); font-size: 11px; letter-spacing: 0.5px; }
   .lab-badge {
@@ -64,7 +84,6 @@
     border-radius: 3px;
     vertical-align: middle;
   }
-  .maple { margin-left: auto; font-size: 20px; opacity: 0.5; }
 
   .app {
     display: grid;
@@ -92,7 +111,7 @@
   }
 
   .section-label {
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-ui);
     font-size: 11px;
     font-weight: 400;
     letter-spacing: 1.5px;
@@ -112,7 +131,7 @@
     border: 1px solid var(--border);
     border-left: 3px solid transparent;
     border-radius: 5px;
-    background: rgba(37,99,235,0.09);
+    background: rgba(15,108,189,0.09);
   }
   .chip-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
   .chip-name {
@@ -151,16 +170,16 @@
     font-size: 11px; height: 20px; padding: 0 4px;
     border: 1px solid var(--border); border-radius: 3px;
     background: var(--surface); color: var(--text);
-    font-family: 'DM Sans', sans-serif; cursor: pointer; flex-shrink: 0;
+    font-family: var(--font-ui); cursor: pointer; flex-shrink: 0;
   }
   .apply-all-btn {
     font-size: 10px; padding: 1px 6px; border-radius: 3px;
     border: 1px solid var(--accent); color: var(--accent);
     background: transparent; cursor: pointer; white-space: nowrap;
-    font-family: 'DM Sans', sans-serif; flex-shrink: 0;
+    font-family: var(--font-ui); flex-shrink: 0;
     transition: background 0.15s;
   }
-  .apply-all-btn:hover { background: rgba(37,99,235,0.1); }
+  .apply-all-btn:hover { background: rgba(15,108,189,0.1); }
 
   .cansim-link {
     color: var(--muted);
@@ -175,7 +194,7 @@
   .cansim-link:hover { color: var(--accent2); border-color: var(--accent2); }
 
   .control-group { display: flex; flex-direction: column; gap: 6px; }
-  label { font-size: 12px; color: var(--muted); font-family: 'DM Sans', sans-serif; }
+  label { font-size: 12px; color: var(--muted); font-family: var(--font-ui); }
 
   select, input[type="number"] {
     width: 100%;
@@ -184,7 +203,7 @@
     border: 1px solid var(--border);
     border-radius: 5px;
     color: var(--text);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-ui);
     font-size: 13px;
     outline: none;
     transition: border-color 0.15s;
@@ -210,12 +229,12 @@
     border: 1px solid var(--border);
     border-radius: 5px;
     color: var(--text);
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-ui);
     font-size: 13px;
     outline: none;
     -webkit-appearance: none;
     transition: border-color 0.15s;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%237d7060' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%23605e5c' stroke-width='2.2' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M21 21l-4.3-4.3'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: left 9px center;
   }
@@ -250,7 +269,7 @@
   .sr-label { font-size: 12px; color: var(--text); line-height: 1.35; }
   .sr-cat { font-size: 9.5px; color: var(--accent); text-transform: uppercase; letter-spacing: 0.4px; }
   .sr-added { color: var(--success); font-size: 10px; margin-left: 4px; white-space: nowrap; }
-  .search-result mark { background: rgba(37,99,235,0.20); color: inherit; border-radius: 2px; padding: 0 1px; }
+  .search-result mark { background: rgba(15,108,189,0.20); color: inherit; border-radius: 2px; padding: 0 1px; }
   .search-empty { padding: 12px 10px; font-size: 12px; color: var(--muted); text-align: center; }
 
   .date-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -263,20 +282,20 @@
     border: 1px solid var(--border);
     border-radius: 20px;
     cursor: pointer;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-ui);
     font-size: 12px;
     transition: all 0.15s;
     color: var(--muted);
   }
   .chip:hover { border-color: var(--accent); color: var(--accent); }
   .chip.active,
-  .chip[aria-checked="true"] { border-color: var(--accent); background: rgba(37,99,235,0.1); color: var(--accent); }
+  .chip[aria-checked="true"] { border-color: var(--accent); background: rgba(15,108,189,0.1); color: var(--accent); }
 
   /* Breakdown steps */
   .breakdown-step {
     margin-top: 8px;
     padding: 9px 10px;
-    background: rgba(37,99,235,0.05);
+    background: rgba(15,108,189,0.05);
     border: 1px dashed var(--accent);
     border-radius: 5px;
     display: flex;
@@ -295,21 +314,21 @@
   .btn {
     padding: 9px 16px;
     border: none;
-    border-radius: 6px;
+    border-radius: 4px;
     cursor: pointer;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-ui);
     font-size: 13px;
     font-weight: 500;
     transition: all 0.15s;
-    letter-spacing: 0.2px;
+    letter-spacing: 0.1px;
   }
-  .btn-primary { background: var(--accent); color: #ffffff; flex: 1; }
-  .btn-primary:hover { background: #f0d060; }
+  .btn-primary { background: var(--brand); color: #ffffff; flex: 1; }
+  .btn-primary:hover { background: var(--brand-dark); }
   .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-secondary { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
-  .btn-secondary:hover { border-color: var(--muted); color: var(--text); background: var(--surface2); }
+  .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .btn-secondary:hover { border-color: var(--muted); background: var(--surface2); }
   .btn-export { background: var(--success); color: #ffffff; display: flex; align-items: center; gap: 6px; }
-  .btn-export:hover { background: #15803d; }
+  .btn-export:hover { background: #0e6b38; }
   .btn-row { display: flex; gap: 8px; }
 
   .main { display: flex; flex-direction: column; background: var(--bg); min-width: 0; overflow: hidden; }
@@ -325,7 +344,7 @@
   }
   .toolbar-left { flex: 1; min-width: 180px; display: flex; flex-direction: column; gap: 3px; }
   .toolbar-title {
-    font-family: 'Fraunces', serif;
+    font-family: var(--font-serif);
     font-size: 17px;
     font-weight: 700;
     color: var(--text);
@@ -346,7 +365,7 @@
     transition: all 0.15s;
   }
   .tab:hover { color: var(--text); border-color: var(--muted); }
-  .tab.active { border-color: var(--accent2); color: var(--accent2); background: rgba(37,99,235,0.08); }
+  .tab.active { border-color: var(--accent2); color: var(--accent2); background: rgba(15,108,189,0.08); }
 
   .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
   .status-dot.loaded { background: var(--success); }
@@ -412,7 +431,7 @@
 
   .formula-preset {
     padding: 3px 7px;
-    font-family: 'DM Sans', sans-serif;
+    font-family: var(--font-ui);
     font-size: 11px;
     border: 1px solid var(--border);
     border-radius: 4px;
@@ -422,8 +441,8 @@
     transition: background 0.15s, border-color 0.15s;
     white-space: nowrap;
   }
-  .formula-preset:hover { background: #e0d8c0; border-color: var(--accent); color: var(--accent); }
-  .formula-active { background: #d8d0b8 !important; border-color: var(--accent) !important; color: var(--accent) !important; }
+  .formula-preset:hover { background: var(--surface2); border-color: var(--accent); color: var(--accent); }
+  .formula-active { background: rgba(15,108,189,0.10) !important; border-color: var(--accent) !important; color: var(--accent) !important; }
   .formula-hint { font-size: 11px; color: var(--muted); margin-top: 4px; height: 14px; transition: opacity 0.15s; }
 
   .spinner {
@@ -481,10 +500,10 @@
   .btn-cfg-load {
     flex-shrink: 0; font-size: 11px; padding: 2px 7px; height: 22px;
     border-radius: 4px; border: 1px solid var(--accent); color: var(--accent);
-    background: transparent; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    background: transparent; cursor: pointer; font-family: var(--font-ui);
     transition: background 0.15s; white-space: nowrap; margin-top: 1px;
   }
-  .btn-cfg-load:hover { background: rgba(37,99,235,0.1); }
+  .btn-cfg-load:hover { background: rgba(15,108,189,0.1); }
   .btn-cfg-delete {
     flex-shrink: 0; background: none; border: none; cursor: pointer;
     color: var(--muted); font-size: 15px; padding: 0 3px; border-radius: 3px;
@@ -493,7 +512,7 @@
   .btn-cfg-delete:hover { color: var(--accent3); }
   .cfg-save-panel {
     margin-top: 6px; padding: 9px 10px;
-    background: rgba(37,99,235,0.05); border: 1px dashed var(--accent);
+    background: rgba(15,108,189,0.05); border: 1px dashed var(--accent);
     border-radius: 5px; display: flex; flex-direction: column; gap: 7px;
   }
   .cfg-save-label { font-size: 11px; color: var(--accent); font-weight: 500; }
@@ -501,7 +520,7 @@
     width: 100%; margin-top: 5px; padding: 6px;
     border: 1px solid var(--border); border-radius: 5px;
     background: var(--surface2); color: var(--muted);
-    font-family: 'DM Sans', sans-serif; font-size: 12px;
+    font-family: var(--font-ui); font-size: 12px;
     cursor: pointer; transition: border-color 0.15s, color 0.15s;
   }
   .btn-cfg-add:hover { border-color: var(--accent); color: var(--accent); }
@@ -519,7 +538,6 @@
     header { padding: 12px 14px; gap: 10px; }
     header h1 { font-size: 17px; }
     header > span { display: none; }        /* hide subtitle to save room (direct child only) */
-    .maple { font-size: 16px; }
     .catalog-btn { padding: 6px 10px; }
     /* scoped under .catalog-btn so these out-specify the base rule,
        which sits later in the source (the catalog block is appended at end of <style>) */
@@ -586,7 +604,7 @@
   }
   .catalog-modal-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
   .catalog-modal-head .row1 { display: flex; align-items: baseline; gap: 10px; }
-  .catalog-modal-head h2 { font-family:'Fraunces',serif; font-size: 18px; color: var(--accent); margin: 0; }
+  .catalog-modal-head h2 { font-family:var(--font-serif); font-size: 18px; color: var(--accent); margin: 0; }
   .catalog-summary { font-size: 11px; color: var(--muted); }
   .catalog-close {
     margin-left: auto; background: none; border: none;
@@ -630,14 +648,17 @@
 
 <header>
   <button class="nav-toggle" onclick="toggleDrawer()" aria-label="Toggle controls">☰</button>
-  <h1>StatCan Explorer</h1>
+  <div class="brand">
+    <span class="app-icon" aria-hidden="true">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19h16"/>
+        <path d="M4 15l4-6 4 2 4-5 4 4"/>
+      </svg>
+    </span>
+    <h1>StatCan Explorer</h1>
+  </div>
   <span>Statistics Canada · Data Workbench</span>
   <button class="catalog-btn" onclick="openCatalog()" title="Browse the full catalog of categories and series">📖 <span class="catalog-btn-full">View Full Catalog</span><span class="catalog-btn-short">Catalog</span></button>
-  <div class="maple" aria-hidden="true">
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="var(--muted)" opacity="0.55" xmlns="http://www.w3.org/2000/svg">
-      <path d="M12 2 L13.5 7 L18 5 L15 9.5 L20 10.5 L16 13 L18 18 L13 16 L12 22 L11 16 L6 18 L8 13 L4 10.5 L9 9.5 L6 5 L10.5 7 Z"/>
-    </svg>
-  </div>
 </header>
 
 <div class="drawer-backdrop" onclick="toggleDrawer(false)" aria-hidden="true"></div>
@@ -848,10 +869,10 @@
       <div id="formulaLetterKey" style="font-size:11px;color:var(--muted);margin-bottom:4px;line-height:1.6;display:none"></div>
       <div class="control-group" style="display:flex;gap:4px;align-items:center">
         <input type="text" id="formulaInput" placeholder="e.g. 100*(A+B+C+D)/E"
-               style="flex:1;min-width:0;font-family:'DM Mono',monospace;font-size:11px"
+               style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px"
                oninput="updateFormula(this.value)" onkeydown="if(event.key==='Enter')applyFormula()">
         <button onclick="applyFormula()" title="Apply formula"
-                style="flex-shrink:0;padding:0 10px;height:28px;border:1px solid var(--accent);background:var(--accent);border-radius:4px;cursor:pointer;font-size:11px;color:#fff;font-family:'DM Sans',sans-serif;font-weight:600">Apply</button>
+                style="flex-shrink:0;padding:0 10px;height:28px;border:1px solid var(--accent);background:var(--accent);border-radius:4px;cursor:pointer;font-size:11px;color:#fff;font-family:var(--font-ui);font-weight:600">Apply</button>
         <button onclick="clearFormula()" title="Clear formula"
                 style="flex-shrink:0;padding:0 7px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:4px;cursor:pointer;font-size:12px;color:var(--muted)">✕</button>
       </div>
@@ -884,9 +905,9 @@
                onkeydown="if(event.key==='Enter')confirmSaveConfig();if(event.key==='Escape')cancelSaveConfig()">
         <div style="display:flex;gap:5px">
           <button onclick="confirmSaveConfig()"
-                  style="flex:1;padding:5px;border:none;border-radius:4px;background:var(--accent);color:#fff;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;cursor:pointer">Save</button>
+                  style="flex:1;padding:5px;border:none;border-radius:4px;background:var(--accent);color:#fff;font-family:var(--font-ui);font-size:12px;font-weight:500;cursor:pointer">Save</button>
           <button onclick="cancelSaveConfig()"
-                  style="padding:5px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12px;cursor:pointer">Cancel</button>
+                  style="padding:5px 10px;border:1px solid var(--border);border-radius:4px;background:var(--surface2);color:var(--muted);font-family:var(--font-ui);font-size:12px;cursor:pointer">Cancel</button>
         </div>
       </div>
       <div id="cfgBookmarkMsg" style="display:none;margin-bottom:10px;"></div>
@@ -2127,6 +2148,7 @@ function clearChart() {
   state.seriesTransforms = {};
   state.formulaResult = null;
   state.formula = '';
+  state.frequency = 'original';
   state.pendingSeriesId = null;
   state.pendingDim1 = null;
   state.pendingDim4 = null;
@@ -2137,6 +2159,7 @@ function clearChart() {
   document.getElementById('fromMonth').value = 1;
   document.getElementById('toYear').value    = new Date().getFullYear();
   document.getElementById('toMonth').value   = 12;
+  document.getElementById('freqSelect').value = 'original';
   const inp = document.getElementById('formulaInput');
   if (inp) inp.value = '';
   const hint = document.getElementById('formulaHint');
@@ -2528,7 +2551,8 @@ function applyAndRender() {
 // ═══════════════════════════════════════════════════════════
 // CHART
 // ═══════════════════════════════════════════════════════════
-const PALETTE = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#7c3aed'];
+// Globe & Mail official accessible chart palette
+const PALETTE = ['#8b4061', '#8ecad4', '#c7a479', '#d46868', '#d1d3d4'];
 
 function renderChart() {
   const empty  = document.getElementById('chartEmpty');
@@ -2557,7 +2581,7 @@ function renderChart() {
   const isArea    = state.chartType === 'area';
 
   const formulaActive = !!state.formulaResult?.length;
-  const FORMULA_COLOR = '#9333ea';
+  const FORMULA_COLOR = '#8b4061';
 
   const activeUoms = [...new Set(sids.map(sid => state.seriesUnits?.[sid]?.uom).filter(Boolean))];
   const yAxisUnit  = formulaActive ? ''
@@ -2608,12 +2632,12 @@ function renderChart() {
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: {
-          labels: { color: '#2a2010', font: { family: 'DM Sans', size: 12 }, boxWidth: 12, padding: 14 }
+          labels: { color: '#242424', font: { family: "Segoe UI, system-ui, sans-serif", size: 12 }, boxWidth: 12, padding: 14 }
         },
         tooltip: {
-          backgroundColor: '#faf7ee', borderColor: '#d0c8a8', borderWidth: 1,
-          titleColor: '#7d7060', bodyColor: '#2a2010',
-          titleFont: { family: 'DM Sans', size: 12 }, bodyFont: { family: 'DM Sans', size: 12 },
+          backgroundColor: '#ffffff', borderColor: '#e1dfdd', borderWidth: 1,
+          titleColor: '#605e5c', bodyColor: '#242424',
+          titleFont: { family: "Segoe UI, system-ui, sans-serif", size: 12 }, bodyFont: { family: "Segoe UI, system-ui, sans-serif", size: 12 },
           callbacks: {
             label: ctx => {
               const v = ctx.parsed.y;
@@ -2634,14 +2658,14 @@ function renderChart() {
       scales: {
         x: {
           stacked: isStacked,
-          ticks: { color: '#7d7060', font: { family: 'DM Sans', size: 10 }, maxRotation: 45, callback: (_, i) => xLabels[i] },
+          ticks: { color: '#605e5c', font: { family: "Segoe UI, system-ui, sans-serif", size: 10 }, maxRotation: 45, callback: (_, i) => xLabels[i] },
           grid: { color: 'rgba(0,0,0,0.07)' }
         },
         y: {
           stacked: isStacked,
-          title: { display: !!yAxisUnit, text: yAxisUnit, color: '#7d7060', font: { family: 'DM Sans', size: 11 }, padding: { bottom: 4 } },
+          title: { display: !!yAxisUnit, text: yAxisUnit, color: '#605e5c', font: { family: "Segoe UI, system-ui, sans-serif", size: 11 }, padding: { bottom: 4 } },
           ticks: {
-            color: '#7d7060', font: { family: 'DM Sans', size: 11 },
+            color: '#605e5c', font: { family: "Segoe UI, system-ui, sans-serif", size: 11 },
             callback: v => {
               const sfx = isPct ? '%' : '';
               if (!isPct && Math.abs(v) >= 1e12) return (v / 1e12).toFixed(1) + 'T';
@@ -2683,13 +2707,13 @@ function renderTable() {
   if (hasFormula) {
     const fdmap = Object.fromEntries(state.formulaResult.map(p => [p.label, p.value]));
     document.getElementById('tableHead').innerHTML =
-      `<tr><th>Period</th><th style="color:#9333ea">${formulaLabel(state.formula)}</th></tr>`;
+      `<tr><th>Period</th><th style="color:#8b4061">${formulaLabel(state.formula)}</th></tr>`;
     document.getElementById('tableBody').innerHTML =
       formulaLabels.slice(-60).map(label => {
         const v = fdmap[label];
         if (v == null) return `<tr><td>${label}</td><td class="num">—</td></tr>`;
         const cls = v > 0 ? '' : v < 0 ? 'neg' : '';
-        return `<tr><td>${label}</td><td class="num ${cls}" style="color:#9333ea">${v.toLocaleString('en-CA', { maximumFractionDigits: 4 })}</td></tr>`;
+        return `<tr><td>${label}</td><td class="num ${cls}" style="color:#8b4061">${v.toLocaleString('en-CA', { maximumFractionDigits: 4 })}</td></tr>`;
       }).join('');
   } else {
     document.getElementById('tableHead').innerHTML =
