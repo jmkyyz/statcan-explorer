@@ -2192,17 +2192,27 @@ function switchChart(type) {
 // DATE RANGE
 // ═══════════════════════════════════════════════════════════
 function computeDateRange() {
-  const cat = CATEGORIES[state.category];
-  const srcFreq = cat?.sourceFreq || 'monthly';
+  // Frequency must come from the series actually on the chart — NOT the category
+  // currently selected in the dropdown. Adding one quarterly series switches the
+  // dropdown to a quarterly category, which would otherwise force quarter-boundary
+  // snapping on monthly series and truncate their most recent months. Snap to
+  // quarter boundaries only when EVERY active series is quarterly; any monthly or
+  // daily series keeps the full monthly range (quarterly series still return their
+  // own quarters within it).
+  const activeFreqs = state.activeSeries.map(sid => SERIES_MAP[sid]?.sourceFreq).filter(Boolean);
+  const srcFreq = activeFreqs.length && activeFreqs.every(f => f === 'quarterly') ? 'quarterly' : 'monthly';
   let fromDate, toDate;
 
   if (srcFreq === 'quarterly') {
     const fromQStartMonth = (Math.ceil(state.fromMonth / 3) - 1) * 3 + 1;
     fromDate = `${state.fromYear}-${String(fromQStartMonth).padStart(2, '0')}-01`;
-    if      (state.toMonth <= 3)  toDate = `${state.toYear - 1}-12-31`;
-    else if (state.toMonth <= 6)  toDate = `${state.toYear}-03-31`;
-    else if (state.toMonth <= 9)  toDate = `${state.toYear}-06-30`;
-    else                          toDate = `${state.toYear}-09-30`;
+    // Include the quarter that CONTAINS toMonth — its data either exists or it
+    // doesn't (auto-update trims to the real latest). The old logic snapped to the
+    // PREVIOUS quarter, hiding the most recent complete quarter (e.g. "to December"
+    // returned only through September).
+    const toQEndMonth = Math.ceil(state.toMonth / 3) * 3;   // 3, 6, 9, or 12
+    const lastDay = new Date(state.toYear, toQEndMonth, 0).getDate();
+    toDate = `${state.toYear}-${String(toQEndMonth).padStart(2, '0')}-${lastDay}`;
   } else {
     fromDate = `${state.fromYear}-${String(state.fromMonth).padStart(2, '0')}-01`;
     const lastDay = new Date(state.toYear, state.toMonth, 0).getDate();
