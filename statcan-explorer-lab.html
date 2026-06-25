@@ -329,6 +329,8 @@
   .btn-secondary:hover { border-color: var(--muted); background: var(--surface2); }
   .btn-export { background: var(--success); color: #ffffff; display: flex; align-items: center; gap: 6px; }
   .btn-export:hover { background: #0e6b38; }
+  .btn-export-img { background: var(--accent); color: #ffffff; display: flex; align-items: center; gap: 6px; }
+  .btn-export-img:hover { background: var(--accent2); }
   .btn-row { display: flex; gap: 8px; }
 
   .main { display: flex; flex-direction: column; background: var(--bg); min-width: 0; overflow: hidden; }
@@ -641,6 +643,38 @@
   .catalog-series-row a.tbl:hover { text-decoration: underline; }
   .catalog-series-row .tbl-plain { font-size: 11px; color: var(--muted); white-space: nowrap; }
   .catalog-empty { padding: 36px; text-align: center; color: var(--muted); font-size: 13px; }
+
+  /* Export-chart customization modal */
+  .cx-overlay {
+    position: fixed; inset: 0; background: rgba(20,16,8,0.45);
+    display: none; z-index: 3000; align-items: center; justify-content: center; padding: 24px;
+  }
+  .cx-overlay.open { display: flex; }
+  .cx-modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    width: min(520px, 100%); max-height: min(86vh, 760px);
+    display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+  }
+  .cx-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); display: flex; align-items: baseline; gap: 10px; }
+  .cx-head h2 { font-family: var(--font-serif); font-size: 18px; color: var(--accent); margin: 0; }
+  .cx-head .cx-close {
+    margin-left: auto; background: none; border: none;
+    font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; padding: 0 4px;
+  }
+  .cx-head .cx-close:hover { color: var(--brand); }
+  .cx-body { overflow-y: auto; padding: 16px 20px; }
+  .cx-field { margin-bottom: 16px; }
+  .cx-field > label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin-bottom: 6px; }
+  .cx-input {
+    width: 100%; padding: 8px 10px; font-size: 13px; font-family: inherit; box-sizing: border-box;
+    border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text);
+  }
+  .cx-input:focus { outline: none; border-color: var(--accent); }
+  .cx-series-label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); margin-bottom: 8px; }
+  .cx-series-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .cx-swatch { width: 14px; height: 14px; border-radius: 3px; flex: none; }
+  .cx-foot { padding: 12px 20px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
 </style>
 </head>
 <body>
@@ -676,6 +710,33 @@
              oninput="renderCatalogBrowser(this.value)">
     </div>
     <div class="catalog-body" id="catalogBody"></div>
+  </div>
+</div>
+
+<div class="cx-overlay" id="chartExportOverlay" onclick="if(event.target===this)closeChartExport()">
+  <div class="cx-modal" role="dialog" aria-label="Export chart as image">
+    <div class="cx-head">
+      <h2>Export Chart</h2>
+      <button class="cx-close" onclick="closeChartExport()" aria-label="Close">×</button>
+    </div>
+    <div class="cx-body">
+      <div class="cx-field">
+        <label for="cxTitle">Chart title</label>
+        <input class="cx-input" id="cxTitle" type="text" autocomplete="off" placeholder="Chart title">
+      </div>
+      <div class="cx-field">
+        <span class="cx-series-label">Series names</span>
+        <div id="cxSeriesList"></div>
+      </div>
+      <div class="cx-field">
+        <label for="cxSource">Source (appears at bottom of image)</label>
+        <input class="cx-input" id="cxSource" type="text" autocomplete="off" placeholder="e.g. Source: Statistics Canada">
+      </div>
+    </div>
+    <div class="cx-foot">
+      <button class="btn btn-secondary" onclick="closeChartExport()">Cancel</button>
+      <button class="btn btn-export-img" onclick="downloadChartImage()">🖼 Download PNG</button>
+    </div>
   </div>
 </div>
 
@@ -935,6 +996,9 @@
         <div class="tab"        data-chart="area"    onclick="switchChart('area')">Area</div>
       </div>
       <div class="status-dot" id="statusDot"></div>
+      <button class="btn btn-export-img" id="exportChartBtn" onclick="openChartExport()" style="display:none;">
+        🖼 Export Chart
+      </button>
       <button class="btn btn-export" id="exportBtn" onclick="exportXlsx()" style="display:none;">
         ↓ Export XLSX
       </button>
@@ -2172,6 +2236,7 @@ function clearChart() {
   document.getElementById('myChart').style.display = 'none';
   document.getElementById('tableWrap').style.display = 'none';
   document.getElementById('exportBtn').style.display = 'none';
+  document.getElementById('exportChartBtn').style.display = 'none';
   document.getElementById('toolbarSources').style.display = 'none';
   if (Object.keys(CATEGORIES).length) {
     document.getElementById('chartTitle').textContent = 'Select a category and series to begin';
@@ -2556,6 +2621,7 @@ function applyAndRender() {
   renderChart();
   renderTable();
   document.getElementById('exportBtn').style.display = '';
+  document.getElementById('exportChartBtn').style.display = '';
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -2826,6 +2892,168 @@ function exportXlsx() {
   toast('Spreadsheet exported ✓', 'success');
 }
 
+// ── Export chart as a PNG image, with user-editable series names ──
+// Opens a small modal pre-filled with the current chart title and each
+// dataset's legend label so the user can rename series before download.
+function openChartExport() {
+  if (!chartInst || !chartInst.data.datasets.length) {
+    toast('Render a chart first', 'error');
+    return;
+  }
+  // Pre-fill the title from the toolbar title, stripping any wrapping quotes.
+  const rawTitle = (document.getElementById('chartTitle').textContent || '').trim();
+  document.getElementById('cxTitle').value = rawTitle.replace(/^["“]|["”]$/g, '');
+
+  const list = document.getElementById('cxSeriesList');
+  list.innerHTML = chartInst.data.datasets.map((ds, i) => {
+    const color = typeof ds.borderColor === 'string' ? ds.borderColor : '#605e5c';
+    const safe  = String(ds.label ?? '').replace(/"/g, '&quot;');
+    return `<div class="cx-series-row">
+      <span class="cx-swatch" style="background:${color}"></span>
+      <input class="cx-input cx-series-name" data-idx="${i}" type="text" value="${safe}" autocomplete="off">
+    </div>`;
+  }).join('');
+
+  document.getElementById('cxSource').value = defaultChartSource();
+
+  document.getElementById('chartExportOverlay').classList.add('open');
+  document.getElementById('cxTitle').focus();
+}
+
+// Build a sensible default attribution from the active series' source tables,
+// mirroring the toolbar "Source:" line. User can edit it before download.
+function defaultChartSource() {
+  const tables = [...new Set(state.activeSeries.map(sid => SERIES_MAP[sid]?.tableId).filter(Boolean))];
+  if (!tables.length) return 'Source: Statistics Canada';
+  const labels = tables.map(t =>
+    t === 'FRED' ? 'FRED (Federal Reserve Bank of St. Louis)'
+    : t === 'CIMT' ? 'Statistics Canada, Canadian International Merchandise Trade'
+    : `Statistics Canada, Table ${t}`);
+  return 'Source: ' + [...new Set(labels)].join('; ');
+}
+
+function closeChartExport() {
+  document.getElementById('chartExportOverlay').classList.remove('open');
+}
+
+function downloadChartImage() {
+  if (!chartInst) return;
+  const title  = document.getElementById('cxTitle').value.trim();
+  const source = document.getElementById('cxSource').value.trim();
+  const inputs = [...document.querySelectorAll('.cx-series-name')];
+
+  // Custom name per dataset, keyed by the input's index.
+  const names = chartInst.data.datasets.map(ds => ds.label);
+  inputs.forEach(inp => {
+    const idx = +inp.dataset.idx;
+    if (chartInst.data.datasets[idx]) names[idx] = inp.value.trim() || names[idx];
+  });
+
+  // Render the export at a FIXED resolution (independent of screen/retina) with
+  // font sizes tuned for that resolution, so axis/legend text never goes tiny.
+  // The on-screen chart is never touched — we build a separate off-screen chart.
+  const EXPORT_W = 1200, EXPORT_H = 675;
+  const EFONT = "Segoe UI, system-ui, sans-serif";
+  const liveX = chartInst.options.scales.x;
+  const liveY = chartInst.options.scales.y;
+  // Reuse the live axis number-formatting callbacks (safe — they don't touch the
+  // tick context), but rebuild grid/title locally so we don't share scriptable
+  // option objects with the live chart (that crashes the export render).
+  const yUnit = (liveY.title && liveY.title.display) ? liveY.title.text : '';
+
+  const canvas = document.createElement('canvas');
+  canvas.width = EXPORT_W; canvas.height = EXPORT_H;
+
+  const exportChart = new Chart(canvas, {
+    data: {
+      labels: chartInst.data.labels,
+      datasets: chartInst.data.datasets.map((ds, i) => ({ ...ds, label: names[i] })),
+    },
+    options: {
+      responsive: false, maintainAspectRatio: false, animation: false, devicePixelRatio: 1,
+      layout: { padding: 16 },
+      plugins: {
+        legend: { labels: { color: '#242424', font: { family: EFONT, size: 14 }, boxWidth: 14, padding: 16 } },
+        tooltip: { enabled: false },
+        title: {
+          display: !!title, text: title,
+          color: '#242424', font: { family: 'Georgia, serif', size: 22, weight: '700' },
+          padding: { top: 4, bottom: 18 },
+        },
+        subtitle: {
+          display: !!source, text: source, position: 'bottom', align: 'start',
+          color: '#605e5c', font: { family: EFONT, size: 12, style: 'italic' },
+          padding: { top: 14, bottom: 2 },
+        },
+      },
+      scales: {
+        x: {
+          stacked: liveX.stacked,
+          grid: { color: 'rgba(0,0,0,0.07)' },
+          ticks: { color: '#605e5c', font: { family: EFONT, size: 13 }, maxRotation: 45, callback: liveX.ticks.callback },
+        },
+        y: {
+          stacked: liveY.stacked,
+          title: { display: !!yUnit, text: yUnit, color: '#605e5c', font: { family: EFONT, size: 12 } },
+          grid: { color: ctx => (ctx && ctx.tick && ctx.tick.value === 0) ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.07)' },
+          ticks: { color: '#605e5c', font: { family: EFONT, size: 13 }, callback: liveY.ticks.callback },
+        },
+      },
+    },
+  });
+
+  let tmp;
+  try {
+    // Composite the (transparent) chart canvas onto a white background.
+    tmp = document.createElement('canvas');
+    tmp.width = canvas.width; tmp.height = canvas.height;
+    const ctx = tmp.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, tmp.width, tmp.height);
+    ctx.drawImage(canvas, 0, 0);
+  } catch (e) {
+    exportChart.destroy();
+    console.error('Chart export failed', e);
+    toast('Chart export failed', 'error');
+    return;
+  }
+  exportChart.destroy();
+
+  const slug = (title || 'chart').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '').toLowerCase() || 'chart';
+  const fname = `statcan_chart_${slug}_${new Date().toISOString().slice(0,10)}.png`;
+
+  // Trigger the actual download. Prefer a Blob object URL (reliable); fall back
+  // to a data: URL if Blobs are unavailable. `done` guards against the fallback
+  // timer and the toBlob callback both firing.
+  let done = false;
+  const triggerDownload = (href, isObjUrl) => {
+    if (done) return;
+    done = true;
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = fname;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    if (isObjUrl) setTimeout(() => URL.revokeObjectURL(href), 1000);
+    toast('Chart image exported ✓', 'success');
+  };
+  const fallbackToDataUrl = () => { try { triggerDownload(tmp.toDataURL('image/png'), false); } catch (e) { console.error(e); toast('Chart export failed', 'error'); } };
+
+  try {
+    tmp.toBlob(blob => {
+      if (blob) triggerDownload(URL.createObjectURL(blob), true);
+      else fallbackToDataUrl();
+    }, 'image/png');
+    // Safety net: if toBlob never invokes its callback, fall back after a beat.
+    setTimeout(fallbackToDataUrl, 1200);
+  } catch (e) {
+    fallbackToDataUrl();
+  }
+
+  closeChartExport();
+}
+
 // ═══════════════════════════════════════════════════════════
 // CATALOG BROWSER
 // ═══════════════════════════════════════════════════════════
@@ -2910,7 +3138,7 @@ function renderCatalogBrowser(query) {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeCatalog();
+  if (e.key === 'Escape') { closeCatalog(); closeChartExport(); }
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -3197,6 +3425,7 @@ function loadConfigObj(config) {
   document.getElementById('myChart').style.display     = 'none';
   document.getElementById('tableWrap').style.display   = 'none';
   document.getElementById('exportBtn').style.display   = 'none';
+  document.getElementById('exportChartBtn').style.display = 'none';
   document.getElementById('toolbarSources').style.display = 'none';
   document.getElementById('chartTitle').textContent    = `"${config.name}"`;
   document.getElementById('statusDot').className = 'status-dot';
