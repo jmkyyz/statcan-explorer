@@ -105,8 +105,15 @@
   .picker .opt .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
   /* HS tree */
-  .tree { border: 1px solid var(--border); border-radius: 6px; max-height: 240px;
+  .tree { border: 1px solid var(--border); border-radius: 6px; max-height: 200px;
           overflow: auto; background: var(--surface); }
+  /* compact province selector — all options visible, no scroll box */
+  .pills { display: flex; flex-wrap: wrap; gap: 5px; }
+  .pills .pill { border: 1px solid var(--border); background: var(--surface);
+          border-radius: 13px; padding: 3px 10px; font: inherit; font-size: 12px;
+          cursor: pointer; color: var(--text); }
+  .pills .pill:hover { border-color: var(--accent); }
+  .pills .pill.on { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
   .node { user-select: none; }
   .node .self { display: flex; align-items: center; gap: 6px; padding: 4px 8px;
           cursor: pointer; border-bottom: 1px solid var(--surface2); }
@@ -190,20 +197,16 @@
 
     <div class="group">
       <label class="title">Partner country <span class="opt">— optional, empty = all partners</span></label>
-      <input type="text" id="ctrySearch" placeholder="Search countries…">
+      <div id="ctryWrap">
+        <input type="text" id="ctrySearch" placeholder="Search countries to add…" autocomplete="off">
+        <div class="picker" id="ctryPicker" style="display:none"></div>
+      </div>
       <button class="addall" id="ctryAddAll">＋ World total — all countries</button>
-      <div class="picker" id="ctryPicker"></div>
       <div class="chips" id="ctryChips"></div>
       <div class="seg modeseg" id="ctryMode" style="display:none">
         <button data-mode="combined" class="on">Combined (sum)</button>
         <button data-mode="separate">Separate</button>
       </div>
-    </div>
-
-    <div class="group" id="provGroup">
-      <label class="title">Province of clearance <span class="opt">— optional, empty = national</span></label>
-      <div class="picker" id="provPicker"></div>
-      <div class="chips" id="provChips"></div>
     </div>
 
     <div class="group">
@@ -242,6 +245,11 @@
         <option value="value">Value (CA$)</option>
         <option value="quantity">Quantity (where units consistent)</option>
       </select>
+    </div>
+
+    <div class="group" id="provGroup">
+      <label class="title">Province of clearance <span class="opt">— optional, empty = national</span></label>
+      <div class="pills" id="provPicker"></div>
     </div>
    </div>
 
@@ -464,7 +472,7 @@ async function init() {
     $("health").textContent = "";
     return;
   }
-  renderCountryPicker(""); renderProvincePicker();
+  renderCountryPicker(""); renderProvincePills();
   await loadHsRoot();
   wire();
   toggleTransform();
@@ -548,9 +556,22 @@ function renderCountryPicker(filter) {
     .slice(0, 300)
     .forEach(c => box.appendChild(makeOpt(c, "countries")));
 }
-function renderProvincePicker() {
+// Province: compact toggle pills (all 13 visible, no scroll box).
+function renderProvincePills() {
   const box = $("provPicker"); box.innerHTML = "";
-  state.dims.provinces.forEach(p => box.appendChild(makeOpt(p, "provinces")));
+  state.dims.provinces.forEach(p => {
+    const on = state.provinces.some(x => x.code === p.code);
+    const pill = document.createElement("button");
+    pill.className = "pill" + (on ? " on" : "");
+    pill.textContent = p.code; pill.title = p.en;
+    pill.onclick = () => {
+      const i = state.provinces.findIndex(x => x.code === p.code);
+      if (i >= 0) state.provinces.splice(i, 1);
+      else state.provinces.push({ code: p.code, en: p.en });
+      renderProvincePills();
+    };
+    box.appendChild(pill);
+  });
 }
 function makeOpt(item, bucket) {
   const opt = document.createElement("label"); opt.className = "opt";
@@ -564,7 +585,7 @@ function makeOpt(item, bucket) {
 }
 
 // ---- chips ----------------------------------------------------------------
-const BUCKET_CHIPS = { hs: "hsChips", countries: "ctryChips", provinces: "provChips" };
+const BUCKET_CHIPS = { hs: "hsChips", countries: "ctryChips" };
 function addChip(bucket, item) {
   if (state[bucket].some(x => x.code === item.code)) return;
   state[bucket].push(item);
@@ -574,7 +595,6 @@ function removeChip(bucket, code) {
   state[bucket] = state[bucket].filter(x => x.code !== code);
   renderChips(bucket);
   if (bucket === "countries") renderCountryPicker($("ctrySearch").value);
-  if (bucket === "provinces") renderProvincePicker();
 }
 function renderChips(bucket) {
   const box = $(BUCKET_CHIPS[bucket]); box.innerHTML = "";
@@ -876,9 +896,10 @@ function toggleTransform() {
 function clearAll() {
   state.hs = []; state.countries = []; state.provinces = [];
   state.productMode = "combined"; state.countryMode = "combined";
-  renderChips("hs"); renderChips("countries"); renderChips("provinces");
+  renderChips("hs"); renderChips("countries");
   $("hsSearch").value = ""; $("ctrySearch").value = "";
-  renderCountryPicker(""); renderProvincePicker(); loadHsRoot();
+  $("ctryPicker").style.display = "none";
+  renderCountryPicker(""); renderProvincePills(); loadHsRoot();
   $("flowSeg").querySelectorAll("button").forEach(x => x.classList.remove("on"));
   $("flowSeg").querySelector('[data-flow="exp_dom"]').classList.add("on");
   state.flow = "exp_dom"; $("provGroup").style.display = "";
@@ -903,7 +924,14 @@ function wire() {
     onHsSearch();
   });
   $("hsSearch").oninput = onHsSearch;
-  $("ctrySearch").oninput = (e) => renderCountryPicker(e.target.value);
+  // Country list stays collapsed until you click into the search; it hides again
+  // when focus leaves the box (selected countries remain as chips below).
+  const showCtry = () => { renderCountryPicker($("ctrySearch").value); $("ctryPicker").style.display = ""; };
+  $("ctrySearch").onfocus = showCtry;
+  $("ctrySearch").oninput = showCtry;
+  $("ctryWrap").addEventListener("focusout", () => setTimeout(() => {
+    if (!$("ctryWrap").contains(document.activeElement)) $("ctryPicker").style.display = "none";
+  }, 150));
   $("breakdown").onchange = toggleTransform;
   $("hsAddAll").onclick = () => addChip("hs", { code: "__ALL__", en: "Total — all products" });
   $("ctryAddAll").onclick = () => addChip("countries", { code: "__ALL__", en: "World — all countries" });
