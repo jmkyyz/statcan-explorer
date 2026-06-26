@@ -598,12 +598,28 @@ def get_boc_series():
     series_codes = [s.strip() for s in raw_series.split(",") if s.strip()]
     results = []
 
+    # Monetary-aggregate vectors (M1+, M1++, M2, M2++) are dollar-denominated and
+    # published by the Bank in MILLIONS of dollars. Multiply by 1e6 so the frontend
+    # plots actual dollars (axis renders e.g. "1.8T") and label the unit "dollars";
+    # every other BoC series here is a rate, which stays "percent".
+    # NOTE: extend this set if more dollar-valued aggregates are added to the catalog.
+    MONETARY_AGGREGATE_CODES = {"V37151", "V37152", "V41552796", "V41552801"}
+
     for code in series_codes:
         # The frontend strips a leading v/V via replace(/^[vV]/, ''), turning
         # "V39079" → "39079".  Re-add the prefix only for pure numeric codes.
         # Named codes (FXUSDCAD, BD.CDN.10YR.DQ.YLD, W.BCPI, etc.) are passed
         # through unchanged because they contain non-digit characters.
         boc_code = f"V{code}" if code.isdigit() else code
+
+        is_dollars = boc_code in MONETARY_AGGREGATE_CODES
+        # Valet only publishes FXUSDCAD = CAD per 1 US$ (~1.42). Canadians read the
+        # loonie the other way — US$ per 1 C$ (~0.70) — so invert it (value → 1/value).
+        is_fx_inv  = boc_code == "FXUSDCAD"
+        scale      = 1_000_000 if is_dollars else 1
+        uom        = ("dollars"     if is_dollars
+                      else "US$ per C$" if is_fx_inv
+                      else "percent")
 
         params = {}
         if from_date:
@@ -637,6 +653,7 @@ def get_boc_series():
                 continue
             try:
                 val_f = float(val)
+                val_f = (1.0 / val_f) if (is_fx_inv and val_f) else (val_f * scale)
             except (ValueError, TypeError):
                 continue
             month_key = d[:7]                           # "YYYY-MM"
@@ -653,7 +670,7 @@ def get_boc_series():
             "vectorId":      code,
             "frequency":     "Monthly",
             "frequencyCode": 6,
-            "uom":           "percent",
+            "uom":           uom,
             "data":          data_points,
         })
 
