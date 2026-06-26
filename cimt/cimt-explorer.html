@@ -339,11 +339,8 @@ class WasmSource {
     this.manifest = await (await fetch(this.base + "/manifest.json")).json();
   }
   maxLeaf() { return 6; }
-  _files(tier, flow, y1, y2) {
-    return this.manifest.years.filter(y => y >= y1 && y <= y2)
-      .map(y => `'${this.base}/${tier}/flow=${flow}/year=${y}/data.parquet'`);
-  }
-  _src(tier, flow, y1, y2) { return `read_parquet([${this._files(tier,flow,y1,y2).join(",")}], hive_partitioning=true)`; }
+  // One consolidated file per tier+flow (year is a column); filter year in SQL.
+  _src(tier, flow) { return `read_parquet('${this.base}/${tier}/${flow}.parquet')`; }
   _dimUrl(name) { return `read_parquet('${this.base}/dim/${name}.parquet')`; }
   async _q(sql) {
     const res = await this.conn.query(sql);
@@ -363,12 +360,14 @@ class WasmSource {
   async hsChildren(flow, code) {
     const cl = ({0:2,2:4,4:6})[code.length];
     if (cl === undefined) return { children: [] };          // HS6 is leaf online
-    const tier = cl === 2 ? "hs2" : cl === 4 ? "hs4" : "hs6";
-    const y = this.manifest.years;
-    const present = await this._q(`SELECT DISTINCT substr(hs,1,${cl}) hs FROM ${this._src(tier,flow,y[0],y[y.length-1])} ${code ? `WHERE hs LIKE '${esc(code)}%'` : ""} ORDER BY hs`);
+    // Read child codes from the small dim_hs file, not by scanning the data —
+    // scanning the tier files over the network is what made drill-down slow.
     const cls = cl <= 4 ? "both" : (flow === "imp" ? "M" : "X");
-    const lab = Object.fromEntries((await this._q(`SELECT hs, any_value(en) en FROM ${this._dimUrl("dim_hs")} WHERE hs_len=${cl} AND classification='${cls}' GROUP BY hs`)).map(r => [r.hs, r.en]));
-    return { children: present.map(r => ({ code: r.hs, en: lab[r.hs] ?? null })) };
+    const rows = await this._q(`SELECT hs AS code, any_value(en) en
+      FROM ${this._dimUrl("dim_hs")}
+      WHERE hs_len=${cl} AND classification='${cls}' AND valid_to='999912'
+      ${code ? `AND hs LIKE '${esc(code)}%'` : ""} GROUP BY hs ORDER BY hs`);
+    return { children: rows.map(r => ({ code: r.code, en: r.en ?? null })) };
   }
   async hsSearch(flow, q) {
     if (q.length < 2) return { results: [] };
@@ -391,9 +390,11 @@ class WasmSource {
     if (f.period) { if (f.period.from) y1 = Math.floor(f.period.from/100); if (f.period.to) y2 = Math.floor(f.period.to/100); }
     const lvl = body.hs_level || 2;
     const tier = lvl <= 2 ? "hs2" : lvl <= 4 ? "hs4" : "hs6";
-    const where = [];
+    // Direct year bounds let DuckDB prune row-groups (files are sorted by year);
+    // the (year*100+month) bounds add month precision. State isn't in the slice.
+    const where = [`year >= ${y1}`, `year <= ${y2}`];
     if (f.hs && f.hs.length) where.push("(" + f.hs.map(c => `hs LIKE '${esc(c)}%'`).join(" OR ") + ")");
-    for (const d of ["country","province","state","uom"]) if (f[d] && f[d].length) where.push(`${d} IN (${f[d].map(v=>`'${esc(v)}'`).join(",")})`);
+    for (const d of ["country","province","uom"]) if (f[d] && f[d].length) where.push(`${d} IN (${f[d].map(v=>`'${esc(v)}'`).join(",")})`);
     if (f.period) { if (f.period.from) where.push(`(year*100+month) >= ${parseInt(f.period.from)}`); if (f.period.to) where.push(`(year*100+month) <= ${parseInt(f.period.to)}`); }
     const agg = measure === "quantity"
       ? `CASE WHEN count(DISTINCT uom)=1 THEN sum(quantity)::DOUBLE END AS quantity, any_value(uom) AS uom`
@@ -401,7 +402,7 @@ class WasmSource {
     const sel = (group.length ? group.join(", ") + ", " : "") + agg;
     const temporal = group.filter(g => g === "year" || g === "month");
     const order = temporal.length ? temporal.join(", ") + " ASC" : `${measure} DESC`;
-    const sql = `SELECT ${sel} FROM ${this._src(tier,flow,y1,y2)} ${where.length?"WHERE "+where.join(" AND "):""} ${group.length?"GROUP BY "+group.join(", "):""} ORDER BY ${order} LIMIT ${parseInt(body.limit||1000)}`;
+    const sql = `SELECT ${sel} FROM ${this._src(tier,flow)} WHERE ${where.join(" AND ")} ${group.length?"GROUP BY "+group.join(", "):""} ORDER BY ${order} LIMIT ${parseInt(body.limit||1000)}`;
     const rows = await this._q(sql);
     await this._attachLabels(rows, group, flow);
     return { columns: group.concat([measure]), rows, row_count: rows.length, elapsed_ms: Math.round(performance.now()-t) };

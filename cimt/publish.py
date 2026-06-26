@@ -50,55 +50,81 @@ def latest_year() -> int:
     return max(years)
 
 
+def flows_present() -> list[str]:
+    return sorted(d.name.split("=")[1]
+                  for d in (PARQUET / "hs6").glob("flow=*") if d.is_dir())
+
+
 def stage(years: int) -> None:
+    """Build the online slice, optimized for *remote* reading by DuckDB-WASM.
+
+    Per-year files with tiny row-groups force hundreds of HTTP range requests
+    over the internet (~the whole latency budget). Instead we write ONE file per
+    tier+flow with few large row-groups, drop the `state` dimension (unused by
+    the UI, ~45% of the rows), sort by year/hs so filtered queries prune, and
+    zstd-compress. That turns a multi-second/minute remote query into a handful
+    of requests.
+    """
+    import duckdb
     cutoff = latest_year() - years + 1
     if PUBLISH.exists():
         shutil.rmtree(PUBLISH)
     PUBLISH.mkdir(parents=True)
-    kept = 0
+    con = duckdb.connect()
+    nfiles = 0
     for tier in ONLINE_TIERS:
-        for ydir in (PARQUET / tier).glob("flow=*/year=*"):
-            yr = int(ydir.name.split("=")[1])
-            if yr < cutoff:
+        (PUBLISH / tier).mkdir(parents=True, exist_ok=True)
+        for flow in flows_present():
+            src_dir = PARQUET / tier / f"flow={flow}"
+            if not src_dir.exists():
                 continue
-            dest = PUBLISH / tier / ydir.parent.name / ydir.name
-            dest.mkdir(parents=True, exist_ok=True)
-            for f in ydir.glob("*.parquet"):
-                shutil.copy2(f, dest / f.name)
-                kept += 1
-    # dimension lookups (small; needed for labels)
+            out = PUBLISH / tier / f"{flow}.parquet"
+            con.execute(f"""
+                COPY (
+                  SELECT year, month, hs, country, province,
+                         sum(value) AS value,
+                         CASE WHEN count(DISTINCT uom)=1 THEN sum(quantity) END AS quantity,
+                         CASE WHEN count(DISTINCT uom)=1 THEN any_value(uom) END AS uom
+                  FROM read_parquet('{src_dir.as_posix()}/**/*.parquet',
+                                    hive_partitioning=true)
+                  WHERE year >= {cutoff}
+                  GROUP BY year, month, hs, country, province
+                  ORDER BY year, hs
+                ) TO '{out.as_posix()}'
+                (FORMAT parquet, COMPRESSION zstd, ROW_GROUP_SIZE 1000000)
+            """)
+            nfiles += 1
+    # dimension lookups (small; needed for labels + cheap drill-down)
     if (PARQUET / "dim").exists():
         shutil.copytree(PARQUET / "dim", PUBLISH / "dim")
     write_manifest()
     size = sum(f.stat().st_size for f in PUBLISH.rglob("*") if f.is_file())
-    print(f"staged {kept} partition files, years {cutoff}+, tiers "
-          f"{'/'.join(ONLINE_TIERS)} -> {PUBLISH}")
+    print(f"staged {nfiles} consolidated files, years {cutoff}+, tiers "
+          f"{'/'.join(ONLINE_TIERS)} (state dropped) -> {PUBLISH}")
     print(f"slice size: {size/1e9:.2f} GB")
 
 
 def write_manifest() -> None:
-    """Browser data-layer needs an explicit file index — object storage has no
-    directory listing, so DuckDB-WASM can't glob. Records tiers/flows/years and
-    the period range so the client can build read_parquet([...]) file lists."""
+    """Index the slice for the browser (object storage has no directory listing).
+    Layout is one file per tier+flow: <tier>/<flow>.parquet, with year a column."""
     import duckdb
     con = duckdb.connect()
-    src = (f"read_parquet('{(PUBLISH/'hs6').as_posix()}/**/*.parquet', "
-           f"hive_partitioning=true)")
+    src = f"read_parquet('{(PUBLISH/'hs6').as_posix()}/*.parquet')"
     pmin, pmax = con.execute(
         f"SELECT min(year*100+month), max(year*100+month) FROM {src}").fetchone()
-    rows = con.execute(
-        f"SELECT DISTINCT flow, year FROM {src} ORDER BY flow, year").fetchall()
-    flows = sorted({r[0] for r in rows})
-    years = sorted({r[1] for r in rows})
+    years = [r[0] for r in con.execute(
+        f"SELECT DISTINCT year FROM {src} ORDER BY year").fetchall()]
+    flows = sorted(p.stem for p in (PUBLISH / "hs6").glob("*.parquet"))
     dims = sorted(p.stem for p in (PUBLISH / "dim").glob("*.parquet"))
     manifest = {
+        "layout": "consolidated",   # <tier>/<flow>.parquet, year is a column
         "tiers": ONLINE_TIERS,
         "flows": flows,
         "years": years,
         "period_min": pmin,
         "period_max": pmax,
         "dims": dims,
-        "detail": False,            # online slice has no HS8/HS10 detail
+        "detail": False,            # online slice has no HS8/HS10 detail or state
     }
     (PUBLISH / "manifest.json").write_text(json.dumps(manifest, indent=2))
     print(f"manifest: {len(flows)} flows, years {years[0]}–{years[-1]}, "
@@ -129,6 +155,16 @@ def upload(prefix: str) -> None:
         region_name="auto",
     )
     bucket = os.environ["R2_BUCKET"]
+    # Sync: remove existing objects under the prefix first, so a layout change
+    # (e.g. old per-year files) doesn't leave stale objects behind.
+    old = []
+    for page in s3.get_paginator("list_objects_v2").paginate(
+            Bucket=bucket, Prefix=f"{prefix}/"):
+        old += [{"Key": o["Key"]} for o in page.get("Contents", [])]
+    for i in range(0, len(old), 1000):
+        s3.delete_objects(Bucket=bucket, Delete={"Objects": old[i:i+1000]})
+    if old:
+        print(f"removed {len(old)} existing objects under {prefix}/")
     n = 0
     for f in PUBLISH.rglob("*"):
         if not f.is_file():
