@@ -18,3 +18,6 @@ anthropic_api_key.txt.rtf
 
 # Wizard catalog backups
 backups/
+
+# CIMT Trade Explorer — local data store (raw zips + parquet, can be GBs)
+cimt/data/

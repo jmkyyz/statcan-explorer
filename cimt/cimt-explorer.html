@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Canada Trade Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    /* Microsoft 365 / Fluent neutrals */
+    --bg: #faf9f8; --surface: #ffffff; --surface2: #f3f2f1;
+    --border: #e1dfdd; --text: #242424; --muted: #605e5c;
+    /* Fluent blue — interactive accent */
+    --accent: #0f6cbd; --accent2: #0c5aa6; --accent3: #c50f1f;
+    --success: #107c41;
+    /* Globe & Mail identity */
+    --brand: #e2001a; --brand-dark: #b80016;
+    --font-ui: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    --font-serif: 'Pratt-Bold', Georgia, Palatino, 'Book Antiqua', 'Times New Roman', serif;
+    --font-mono: 'Cascadia Code', Consolas, ui-monospace, 'SFMono-Regular', monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: var(--font-ui); color: var(--text);
+         background: var(--bg); font-size: 14px; }
+
+  /* Header */
+  header { background: var(--surface); border-bottom: 1px solid var(--border);
+           border-top: 3px solid var(--brand); padding: 12px 20px;
+           display: flex; align-items: center; gap: 12px; }
+  .app-tile { width: 30px; height: 30px; border-radius: 7px; background: var(--brand);
+              display: grid; place-items: center; flex: none; }
+  .app-tile svg { width: 18px; height: 18px; }
+  header h1 { font-family: var(--font-serif); font-weight: 700; font-size: 22px;
+              margin: 0; letter-spacing: .2px; }
+  header .sub { color: var(--muted); font-size: 12.5px; margin-top: 1px; }
+
+  /* Layout */
+  .wrap { display: grid; grid-template-columns: 340px 1fr; gap: 0; align-items: start; }
+  @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } }
+  /* Sidebar: fixed full-height column; controls scroll, actions pinned bottom. */
+  aside { background: var(--surface); border-right: 1px solid var(--border);
+          display: flex; flex-direction: column;
+          height: calc(100vh - 60px); position: sticky; top: 0; }
+  .controls { flex: 1 1 auto; overflow-y: auto; padding: 16px; }
+  .sidebar-actions { flex: none; display: flex; gap: 8px; padding: 12px 16px;
+          background: var(--surface); border-top: 1px solid var(--border); }
+  .sidebar-actions .primary { flex: 1; }
+  @media (max-width: 860px) {
+    aside { height: auto; position: static; }
+    .controls { overflow: visible; }
+    .sidebar-actions { position: sticky; bottom: 0; }
+  }
+  main { padding: 20px; min-width: 0; }
+
+  .group { margin-bottom: 18px; }
+  .group > label.title { display: block; font-weight: 600; font-size: 12px;
+            text-transform: uppercase; letter-spacing: .4px; color: var(--muted);
+            margin-bottom: 7px; }
+  .title .opt { text-transform: none; letter-spacing: 0; font-weight: 400;
+            color: var(--muted); font-size: 11px; }
+  select, input[type=text], input[type=number] {
+            width: 100%; padding: 7px 9px; border: 1px solid var(--border);
+            border-radius: 6px; background: var(--surface); font: inherit;
+            color: var(--text); }
+  select:focus, input:focus { outline: 2px solid var(--accent); border-color: var(--accent); }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .trow { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+  .trow .tlab { width: 34px; flex: none; color: var(--muted); font-size: 12px; }
+  .trow select { flex: 1; min-width: 0; }
+
+  /* segmented flow control */
+  .seg { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+  .seg button { flex: 1; border: 0; background: var(--surface); padding: 8px 4px;
+            font: inherit; cursor: pointer; color: var(--muted); border-right: 1px solid var(--border); }
+  .seg button:last-child { border-right: 0; }
+  .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+
+  /* chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  .chip { display: inline-flex; align-items: center; gap: 5px; background: var(--surface2);
+          border: 1px solid var(--border); border-radius: 14px; padding: 2px 6px 2px 9px;
+          font-size: 12px; max-width: 100%; }
+  .chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chip b { color: var(--accent2); font-weight: 600; }
+  .chip button { border: 0; background: none; cursor: pointer; color: var(--muted);
+          font-size: 14px; line-height: 1; padding: 0 1px; }
+  .chip button:hover { color: var(--accent3); }
+
+  /* picker (search + checklist) */
+  .picker { border: 1px solid var(--border); border-radius: 6px; max-height: 190px;
+            overflow: auto; background: var(--surface); }
+  .picker .opt { display: flex; align-items: center; gap: 7px; padding: 5px 9px;
+            cursor: pointer; border-bottom: 1px solid var(--surface2); }
+  .picker .opt:hover { background: var(--surface2); }
+  .picker .opt input { width: auto; }
+  .picker .opt .code { font-family: var(--font-mono); color: var(--muted); font-size: 12px; flex: none; }
+  .picker .opt .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* HS tree */
+  .tree { border: 1px solid var(--border); border-radius: 6px; max-height: 240px;
+          overflow: auto; background: var(--surface); }
+  .node { user-select: none; }
+  .node .self { display: flex; align-items: center; gap: 6px; padding: 4px 8px;
+          cursor: pointer; border-bottom: 1px solid var(--surface2); }
+  .node .self:hover { background: var(--surface2); }
+  .node .tw { width: 14px; text-align: center; color: var(--muted); flex: none; font-size: 11px; }
+  .node .code { font-family: var(--font-mono); font-size: 12px; color: var(--accent2); flex: none; }
+  .node .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+  .node .add { margin-left: auto; border: 0; background: none; color: var(--accent);
+          cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; flex: none; }
+  .node .kids { margin-left: 14px; }
+
+  button.primary { width: 100%; background: var(--brand); color: #fff; border: 0;
+          padding: 11px; border-radius: 6px; font: inherit; font-weight: 600;
+          cursor: pointer; font-size: 15px; }
+  button.primary:hover { background: var(--brand-dark); }
+  button.ghost { background: var(--surface2); border: 1px solid var(--border);
+          border-radius: 6px; padding: 7px 12px; font: inherit; cursor: pointer; color: var(--text); }
+  button.ghost:hover { border-color: var(--accent); color: var(--accent2); }
+
+  /* main */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+          padding: 16px; margin-bottom: 16px; }
+  .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .toolbar h2 { font-family: var(--font-serif); font-size: 18px; margin: 0; flex: 1; min-width: 200px; }
+  .stat { color: var(--muted); font-size: 12.5px; }
+  .stat b { color: var(--text); font-size: 15px; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; font-size: 11.5px; text-transform: uppercase;
+       letter-spacing: .3px; position: sticky; top: 0; background: var(--surface); }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .tablewrap { max-height: 460px; overflow: auto; }
+  .empty { color: var(--muted); text-align: center; padding: 60px 20px; }
+  .empty svg { width: 46px; height: 46px; opacity: .35; margin-bottom: 10px; }
+  .err { background: #fde7e9; border: 1px solid #f1bbc0; color: #a4262c;
+         padding: 10px 12px; border-radius: 6px; margin-bottom: 14px; }
+  .badge { font-size: 11px; background: var(--surface2); border: 1px solid var(--border);
+           border-radius: 4px; padding: 1px 6px; color: var(--muted); }
+  .hint { color: var(--muted); font-size: 11.5px; margin-top: 5px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="app-tile">
+    <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"
+         stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 17 9 11 13 15 21 6"></polyline>
+    </svg>
+  </div>
+  <div>
+    <h1>Canada Trade Explorer</h1>
+    <div class="sub">Canadian International Merchandise Trade · local DuckDB store</div>
+  </div>
+  <span id="health" class="stat" style="margin-left:auto"></span>
+</header>
+
+<div class="wrap">
+  <aside>
+   <div class="controls">
+    <div class="group">
+      <label class="title">Trade flow</label>
+      <div class="seg" id="flowSeg">
+        <button data-flow="imp" class="on">Imports</button>
+        <button data-flow="exp_tot">Exports</button>
+        <button data-flow="exp_dom">Dom. exports</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <label class="title">Product (HS code) <span class="opt">— optional, empty = all products</span></label>
+      <input type="text" id="hsSearch" placeholder="Search by name or HS code (e.g. gold, 7108)…">
+      <div class="tree" id="hsTree"></div>
+      <div class="chips" id="hsChips"></div>
+      <div class="hint">Click a chapter to drill down; <b style="color:var(--accent)">+</b> to add as a filter.</div>
+    </div>
+
+    <div class="group">
+      <label class="title">Partner country <span class="opt">— optional, empty = all partners</span></label>
+      <input type="text" id="ctrySearch" placeholder="Search countries…">
+      <div class="picker" id="ctryPicker"></div>
+      <div class="chips" id="ctryChips"></div>
+    </div>
+
+    <div class="group" id="provGroup">
+      <label class="title">Province of clearance <span class="opt">— optional, empty = national</span></label>
+      <div class="picker" id="provPicker"></div>
+      <div class="chips" id="provChips"></div>
+    </div>
+
+    <div class="group">
+      <label class="title">Time range</label>
+      <div class="trow"><span class="tlab">From</span>
+        <select id="yearFrom"></select><select id="monthFrom"></select></div>
+      <div class="trow"><span class="tlab">To</span>
+        <select id="yearTo"></select><select id="monthTo"></select></div>
+    </div>
+
+    <div class="group">
+      <label class="title">Break down by</label>
+      <select id="breakdown">
+        <option value="country">Partner country (ranking)</option>
+        <option value="province">Province (ranking)</option>
+        <option value="hs2">Product — chapter (HS2)</option>
+        <option value="hs4">Product — heading (HS4)</option>
+        <option value="hs6">Product — subheading (HS6)</option>
+        <option value="year">Over time — yearly</option>
+        <option value="month">Over time — monthly</option>
+      </select>
+    </div>
+
+    <div class="group" id="transformGroup" style="display:none">
+      <label class="title">Show</label>
+      <select id="transform">
+        <option value="level">Level (dollars / units)</option>
+        <option value="pop">Change vs previous period (%)</option>
+        <option value="yoy">Change vs year earlier (%)</option>
+      </select>
+    </div>
+
+    <div class="group">
+      <label class="title">Measure</label>
+      <select id="measure">
+        <option value="value">Value (CA$)</option>
+        <option value="quantity">Quantity (where units consistent)</option>
+      </select>
+    </div>
+   </div>
+
+   <div class="sidebar-actions">
+     <button class="primary" id="runBtn">Run query</button>
+     <button class="ghost" id="clearBtn" title="Clear all selections">Clear</button>
+   </div>
+  </aside>
+
+  <main>
+    <div id="errBox"></div>
+    <div class="card">
+      <div class="toolbar">
+        <h2 id="resultTitle">Results</h2>
+        <span class="stat" id="totalStat"></span>
+        <span class="badge" id="timeBadge"></span>
+        <button class="ghost" id="exportBtn" disabled>⤓ Export .xlsx</button>
+      </div>
+      <div id="chartWrap" style="position:relative;height:340px;display:none">
+        <canvas id="chart"></canvas>
+      </div>
+      <div id="emptyState" class="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+          <path d="M3 3v18h18"></path><rect x="7" y="10" width="3" height="7"></rect>
+          <rect x="12" y="6" width="3" height="11"></rect><rect x="17" y="13" width="3" height="4"></rect>
+        </svg>
+        <div>Choose your filters and click <b>Run query</b>.</div>
+      </div>
+    </div>
+    <div class="card" id="tableCard" style="display:none">
+      <div class="tablewrap"><table id="resultTable"></table></div>
+    </div>
+  </main>
+</div>
+
+<script>
+const API_BASE = window.location.protocol === "file:" ? "http://localhost:5003" : "";
+const PALETTE = ["#8b4061","#8ecad4","#c7a479","#d46868","#d1d3d4",
+                 "#0f6cbd","#107c41","#e2001a","#605e5c","#b80016"];
+const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+const state = {
+  flow: "imp",
+  hs: [],            // [{code,en}]
+  countries: [],     // [{code,en}]
+  provinces: [],     // [{code,en}]
+  dims: null,
+  years: [],
+  lastBody: null,
+  chart: null,
+};
+
+const $ = (id) => document.getElementById(id);
+const fmtMoney = (v) => v == null ? "—" :
+  (Math.abs(v) >= 1e9 ? "$" + (v/1e9).toFixed(2) + "B" :
+   Math.abs(v) >= 1e6 ? "$" + (v/1e6).toFixed(1) + "M" :
+   "$" + v.toLocaleString());
+const fmtNum = (v) => v == null ? "—" : Number(v).toLocaleString();
+
+async function api(path, opts) {
+  const r = await fetch(API_BASE + path, opts);
+  if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || ("HTTP "+r.status));
+  return r.json();
+}
+
+// ---- init -----------------------------------------------------------------
+async function init() {
+  try {
+    const h = await api("/api/health");
+    const years = [...new Set(h.flow_years.map(f => f.year))].sort((a,b)=>a-b);
+    state.years = years;
+    state.periodMin = h.period_min;   // YYYYMM ints
+    state.periodMax = h.period_max;
+    const mx = String(h.period_max);
+    $("health").textContent =
+      `${years[0]}–${mx.slice(0,4)}-${mx.slice(4)} · ${h.flow_years.length} flow-years`;
+    fillTimeSelects(years, h.period_min, h.period_max);
+  } catch (e) {
+    showError("Cannot reach the API at " + (API_BASE||"this server") +
+              ". Start it with: python api.py  (" + e.message + ")");
+    return;
+  }
+  state.dims = await api("/api/dimensions");
+  renderCountryPicker(""); renderProvincePicker();
+  await loadHsRoot();
+  wire();
+  toggleTransform();
+}
+
+const yr = (p) => String(p).slice(0, 4);
+const mo = (p) => String(+String(p).slice(4));   // "200703" -> "3"
+
+function fillTimeSelects(years, pmin, pmax) {
+  const yf=$("yearFrom"), yt=$("yearTo"), mf=$("monthFrom"), mt=$("monthTo");
+  years.forEach(y => { yf.add(new Option(y, y)); yt.add(new Option(y, y)); });
+  MONTHS.forEach((nm, i) => { mf.add(new Option(nm, i+1)); mt.add(new Option(nm, i+1)); });
+  yf.value=yr(pmin); mf.value=mo(pmin); yt.value=yr(pmax); mt.value=mo(pmax);
+}
+
+// ---- HS tree --------------------------------------------------------------
+async function loadHsRoot() {
+  const tree = $("hsTree"); tree.innerHTML = "";
+  state.dims.hs2.forEach(c => tree.appendChild(makeNode(c, 2)));
+}
+
+// Search by description OR code across every HS level (e.g. "gold" -> 7108,
+// "7108" -> that heading + its sub-codes). Empty/short -> chapter tree.
+let hsSearchTimer = null;
+function onHsSearch() {
+  const q = $("hsSearch").value.trim();
+  clearTimeout(hsSearchTimer);
+  if (q.length < 2) { loadHsRoot(); return; }
+  hsSearchTimer = setTimeout(() => searchHs(q), 200);
+}
+async function searchHs(q) {
+  try {
+    const r = await api(`/api/hs/search?flow=${state.flow}&q=${encodeURIComponent(q)}`);
+    const tree = $("hsTree"); tree.innerHTML = "";
+    if (!r.results.length) {
+      tree.innerHTML = '<div class="hint" style="padding:8px">No matching products.</div>';
+      return;
+    }
+    r.results.forEach(it => tree.appendChild(makeNode(it, it.hs_len)));
+  } catch (e) { showError(e.message); }
+}
+
+function makeNode(item, level) {
+  const node = document.createElement("div"); node.className = "node";
+  const self = document.createElement("div"); self.className = "self";
+  const tw = document.createElement("span"); tw.className = "tw";
+  const isLeaf = (state.flow === "imp" ? level >= 10 : level >= 8);
+  tw.textContent = isLeaf ? "·" : "▸";
+  const code = document.createElement("span"); code.className = "code"; code.textContent = item.code;
+  const nm = document.createElement("span"); nm.className = "nm";
+  nm.textContent = item.en || "(no label)"; nm.title = item.en || "";
+  const add = document.createElement("button"); add.className = "add"; add.textContent = "+";
+  add.title = "Add as filter";
+  add.onclick = (e) => { e.stopPropagation(); addChip("hs", item); };
+  self.append(tw, code, nm, add);
+  const kids = document.createElement("div"); kids.className = "kids";
+  let loaded = false, open = false;
+  self.onclick = async () => {
+    if (isLeaf) { addChip("hs", item); return; }
+    open = !open;
+    kids.style.display = open ? "" : "none";
+    tw.textContent = open ? "▾" : "▸";
+    if (open && !loaded) {
+      loaded = true;
+      tw.textContent = "…";
+      const r = await api(`/api/hs/children?flow=${state.flow}&code=${item.code}`);
+      r.children.forEach(ch => kids.appendChild(makeNode(ch, item.code.length === 2 ? 4 : item.code.length === 4 ? 6 : (state.flow==="imp"?10:8))));
+      tw.textContent = "▾";
+    }
+  };
+  node.append(self, kids);
+  return node;
+}
+
+// ---- pickers --------------------------------------------------------------
+function renderCountryPicker(filter) {
+  const box = $("ctryPicker"); box.innerHTML = "";
+  const f = filter.toLowerCase();
+  state.dims.countries
+    .filter(c => !f || c.code.toLowerCase().includes(f) || c.en.toLowerCase().includes(f))
+    .slice(0, 300)
+    .forEach(c => box.appendChild(makeOpt(c, "countries")));
+}
+function renderProvincePicker() {
+  const box = $("provPicker"); box.innerHTML = "";
+  state.dims.provinces.forEach(p => box.appendChild(makeOpt(p, "provinces")));
+}
+function makeOpt(item, bucket) {
+  const opt = document.createElement("label"); opt.className = "opt";
+  const cb = document.createElement("input"); cb.type = "checkbox";
+  cb.checked = state[bucket].some(x => x.code === item.code);
+  cb.onchange = () => cb.checked ? addChip(bucket, item) : removeChip(bucket, item.code);
+  const code = document.createElement("span"); code.className = "code"; code.textContent = item.code;
+  const nm = document.createElement("span"); nm.className = "nm"; nm.textContent = item.en; nm.title = item.en;
+  opt.append(cb, code, nm);
+  return opt;
+}
+
+// ---- chips ----------------------------------------------------------------
+const BUCKET_CHIPS = { hs: "hsChips", countries: "ctryChips", provinces: "provChips" };
+function addChip(bucket, item) {
+  if (state[bucket].some(x => x.code === item.code)) return;
+  state[bucket].push(item);
+  renderChips(bucket);
+}
+function removeChip(bucket, code) {
+  state[bucket] = state[bucket].filter(x => x.code !== code);
+  renderChips(bucket);
+  if (bucket === "countries") renderCountryPicker($("ctrySearch").value);
+  if (bucket === "provinces") renderProvincePicker();
+}
+function renderChips(bucket) {
+  const box = $(BUCKET_CHIPS[bucket]); box.innerHTML = "";
+  state[bucket].forEach(item => {
+    const chip = document.createElement("span"); chip.className = "chip";
+    const label = document.createElement("span");
+    label.innerHTML = `<b>${item.code}</b> ${item.en || ""}`;
+    label.title = item.en || "";
+    const x = document.createElement("button"); x.textContent = "×";
+    x.onclick = () => removeChip(bucket, item.code);
+    chip.append(label, x); box.appendChild(chip);
+  });
+}
+
+// ---- query ----------------------------------------------------------------
+const BREAKDOWNS = {
+  country:  { group: ["country"], dim: "country", chart: "bar", level: null },
+  province: { group: ["province"], dim: "province", chart: "bar", level: null },
+  hs2:      { group: ["hs"], dim: "hs", chart: "bar", level: 2 },
+  hs4:      { group: ["hs"], dim: "hs", chart: "bar", level: 4 },
+  hs6:      { group: ["hs"], dim: "hs", chart: "bar", level: 6 },
+  year:     { group: ["year"], dim: "year", chart: "line", level: null },
+  month:    { group: ["year","month"], dim: "ym", chart: "line", level: null },
+};
+
+function deepestHsLen() {
+  return state.hs.reduce((m, c) => Math.max(m, c.code.length), 0);
+}
+
+function buildBody() {
+  const bd = BREAKDOWNS[$("breakdown").value];
+  const filters = {};
+  if (state.hs.length) filters.hs = state.hs.map(c => c.code);
+  if (state.countries.length) filters.country = state.countries.map(c => c.code);
+  if (state.provinces.length && state.flow !== "exp_tot")
+    filters.province = state.provinces.map(c => c.code);
+  filters.period = {
+    from: (+$("yearFrom").value)*100 + (+$("monthFrom").value),
+    to:   (+$("yearTo").value)*100 + (+$("monthTo").value),
+  };
+  // Tier must be at least as deep as both the breakdown level and any HS filter.
+  const need = Math.max(bd.level || 0, deepestHsLen());
+  const hs_level = need <= 2 ? 2 : need <= 4 ? 4 : need <= 6 ? 6 : need <= 8 ? 8 : 10;
+  return {
+    flow: state.flow, hs_level, filters,
+    group_by: bd.group, measure: $("measure").value, limit: 5000, _bd: bd,
+  };
+}
+
+async function runQuery() {
+  showError("");
+  const body = buildBody();
+  const bd = body._bd; delete body._bd;
+  $("runBtn").disabled = true; $("runBtn").textContent = "Running…";
+  try {
+    const res = await api("/api/query", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    state.lastBody = body;
+    render(res, bd);
+  } catch (e) {
+    showError(e.message);
+  } finally {
+    $("runBtn").disabled = false; $("runBtn").textContent = "Run query";
+  }
+}
+
+function rowLabel(r, bd) {
+  if (bd.dim === "ym") return r.year + "-" + String(r.month).padStart(2,"0");
+  if (bd.dim === "year") return String(r.year);
+  const code = r[bd.dim], lab = r[bd.dim + "_label"];
+  return lab ? `${code} · ${lab}` : code;
+}
+
+// For "over time" breakdowns, optionally convert the (chronological) series to
+// period-over-period or year-over-year % change. Adds `_d` (display value).
+// Matches the comparison period by actual date (not positional offset), so it
+// stays correct across data gaps or a partial current year.
+function computeDisplay(rows, bd, measure, transform) {
+  if (transform === "level")
+    return rows.map(r => Object.assign({}, r, { _d: r[measure] }));
+  const monthly = bd.dim === "ym";
+  const key = (y, m) => monthly ? y * 100 + m : y;
+  const valByKey = new Map(rows.map(r => [key(r.year, r.month), r[measure]]));
+  const prevKey = (r) => {
+    if (transform === "yoy") return key(r.year - 1, r.month);
+    return monthly
+      ? (r.month === 1 ? key(r.year - 1, 12) : key(r.year, r.month - 1))
+      : key(r.year - 1, r.month);
+  };
+  return rows.map(r => {
+    const prev = valByKey.get(prevKey(r));
+    const d = (prev != null && prev !== 0) ? (r[measure] - prev) / prev * 100 : null;
+    return Object.assign({}, r, { _d: d });
+  });
+}
+
+function render(res, bd) {
+  const measure = $("measure").value;
+  const transform = bd.chart === "line" ? $("transform").value : "level";
+  const pct = transform !== "level";
+  const rows = computeDisplay(res.rows, bd, measure, transform);
+
+  $("emptyState").style.display = rows.length ? "none" : "";
+  $("chartWrap").style.display = rows.length ? "" : "none";
+  $("tableCard").style.display = rows.length ? "" : "none";
+  $("exportBtn").disabled = !rows.length;
+  $("timeBadge").textContent = `${res.elapsed_ms} ms · ${res.row_count} rows`;
+  $("resultTitle").textContent = titleFor(bd);
+
+  if (pct) {
+    $("totalStat").innerHTML = `Showing <b>% change</b> vs ` +
+      (transform === "yoy" ? "year earlier" : "previous period");
+  } else {
+    const total = res.rows.reduce((s, r) => s + (r[measure] || 0), 0);
+    $("totalStat").innerHTML = measure === "value"
+      ? `Total <b>${fmtMoney(total)}</b>` : `Total <b>${fmtNum(total)}</b> units`;
+  }
+
+  renderTable(rows, bd, measure, pct);
+  renderChart(rows, bd, measure, pct);
+}
+
+function titleFor(bd) {
+  const flowName = { imp: "Imports", exp_tot: "Exports", exp_dom: "Domestic exports" }[state.flow];
+  const by = $("breakdown").selectedOptions[0].textContent.replace(/ \(.*\)/, "");
+  return `${flowName} by ${by.toLowerCase()}`;
+}
+
+function renderTable(rows, bd, measure, pct) {
+  const t = $("resultTable");
+  const head = bd.dim === "ym" ? "Period" : bd.dim === "year" ? "Year" :
+               bd.dim === "country" ? "Country" : bd.dim === "province" ? "Province" : "HS code";
+  const mh = pct ? "Change" : (measure === "value" ? "Value (CA$)" : "Quantity");
+  let html = `<thead><tr><th>${head}</th><th class="num">${mh}</th>`;
+  if (!pct && measure === "quantity") html += `<th>Unit</th>`;
+  if (!pct) html += `<th class="num">Share</th>`;
+  html += `</tr></thead><tbody>`;
+  const total = rows.reduce((s,r)=>s+(r[measure]||0),0) || 1;
+  rows.slice(0, 500).forEach(r => {
+    const d = r._d;
+    html += `<tr><td>${escapeHtml(rowLabel(r, bd))}</td>`;
+    html += `<td class="num">${pct ? (d==null?"—":(d>=0?"+":"")+d.toFixed(1)+"%")
+                                    : (measure==="value"?fmtMoney(d):fmtNum(d))}</td>`;
+    if (!pct && measure === "quantity") html += `<td>${r.uom||"—"}</td>`;
+    if (!pct) { const v = r[measure];
+      html += `<td class="num">${v!=null?((v/total*100).toFixed(1)+"%"):"—"}</td>`; }
+    html += `</tr>`;
+  });
+  t.innerHTML = html + "</tbody>";
+}
+
+function renderChart(rows, bd, measure, pct) {
+  if (state.chart) state.chart.destroy();
+  const ctx = $("chart").getContext("2d");
+  const isTime = bd.chart === "line";
+  const top = isTime ? rows : rows.slice(0, 20);
+  const labels = top.map(r => rowLabel(r, bd));
+  const data = top.map(r => r._d);
+  const fmt = pct ? (v)=> (v==null?"":(v>=0?"+":"")+(+v).toFixed(1)+"%")
+                  : (measure==="value"?fmtMoney:fmtNum);
+  state.chart = new Chart(ctx, {
+    type: bd.chart,
+    data: { labels, datasets: [{
+      label: pct ? "% change" : (measure === "value" ? "Value (CA$)" : "Quantity"),
+      data,
+      backgroundColor: isTime ? "transparent" : labels.map((_,i)=>PALETTE[i%PALETTE.length]),
+      borderColor: isTime ? PALETTE[0] : labels.map((_,i)=>PALETTE[i%PALETTE.length]),
+      borderWidth: isTime ? 2.5 : 0, tension: .25, pointRadius: isTime ? 2 : 0, fill: false,
+    }]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false },
+        tooltip: { callbacks: { label: (c) => fmt(c.parsed.y ?? c.parsed) } } },
+      scales: { y: { ticks: { callback: (v) => fmt(v) } },
+                x: { ticks: { maxRotation: 60, minRotation: 0, autoSkip: true,
+                     callback: function(val){ const l=this.getLabelForValue(val); return l.length>22?l.slice(0,20)+"…":l; } } } }
+    }
+  });
+}
+
+async function exportXlsx() {
+  if (!state.lastBody) return;
+  $("exportBtn").disabled = true;
+  try {
+    const r = await fetch(API_BASE + "/api/export", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state.lastBody),
+    });
+    const blob = await r.blob();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = "cimt-query.xlsx"; a.click();
+    URL.revokeObjectURL(a.href);
+  } finally { $("exportBtn").disabled = false; }
+}
+
+// ---- misc -----------------------------------------------------------------
+function showError(msg) {
+  $("errBox").innerHTML = msg ? `<div class="err">${escapeHtml(msg)}</div>` : "";
+}
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+}
+
+function toggleTransform() {
+  // The Show (level / % change) control only applies to "over time" breakdowns.
+  $("transformGroup").style.display =
+    BREAKDOWNS[$("breakdown").value].chart === "line" ? "" : "none";
+}
+
+function clearAll() {
+  state.hs = []; state.countries = []; state.provinces = [];
+  renderChips("hs"); renderChips("countries"); renderChips("provinces");
+  $("hsSearch").value = ""; $("ctrySearch").value = "";
+  renderCountryPicker(""); renderProvincePicker(); loadHsRoot();
+  $("flowSeg").querySelectorAll("button").forEach(x => x.classList.remove("on"));
+  $("flowSeg").querySelector('[data-flow="imp"]').classList.add("on");
+  state.flow = "imp"; $("provGroup").style.display = "";
+  $("yearFrom").value = yr(state.periodMin); $("monthFrom").value = mo(state.periodMin);
+  $("yearTo").value = yr(state.periodMax);  $("monthTo").value = mo(state.periodMax);
+  $("breakdown").value = "country"; $("measure").value = "value";
+  $("transform").value = "level"; toggleTransform();
+  if (state.chart) { state.chart.destroy(); state.chart = null; }
+  state.lastBody = null;
+  $("emptyState").style.display = ""; $("chartWrap").style.display = "none";
+  $("tableCard").style.display = "none"; $("exportBtn").disabled = true;
+  $("totalStat").textContent = ""; $("timeBadge").textContent = "";
+  $("resultTitle").textContent = "Results"; showError("");
+}
+
+function wire() {
+  $("flowSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
+    $("flowSeg").querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    b.classList.add("on"); state.flow = b.dataset.flow;
+    // total exports have no province dimension
+    $("provGroup").style.display = state.flow === "exp_tot" ? "none" : "";
+    onHsSearch();
+  });
+  $("hsSearch").oninput = onHsSearch;
+  $("ctrySearch").oninput = (e) => renderCountryPicker(e.target.value);
+  $("breakdown").onchange = toggleTransform;
+  $("runBtn").onclick = runQuery;
+  $("clearBtn").onclick = clearAll;
+  $("exportBtn").onclick = exportXlsx;
+}
+
+init();
+</script>
+</body>
+</html>

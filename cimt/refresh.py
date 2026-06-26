@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""CIMT Trade Explorer — monthly refresh job (Phase 4).
+
+StatCan releases merchandise-trade data monthly, ~6 weeks in arrears. The
+current-year bulk file holds every YTD month and is the only MUTABLE partition;
+prior years are effectively frozen but can still see small back-revisions, so
+this refreshes the current AND previous year, then rebuilds the dimension
+lookups. Re-ingest is idempotent (it overwrites whole flow-year partitions), so
+running this more often than data changes is harmless.
+
+Triggered by a launchd LaunchAgent on a monthly schedule — see
+com.statcan.cimt-refresh.plist and the install steps in README.md. Runs from the
+TCC-safe ~/statcan-explorer clone so macOS doesn't block file access.
+
+Manual run:  python refresh.py            # current + previous year
+             python refresh.py --years 2024,2025,2026
+"""
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+LOCK = HERE / "data" / ".refresh.lock"
+DETAIL = HERE / "data" / "parquet" / "detail"
+
+RETRY_TRIES = 8        # with --retry: re-check this many times…
+RETRY_INTERVAL = 900   # …15 min apart (~1h45m) for a late posting to land
+
+
+def log(msg: str) -> None:
+    print(f"{dt.datetime.now():%Y-%m-%d %H:%M:%S}  {msg}", flush=True)
+
+
+def run(args: list[str]) -> int:
+    """Run a sibling script with this same interpreter; stream its output."""
+    log("$ " + " ".join(args))
+    return subprocess.run([sys.executable, *args], cwd=HERE).returncode
+
+
+def store_max_period() -> int | None:
+    """Latest YYYYMM present in the store, or None if empty/unreadable."""
+    if not DETAIL.exists():
+        return None
+    try:
+        import duckdb
+        return duckdb.connect().execute(
+            f"SELECT max(year*100+month) FROM "
+            f"read_parquet('{DETAIL.as_posix()}/**/*.parquet', "
+            f"hive_partitioning=true)").fetchone()[0]
+    except Exception as e:
+        log(f"(could not read store max period: {e})")
+        return None
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="CIMT monthly refresh")
+    cur = dt.date.today().year
+    ap.add_argument("--years", default=f"{cur-1},{cur}",
+                    help="years to refresh (default: previous + current)")
+    ap.add_argument("--retry", action="store_true",
+                    help="on a release day, re-check until a new month lands "
+                         f"({RETRY_TRIES}x, {RETRY_INTERVAL//60} min apart)")
+    args = ap.parse_args()
+
+    LOCK.parent.mkdir(parents=True, exist_ok=True)
+    if LOCK.exists():
+        age_h = (time.time() - LOCK.stat().st_mtime) / 3600
+        if age_h < 6:                      # a real run rarely exceeds minutes
+            log(f"another refresh started {age_h:.1f}h ago (lock present); exiting")
+            return 0
+        log("stale lock found (>6h); overriding")
+    LOCK.write_text(str(dt.datetime.now()))
+
+    t0 = time.time()
+    before = store_max_period()
+    log(f"=== CIMT refresh start (years {args.years}, latest in store "
+        f"{before}) ===")
+    tries = RETRY_TRIES if args.retry else 1
+    try:
+        for attempt in range(1, tries + 1):
+            # --force-download: the on-disk current-year zip is last month's
+            # copy; re-pull to pick up the new month + back-revisions.
+            rc = run(["ingest.py", "--years", args.years,
+                      "--flows", "imp,exp_tot,exp_dom", "--force-download"])
+            if rc != 0:
+                log(f"ingest failed (exit {rc}); skipping dimensions")
+                return rc
+            after = store_max_period()
+            if before is None or (after is not None and after > before):
+                log(f"new data: latest period {before} -> {after}")
+                break
+            log(f"no new month yet (latest still {after}); "
+                f"attempt {attempt}/{tries}")
+            if attempt < tries:
+                log(f"sleeping {RETRY_INTERVAL//60} min for the release to post…")
+                time.sleep(RETRY_INTERVAL)
+        rc = run(["dimensions.py"])        # rebuild labels from newest year
+        if rc != 0:
+            log(f"dimensions failed (exit {rc})")
+            return rc
+    finally:
+        LOCK.unlink(missing_ok=True)
+    log(f"=== CIMT refresh done in {time.time()-t0:.0f}s ===")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
