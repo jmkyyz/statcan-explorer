@@ -25,6 +25,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -115,9 +116,14 @@ def upload(prefix: str) -> None:
         sys.exit(f"missing R2 env vars: {missing}")
     if not PUBLISH.exists():
         sys.exit("nothing staged — run with --stage first")
+    # Tolerate R2_ACCOUNT_ID being pasted as the full endpoint URL — pull the
+    # 32-hex account id out of whatever was provided.
+    acct = os.environ["R2_ACCOUNT_ID"].strip()
+    m = re.search(r"[0-9a-fA-F]{32}", acct)
+    acct = m.group(0) if m else acct
     s3 = boto3.client(
         "s3",
-        endpoint_url=f"https://{os.environ['R2_ACCOUNT_ID']}.r2.cloudflarestorage.com",
+        endpoint_url=f"https://{acct}.r2.cloudflarestorage.com",
         aws_access_key_id=os.environ["R2_ACCESS_KEY_ID"],
         aws_secret_access_key=os.environ["R2_SECRET_ACCESS_KEY"],
         region_name="auto",
