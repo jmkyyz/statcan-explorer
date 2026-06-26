@@ -75,6 +75,13 @@
             font: inherit; cursor: pointer; color: var(--muted); border-right: 1px solid var(--border); }
   .seg button:last-child { border-right: 0; }
   .seg button.on { background: var(--accent); color: #fff; font-weight: 600; }
+  .addall { display: block; width: 100%; margin: 7px 0 0; padding: 6px;
+            background: var(--surface2); border: 1px dashed var(--border);
+            border-radius: 6px; font: inherit; font-size: 12.5px; cursor: pointer;
+            color: var(--accent2); }
+  .addall:hover { border-color: var(--accent); border-style: solid; }
+  .modeseg { margin-top: 7px; }
+  .modeseg button { padding: 5px 4px; font-size: 12px; }
 
   /* chips */
   .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
@@ -162,25 +169,35 @@
     <div class="group">
       <label class="title">Trade flow</label>
       <div class="seg" id="flowSeg">
-        <button data-flow="imp" class="on">Imports</button>
-        <button data-flow="exp_tot">Exports</button>
-        <button data-flow="exp_dom">Dom. exports</button>
+        <button data-flow="exp_dom" class="on">Domestic exports</button>
+        <button data-flow="exp_tot">All exports</button>
+        <button data-flow="imp">Imports</button>
       </div>
     </div>
 
     <div class="group">
       <label class="title">Product (HS code) <span class="opt">— optional, empty = all products</span></label>
       <input type="text" id="hsSearch" placeholder="Search by name or HS code (e.g. gold, 7108)…">
+      <button class="addall" id="hsAddAll">＋ Total — all products</button>
       <div class="tree" id="hsTree"></div>
       <div class="chips" id="hsChips"></div>
+      <div class="seg modeseg" id="hsMode" style="display:none">
+        <button data-mode="combined" class="on">Combined (sum)</button>
+        <button data-mode="separate">Separate</button>
+      </div>
       <div class="hint">Click a chapter to drill down; <b style="color:var(--accent)">+</b> to add as a filter.</div>
     </div>
 
     <div class="group">
       <label class="title">Partner country <span class="opt">— optional, empty = all partners</span></label>
       <input type="text" id="ctrySearch" placeholder="Search countries…">
+      <button class="addall" id="ctryAddAll">＋ World total — all countries</button>
       <div class="picker" id="ctryPicker"></div>
       <div class="chips" id="ctryChips"></div>
+      <div class="seg modeseg" id="ctryMode" style="display:none">
+        <button data-mode="combined" class="on">Combined (sum)</button>
+        <button data-mode="separate">Separate</button>
+      </div>
     </div>
 
     <div class="group" id="provGroup">
@@ -206,7 +223,7 @@
         <option value="hs4">Product — heading (HS4)</option>
         <option value="hs6">Product — subheading (HS6)</option>
         <option value="year">Over time — yearly</option>
-        <option value="month">Over time — monthly</option>
+        <option value="month" selected>Over time — monthly</option>
       </select>
     </div>
 
@@ -267,13 +284,16 @@ const PALETTE = ["#8b4061","#8ecad4","#c7a479","#d46868","#d1d3d4",
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 const state = {
-  flow: "imp",
-  hs: [],            // [{code,en}]
-  countries: [],     // [{code,en}]
+  flow: "exp_dom",
+  hs: [],            // [{code,en}]  (code "__ALL__" = total over all products)
+  countries: [],     // [{code,en}]  (code "__ALL__" = world total)
   provinces: [],     // [{code,en}]
+  productMode: "combined",   // combined (sum) | separate (one series each)
+  countryMode: "combined",
   dims: null,
   years: [],
-  lastBody: null,
+  lastResults: null,
+  lastExport: null,
   chart: null,
 };
 
@@ -561,12 +581,28 @@ function renderChips(bucket) {
   state[bucket].forEach(item => {
     const chip = document.createElement("span"); chip.className = "chip";
     const label = document.createElement("span");
-    label.innerHTML = `<b>${item.code}</b> ${item.en || ""}`;
+    const code = item.code === "__ALL__" ? "∑" : item.code;
+    label.innerHTML = `<b>${code}</b> ${item.en || ""}`;
     label.title = item.en || "";
     const x = document.createElement("button"); x.textContent = "×";
     x.onclick = () => removeChip(bucket, item.code);
     chip.append(label, x); box.appendChild(chip);
   });
+  updateModeToggle(bucket);
+}
+
+// The Combined/Separate toggle is only relevant with 2+ items in that dimension.
+function updateModeToggle(bucket) {
+  const seg = bucket === "hs" ? $("hsMode") : bucket === "countries" ? $("ctryMode") : null;
+  if (!seg) return;
+  const show = state[bucket].length >= 2;
+  seg.style.display = show ? "" : "none";
+  if (!show) {
+    if (bucket === "hs") state.productMode = "combined";
+    else state.countryMode = "combined";
+    seg.querySelectorAll("button").forEach(b =>
+      b.classList.toggle("on", b.dataset.mode === "combined"));
+  }
 }
 
 // ---- query ----------------------------------------------------------------
@@ -580,45 +616,70 @@ const BREAKDOWNS = {
   month:    { group: ["year","month"], dim: "ym", chart: "line", level: null },
 };
 
-function deepestHsLen() {
-  return state.hs.reduce((m, c) => Math.max(m, c.code.length), 0);
+// A "series" = one line/bar: a label + optional product/country filters. An
+// "All products"/"All countries" chip means no filter on that dimension (the
+// total). Multiple selections + "Separate" => one series each; "Combined" sums.
+function buildSeries() {
+  const member = (bucket, mode, allLabel) => {
+    const chips = state[bucket];
+    if (!chips.length) return [{ label: null, codes: null }];
+    const toMember = c => c.code === "__ALL__"
+      ? { label: allLabel, codes: null }
+      : { label: bucket === "hs" ? c.code : (c.en || c.code), codes: [c.code] };
+    if (mode === "separate") return chips.map(toMember);
+    if (chips.some(c => c.code === "__ALL__")) return [{ label: null, codes: null }];
+    return [{ label: null, codes: chips.map(c => c.code) }];
+  };
+  const prod = member("hs", state.productMode, "All products");
+  const ctry = member("countries", state.countryMode, "All countries");
+  const out = [];
+  for (const p of prod) for (const c of ctry)
+    out.push({ label: [p.label, c.label].filter(Boolean).join(" · ") || "Total",
+               hs: p.codes, country: c.codes });
+  return out;
 }
 
-function buildBody() {
-  const bd = BREAKDOWNS[$("breakdown").value];
+function buildBody(bd, s) {
   const filters = {};
-  if (state.hs.length) filters.hs = state.hs.map(c => c.code);
-  if (state.countries.length) filters.country = state.countries.map(c => c.code);
+  if (s.hs) filters.hs = s.hs;
+  if (s.country) filters.country = s.country;
   if (state.provinces.length && state.flow !== "exp_tot")
-    filters.province = state.provinces.map(c => c.code);
+    filters.province = state.provinces.map(c => c.code).filter(c => c !== "__ALL__");
   filters.period = {
     from: (+$("yearFrom").value)*100 + (+$("monthFrom").value),
     to:   (+$("yearTo").value)*100 + (+$("monthTo").value),
   };
-  // Tier must be at least as deep as both the breakdown level and any HS filter.
-  const need = Math.max(bd.level || 0, deepestHsLen());
+  const deepest = (s.hs || []).reduce((m, c) => Math.max(m, c.length), 0);
+  const need = Math.max(bd.level || 0, deepest);
   const hs_level = need <= 2 ? 2 : need <= 4 ? 4 : need <= 6 ? 6 : need <= 8 ? 8 : 10;
-  return {
-    flow: state.flow, hs_level, filters,
-    group_by: bd.group, measure: $("measure").value, limit: 5000, _bd: bd,
-  };
+  return { flow: state.flow, hs_level, filters,
+           group_by: bd.group, measure: $("measure").value, limit: 5000 };
 }
 
 async function runQuery() {
   showError("");
-  const body = buildBody();
-  const bd = body._bd; delete body._bd;
+  const bd = BREAKDOWNS[$("breakdown").value];
+  const specs = buildSeries();
   $("runBtn").disabled = true; $("runBtn").textContent = "Running…";
   try {
-    const res = await DS.query(body);
-    state.lastBody = body;
-    state.lastRows = res.rows;
-    render(res, bd);
+    const results = [];
+    for (const s of specs) {
+      const res = await DS.query(buildBody(bd, s));
+      results.push({ label: s.label, rows: res.rows, elapsed: res.elapsed_ms });
+    }
+    state.lastResults = results;
+    render(results, bd);
   } catch (e) {
     showError(e.message);
   } finally {
     $("runBtn").disabled = false; $("runBtn").textContent = "Run query";
   }
+}
+
+function rowKey(r, bd) {
+  if (bd.dim === "ym") return r.year * 100 + r.month;
+  if (bd.dim === "year") return r.year;
+  return r[bd.dim];
 }
 
 function rowLabel(r, bd) {
@@ -651,83 +712,126 @@ function computeDisplay(rows, bd, measure, transform) {
   });
 }
 
-function render(res, bd) {
+function render(results, bd) {
   const measure = $("measure").value;
-  const transform = bd.chart === "line" ? $("transform").value : "level";
+  const isTime = bd.chart === "line";
+  const transform = isTime ? $("transform").value : "level";
   const pct = transform !== "level";
-  const rows = computeDisplay(res.rows, bd, measure, transform);
 
-  $("emptyState").style.display = rows.length ? "none" : "";
-  $("chartWrap").style.display = rows.length ? "" : "none";
-  $("tableCard").style.display = rows.length ? "" : "none";
-  $("exportBtn").disabled = !rows.length;
-  $("timeBadge").textContent = `${res.elapsed_ms} ms · ${res.row_count} rows`;
-  $("resultTitle").textContent = titleFor(bd);
+  // Apply the % transform per series; index each series by breakdown key.
+  const series = results.map(r => {
+    const rows = computeDisplay(r.rows, bd, measure, transform);
+    return { label: r.label, rows,
+             byKey: new Map(rows.map(x => [rowKey(x, bd), x._d])),
+             rawByKey: new Map(r.rows.map(x => [rowKey(x, bd), x[measure]])) };
+  });
+
+  // x-axis keys: chronological for time, else ranked by total across series.
+  const labelByKey = new Map(), totalByKey = new Map();
+  series.forEach(s => s.rows.forEach(x => {
+    const k = rowKey(x, bd);
+    if (!labelByKey.has(k)) labelByKey.set(k, rowLabel(x, bd));
+    totalByKey.set(k, (totalByKey.get(k) || 0) + (x[measure] || 0));
+  }));
+  let keys = [...labelByKey.keys()];
+  keys.sort(isTime ? (a, b) => a - b
+                   : (a, b) => (totalByKey.get(b) || 0) - (totalByKey.get(a) || 0));
+  if (!isTime) keys = keys.slice(0, 20);
+
+  const hasData = keys.length > 0;
+  $("emptyState").style.display = hasData ? "none" : "";
+  $("chartWrap").style.display = hasData ? "" : "none";
+  $("tableCard").style.display = hasData ? "" : "none";
+  $("exportBtn").disabled = !hasData;
+  const ms = results.reduce((s, r) => s + (r.elapsed || 0), 0);
+  $("timeBadge").textContent = `${ms} ms · ` +
+    (series.length > 1 ? `${series.length} series · ` : "") + `${keys.length} pts`;
+  $("resultTitle").textContent = titleFor(bd, series);
 
   if (pct) {
     $("totalStat").innerHTML = `Showing <b>% change</b> vs ` +
       (transform === "yoy" ? "year earlier" : "previous period");
-  } else {
-    const total = res.rows.reduce((s, r) => s + (r[measure] || 0), 0);
+  } else if (series.length === 1) {
+    const total = results[0].rows.reduce((s, r) => s + (r[measure] || 0), 0);
     $("totalStat").innerHTML = measure === "value"
       ? `Total <b>${fmtMoney(total)}</b>` : `Total <b>${fmtNum(total)}</b> units`;
+  } else {
+    $("totalStat").innerHTML = `<b>${series.length}</b> series compared`;
   }
 
-  renderTable(rows, bd, measure, pct);
-  renderChart(rows, bd, measure, pct);
+  renderTablePivot(keys, labelByKey, series, bd, measure, pct);
+  renderChartMulti(keys, labelByKey, series, bd, measure, pct);
+  state.lastExport = buildExportRows(keys, labelByKey, series, bd, measure, pct);
 }
 
-function titleFor(bd) {
-  const flowName = { imp: "Imports", exp_tot: "Exports", exp_dom: "Domestic exports" }[state.flow];
+function titleFor(bd, series) {
+  const flowName = { imp: "Imports", exp_tot: "Exports",
+                     exp_dom: "Domestic exports" }[state.flow];
   const by = $("breakdown").selectedOptions[0].textContent.replace(/ \(.*\)/, "");
-  return `${flowName} by ${by.toLowerCase()}`;
+  const cmp = series && series.length > 1 ? ` — ${series.length} series` : "";
+  return `${flowName} by ${by.toLowerCase()}${cmp}`;
 }
 
-function renderTable(rows, bd, measure, pct) {
-  const t = $("resultTable");
+const fmtCell = (d, measure, pct) => pct
+  ? (d == null ? "—" : (d >= 0 ? "+" : "") + d.toFixed(1) + "%")
+  : (d == null ? "—" : (measure === "value" ? fmtMoney(d) : fmtNum(d)));
+
+// Rows = breakdown values; one value column per series (a pivot). With a single
+// series it also shows a Share column.
+function renderTablePivot(keys, labelByKey, series, bd, measure, pct) {
   const head = bd.dim === "ym" ? "Period" : bd.dim === "year" ? "Year" :
                bd.dim === "country" ? "Country" : bd.dim === "province" ? "Province" : "HS code";
-  const mh = pct ? "Change" : (measure === "value" ? "Value (CA$)" : "Quantity");
-  let html = `<thead><tr><th>${head}</th><th class="num">${mh}</th>`;
-  if (!pct && measure === "quantity") html += `<th>Unit</th>`;
-  if (!pct) html += `<th class="num">Share</th>`;
+  const single = series.length === 1;
+  let html = `<thead><tr><th>${head}</th>`;
+  if (single) {
+    html += `<th class="num">${pct ? "Change" : (measure === "value" ? "Value (CA$)" : "Quantity")}</th>`;
+    if (!pct) html += `<th class="num">Share</th>`;
+  } else {
+    series.forEach(s => html += `<th class="num">${escapeHtml(s.label)}</th>`);
+  }
   html += `</tr></thead><tbody>`;
-  const total = rows.reduce((s,r)=>s+(r[measure]||0),0) || 1;
-  rows.slice(0, 500).forEach(r => {
-    const d = r._d;
-    html += `<tr><td>${escapeHtml(rowLabel(r, bd))}</td>`;
-    html += `<td class="num">${pct ? (d==null?"—":(d>=0?"+":"")+d.toFixed(1)+"%")
-                                    : (measure==="value"?fmtMoney(d):fmtNum(d))}</td>`;
-    if (!pct && measure === "quantity") html += `<td>${r.uom||"—"}</td>`;
-    if (!pct) { const v = r[measure];
-      html += `<td class="num">${v!=null?((v/total*100).toFixed(1)+"%"):"—"}</td>`; }
+  const grand = single
+    ? (keys.reduce((s, k) => s + (series[0].rawByKey.get(k) || 0), 0) || 1) : 1;
+  keys.slice(0, 500).forEach(k => {
+    html += `<tr><td>${escapeHtml(labelByKey.get(k))}</td>`;
+    series.forEach(s => html += `<td class="num">${fmtCell(s.byKey.get(k), measure, pct)}</td>`);
+    if (single && !pct) {
+      const v = series[0].rawByKey.get(k);
+      html += `<td class="num">${v != null ? (v / grand * 100).toFixed(1) + "%" : "—"}</td>`;
+    }
     html += `</tr>`;
   });
-  t.innerHTML = html + "</tbody>";
+  $("resultTable").innerHTML = html + "</tbody>";
 }
 
-function renderChart(rows, bd, measure, pct) {
+function renderChartMulti(keys, labelByKey, series, bd, measure, pct) {
   if (state.chart) state.chart.destroy();
-  const ctx = $("chart").getContext("2d");
   const isTime = bd.chart === "line";
-  const top = isTime ? rows : rows.slice(0, 20);
-  const labels = top.map(r => rowLabel(r, bd));
-  const data = top.map(r => r._d);
-  const fmt = pct ? (v)=> (v==null?"":(v>=0?"+":"")+(+v).toFixed(1)+"%")
-                  : (measure==="value"?fmtMoney:fmtNum);
-  state.chart = new Chart(ctx, {
+  const multi = series.length > 1;
+  const labels = keys.map(k => labelByKey.get(k));
+  const fmt = pct ? (v) => (v == null ? "" : (v >= 0 ? "+" : "") + (+v).toFixed(1) + "%")
+                  : (measure === "value" ? fmtMoney : fmtNum);
+  const datasets = series.map((s, i) => {
+    const color = PALETTE[i % PALETTE.length];
+    // single-series bar keeps the per-category rainbow; otherwise one colour/series
+    const bg = (!isTime && !multi) ? keys.map((_, j) => PALETTE[j % PALETTE.length]) : color;
+    return {
+      label: s.label,
+      data: keys.map(k => s.byKey.has(k) ? s.byKey.get(k) : null),
+      backgroundColor: isTime ? "transparent" : bg,
+      borderColor: color, borderWidth: isTime ? 2.5 : 0,
+      tension: .25, pointRadius: isTime ? 2 : 0, fill: false, spanGaps: true,
+    };
+  });
+  state.chart = new Chart($("chart").getContext("2d"), {
     type: bd.chart,
-    data: { labels, datasets: [{
-      label: pct ? "% change" : (measure === "value" ? "Value (CA$)" : "Quantity"),
-      data,
-      backgroundColor: isTime ? "transparent" : labels.map((_,i)=>PALETTE[i%PALETTE.length]),
-      borderColor: isTime ? PALETTE[0] : labels.map((_,i)=>PALETTE[i%PALETTE.length]),
-      borderWidth: isTime ? 2.5 : 0, tension: .25, pointRadius: isTime ? 2 : 0, fill: false,
-    }]},
+    data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false },
-        tooltip: { callbacks: { label: (c) => fmt(c.parsed.y ?? c.parsed) } } },
+      plugins: {
+        legend: { display: multi, position: "top", labels: { boxWidth: 12, font: { size: 11 } } },
+        tooltip: { callbacks: { label: (c) =>
+          (multi ? c.dataset.label + ": " : "") + fmt(c.parsed.y ?? c.parsed) } } },
       scales: { y: { ticks: { callback: (v) => fmt(v) } },
                 x: { ticks: { maxRotation: 60, minRotation: 0, autoSkip: true,
                      callback: function(val){ const l=this.getLabelForValue(val); return l.length>22?l.slice(0,20)+"…":l; } } } }
@@ -735,11 +839,21 @@ function renderChart(rows, bd, measure, pct) {
   });
 }
 
-// Build the .xlsx client-side from the last result rows (works in both data
-// modes — no server round-trip needed).
+// Tidy rows for the .xlsx: breakdown label + one column per series (a pivot).
+function buildExportRows(keys, labelByKey, series, bd, measure, pct) {
+  const head = bd.dim === "ym" ? "period" : bd.dim === "year" ? "year" : bd.dim;
+  const suffix = pct ? " (% chg)" : (measure === "quantity" ? " (qty)" : " (CA$)");
+  return keys.map(k => {
+    const o = { [head]: labelByKey.get(k) };
+    series.forEach(s => o[(s.label || "value") + suffix] = s.byKey.get(k) ?? null);
+    return o;
+  });
+}
+
+// Build the .xlsx client-side from the last result (works in both data modes).
 function exportXlsx() {
-  if (!state.lastRows || !state.lastRows.length) return;
-  const ws = XLSX.utils.json_to_sheet(state.lastRows);
+  if (!state.lastExport || !state.lastExport.length) return;
+  const ws = XLSX.utils.json_to_sheet(state.lastExport);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Canada trade");
   XLSX.writeFile(wb, "canada-trade.xlsx");
@@ -761,18 +875,19 @@ function toggleTransform() {
 
 function clearAll() {
   state.hs = []; state.countries = []; state.provinces = [];
+  state.productMode = "combined"; state.countryMode = "combined";
   renderChips("hs"); renderChips("countries"); renderChips("provinces");
   $("hsSearch").value = ""; $("ctrySearch").value = "";
   renderCountryPicker(""); renderProvincePicker(); loadHsRoot();
   $("flowSeg").querySelectorAll("button").forEach(x => x.classList.remove("on"));
-  $("flowSeg").querySelector('[data-flow="imp"]').classList.add("on");
-  state.flow = "imp"; $("provGroup").style.display = "";
+  $("flowSeg").querySelector('[data-flow="exp_dom"]').classList.add("on");
+  state.flow = "exp_dom"; $("provGroup").style.display = "";
   $("yearFrom").value = yr(state.periodMin); $("monthFrom").value = mo(state.periodMin);
   $("yearTo").value = yr(state.periodMax);  $("monthTo").value = mo(state.periodMax);
-  $("breakdown").value = "country"; $("measure").value = "value";
+  $("breakdown").value = "month"; $("measure").value = "value";
   $("transform").value = "level"; toggleTransform();
   if (state.chart) { state.chart.destroy(); state.chart = null; }
-  state.lastBody = null; state.lastRows = null;
+  state.lastResults = null; state.lastExport = null;
   $("emptyState").style.display = ""; $("chartWrap").style.display = "none";
   $("tableCard").style.display = "none"; $("exportBtn").disabled = true;
   $("totalStat").textContent = ""; $("timeBadge").textContent = "";
@@ -790,6 +905,14 @@ function wire() {
   $("hsSearch").oninput = onHsSearch;
   $("ctrySearch").oninput = (e) => renderCountryPicker(e.target.value);
   $("breakdown").onchange = toggleTransform;
+  $("hsAddAll").onclick = () => addChip("hs", { code: "__ALL__", en: "Total — all products" });
+  $("ctryAddAll").onclick = () => addChip("countries", { code: "__ALL__", en: "World — all countries" });
+  [["hsMode", "productMode"], ["ctryMode", "countryMode"]].forEach(([id, key]) => {
+    $(id).querySelectorAll("button").forEach(b => b.onclick = () => {
+      $(id).querySelectorAll("button").forEach(x => x.classList.remove("on"));
+      b.classList.add("on"); state[key] = b.dataset.mode;
+    });
+  });
   $("runBtn").onclick = runQuery;
   $("clearBtn").onclick = clearAll;
   $("exportBtn").onclick = exportXlsx;
