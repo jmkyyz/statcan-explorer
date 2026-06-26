@@ -10,7 +10,7 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/python3</string>
+    <string>/Library/Frameworks/Python.framework/Versions/3.14/bin/python3</string>
     <string>/Users/jasonkirby/statcan-explorer/cimt/refresh.py</string>
     <string>--retry</string>
   </array>

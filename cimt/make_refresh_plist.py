@@ -16,6 +16,7 @@ Then reload the agent (see README).
 """
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -25,6 +26,9 @@ PLIST = HERE / "com.statcan.cimt-refresh.plist"
 # Where the job runs from on the user's machine (TCC-safe home clone).
 SCRIPT = "/Users/jasonkirby/statcan-explorer/cimt/refresh.py"
 LOG = "/Users/jasonkirby/statcan-explorer/cimt/cimt_refresh.log"
+# Use the interpreter that has duckdb/pyarrow/requests/boto3 installed (the
+# framework python), not /usr/bin/python3 which lacks them.
+PYTHON = sys.executable
 RELEASE_HOUR, RELEASE_MIN = 8, 35       # ~5 min after the 08:30 ET release
 
 
@@ -65,7 +69,7 @@ def build(dates) -> str:
 
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/python3</string>
+    <string>{PYTHON}</string>
     <string>{SCRIPT}</string>
     <string>--retry</string>
   </array>
