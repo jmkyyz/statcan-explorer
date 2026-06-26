@@ -185,3 +185,65 @@ data). When StatCan publishes the next schedule, append the dates to
 the agent. launchd uses the Mac's **local** time, so these assume the machine is
 on Eastern; change `RELEASE_HOUR/MIN` in `make_refresh_plist.py` otherwise. If
 the Mac is asleep at 08:35, launchd runs the job on wake.
+
+## Online deployment (Phase 5)
+
+The UI is **dual-mode** and picks its data source automatically:
+- served by a local `api.py` (full store on disk) → **API mode**, full 20-yr/HS10;
+- served as a static page with no local API → **WASM mode**: DuckDB-WASM runs in
+  the browser and queries a **trimmed slice in Cloudflare R2** (last 10 yr, HS6).
+
+So coworkers get the online slice with **zero server compute** (R2 just serves
+files; the browser does the querying), while you keep full detail locally.
+`?wasm=1` forces WASM mode for testing; `?r2=<base>` overrides the slice URL.
+
+### 1. Build the slice
+
+```bash
+python publish.py --stage          # builds data/publish/parquet (~1 GB) + manifest.json
+```
+
+Test it locally before R2 exists — `api.py` serves the staged slice at `/r2`
+with CORS+range, so open `http://127.0.0.1:5003/?wasm=1`.
+
+### 2. Cloudflare R2 (one-time)
+
+1. Create a bucket (e.g. `cimt-trade`) and an **R2 API token** (Object Read &
+   Write). Note the account ID + access key/secret.
+2. Enable **public access** — either the managed `https://<hash>.r2.dev` URL or
+   a custom domain. That public base URL is your `R2_BASE`.
+3. Add a **CORS policy** so browsers can range-read the parquet (the
+   `statcan-explorer.onrender.com` origin needs `GET`, the `Range` request
+   header, and the range response headers exposed):
+
+   ```json
+   [{ "AllowedOrigins": ["https://statcan-explorer.onrender.com"],
+      "AllowedMethods": ["GET", "HEAD"],
+      "AllowedHeaders": ["Range"],
+      "ExposeHeaders": ["Content-Range", "Accept-Ranges", "Content-Length"] }]
+   ```
+
+### 3. Upload
+
+```bash
+pip install boto3
+export R2_ACCOUNT_ID=... R2_ACCESS_KEY_ID=... R2_SECRET_ACCESS_KEY=... R2_BUCKET=cimt-trade
+python publish.py --upload         # syncs the slice + manifest under the "cimt" prefix
+```
+
+The monthly refresh keeps the online slice current: after `refresh.py`, re-run
+`python publish.py --stage --upload` (a few MB change). Add that line to the
+launchd job once R2 is set up.
+
+### 4. Deploy the page
+
+`proxy.py` serves the UI at **`statcan-explorer.onrender.com/trade`** and injects
+the R2 URL from an env var (so it's not hard-coded). On Render, set:
+
+```
+CIMT_R2_BASE = https://<your-r2-public-base>/cimt
+```
+
+then push to `main` (Render auto-deploys). No new server dependencies — `/trade`
+is a static page; all querying happens in the visitor's browser. The old
+`/api/cimt*` WDS routes are untouched.

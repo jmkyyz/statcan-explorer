@@ -65,6 +65,20 @@ def tax_tracker():
     here = os.path.dirname(os.path.abspath(__file__))
     return send_from_directory(here, "tax-dollar-tracker.html")
 
+@app.route("/trade")
+def trade_explorer():
+    # Canada Trade Explorer (CIMT). Static page; it queries the trimmed slice in
+    # Cloudflare R2 directly from the browser (DuckDB-WASM). We only inject the
+    # R2 base URL from the CIMT_R2_BASE env var so it isn't hard-coded in source.
+    here = os.path.dirname(os.path.abspath(__file__))
+    with open(os.path.join(here, "cimt", "cimt-explorer.html"), encoding="utf-8") as fh:
+        html = fh.read()
+    r2 = os.environ.get("CIMT_R2_BASE", "")
+    if r2:
+        html = html.replace("</head>",
+                             f"<script>window.R2_BASE={json.dumps(r2)};</script></head>", 1)
+    return html
+
 EV_DIST = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ev-dashboard", "dist")
 
 @app.route("/ev")

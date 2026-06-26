@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Canada Trade Explorer</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root {
     /* Microsoft 365 / Fluent neutrals */
@@ -289,24 +290,159 @@ async function api(path, opts) {
   return r.json();
 }
 
+// ---- data source ----------------------------------------------------------
+// Production: the public Cloudflare R2 base URL of the trimmed slice, injected
+// by the /trade route from the CIMT_R2_BASE env var (window.R2_BASE). The online
+// /trade page queries it in the browser. Empty -> prefer a local full-data API.
+const R2_BASE = window.R2_BASE || "";
+const esc = (s) => String(s).replace(/'/g, "''");
+let DS = null;
+
+// Prefer a local full-data API; else fall back to browser-WASM over the R2
+// slice. ?wasm forces WASM (testing); ?r2=<base> overrides the slice location.
+async function makeDataSource() {
+  const params = new URLSearchParams(location.search);
+  const forceWasm = params.has("wasm");
+  const r2 = (params.get("r2") || R2_BASE || (location.origin + "/r2")).replace(/\/$/, "");
+  if (!forceWasm) {
+    try {
+      const r = await fetch(API_BASE + "/api/health");
+      if (r.ok) { const h = await r.json(); if (h.period_max) return new ApiSource(h); }
+    } catch (e) { /* no local API — fall through to WASM */ }
+  }
+  return await WasmSource.create(r2);
+}
+
+class ApiSource {
+  constructor(h) { this.mode = "api"; this.label = "local · full 20-yr detail"; this._h = h; }
+  maxLeaf(flow) { return flow === "imp" ? 10 : 8; }
+  async health() { return this._h; }
+  async dimensions() { return api("/api/dimensions"); }
+  async hsChildren(flow, code) { return api(`/api/hs/children?flow=${flow}&code=${encodeURIComponent(code)}`); }
+  async hsSearch(flow, q) { return api(`/api/hs/search?flow=${flow}&q=${encodeURIComponent(q)}`); }
+  async query(body) { return api("/api/query", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(body) }); }
+}
+
+// Browser engine: DuckDB-WASM reading the trimmed parquet slice from R2 over
+// HTTP range requests. Object storage has no directory listing, so file lists
+// are built from manifest.json (years/flows). Online slice stops at HS6.
+class WasmSource {
+  static async create(base) { const w = new WasmSource(base); await w.init(); return w; }
+  constructor(base) { this.mode = "wasm"; this.label = "online · 10-yr HS6 slice"; this.base = base; this._dim = {}; }
+  async init() {
+    const duckdb = await import("https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/+esm");
+    const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+    const worker = await duckdb.createWorker(bundle.mainWorker);
+    this.db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
+    await this.db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    this.conn = await this.db.connect();
+    this.manifest = await (await fetch(this.base + "/manifest.json")).json();
+  }
+  maxLeaf() { return 6; }
+  _files(tier, flow, y1, y2) {
+    return this.manifest.years.filter(y => y >= y1 && y <= y2)
+      .map(y => `'${this.base}/${tier}/flow=${flow}/year=${y}/data.parquet'`);
+  }
+  _src(tier, flow, y1, y2) { return `read_parquet([${this._files(tier,flow,y1,y2).join(",")}], hive_partitioning=true)`; }
+  _dimUrl(name) { return `read_parquet('${this.base}/dim/${name}.parquet')`; }
+  async _q(sql) {
+    const res = await this.conn.query(sql);
+    const cols = res.schema.fields.map(f => f.name);
+    return res.toArray().map(row => { const o = {}; for (const c of cols) { let v = row[c]; if (typeof v === "bigint") v = Number(v); o[c] = v; } return o; });
+  }
+  async health() {
+    const m = this.manifest, fy = [];
+    for (const fl of m.flows) for (const y of m.years) fy.push({ flow: fl, year: y });
+    return { flow_years: fy, period_min: m.period_min, period_max: m.period_max };
+  }
+  async dimensions() {
+    const small = (v) => this._q(`SELECT DISTINCT code, en FROM ${this._dimUrl(v)} WHERE valid_to='999912' ORDER BY code`);
+    const hs2 = await this._q(`SELECT DISTINCT hs AS code, en FROM ${this._dimUrl("dim_hs")} WHERE hs_len=2 AND valid_to='999912' ORDER BY hs`);
+    return { hs2, countries: await small("dim_country"), provinces: await small("dim_province"), states: await small("dim_state"), uom: await small("dim_uom") };
+  }
+  async hsChildren(flow, code) {
+    const cl = ({0:2,2:4,4:6})[code.length];
+    if (cl === undefined) return { children: [] };          // HS6 is leaf online
+    const tier = cl === 2 ? "hs2" : cl === 4 ? "hs4" : "hs6";
+    const y = this.manifest.years;
+    const present = await this._q(`SELECT DISTINCT substr(hs,1,${cl}) hs FROM ${this._src(tier,flow,y[0],y[y.length-1])} ${code ? `WHERE hs LIKE '${esc(code)}%'` : ""} ORDER BY hs`);
+    const cls = cl <= 4 ? "both" : (flow === "imp" ? "M" : "X");
+    const lab = Object.fromEntries((await this._q(`SELECT hs, any_value(en) en FROM ${this._dimUrl("dim_hs")} WHERE hs_len=${cl} AND classification='${cls}' GROUP BY hs`)).map(r => [r.hs, r.en]));
+    return { children: present.map(r => ({ code: r.hs, en: lab[r.hs] ?? null })) };
+  }
+  async hsSearch(flow, q) {
+    if (q.length < 2) return { results: [] };
+    const cls = flow === "imp" ? "M" : "X", e = esc(q), el = esc(q.toLowerCase());
+    const rows = await this._q(`
+      SELECT hs, any_value(en) en, any_value(hs_len) hs_len FROM ${this._dimUrl("dim_hs")}
+      WHERE valid_to='999912' AND hs_len<=6 AND (classification='both' OR classification='${cls}')
+        AND (hs LIKE '${e}%' OR lower(en) LIKE '%${el}%')
+      GROUP BY hs
+      ORDER BY (hs LIKE '${e}%') DESC, (lower(any_value(en)) LIKE '${el}%') DESC, (lower(any_value(en)) LIKE '% ${el}%') DESC, length(hs), hs
+      LIMIT 100`);
+    return { results: rows.map(r => ({ code: r.hs, en: r.en, hs_len: Number(r.hs_len) })) };
+  }
+  async query(body) {
+    const t = performance.now();
+    const flow = body.flow, measure = body.measure === "quantity" ? "quantity" : "value";
+    const group = (body.group_by || []).slice();
+    const f = body.filters || {};
+    let y1 = this.manifest.years[0], y2 = this.manifest.years.at(-1);
+    if (f.period) { if (f.period.from) y1 = Math.floor(f.period.from/100); if (f.period.to) y2 = Math.floor(f.period.to/100); }
+    const lvl = body.hs_level || 2;
+    const tier = lvl <= 2 ? "hs2" : lvl <= 4 ? "hs4" : "hs6";
+    const where = [];
+    if (f.hs && f.hs.length) where.push("(" + f.hs.map(c => `hs LIKE '${esc(c)}%'`).join(" OR ") + ")");
+    for (const d of ["country","province","state","uom"]) if (f[d] && f[d].length) where.push(`${d} IN (${f[d].map(v=>`'${esc(v)}'`).join(",")})`);
+    if (f.period) { if (f.period.from) where.push(`(year*100+month) >= ${parseInt(f.period.from)}`); if (f.period.to) where.push(`(year*100+month) <= ${parseInt(f.period.to)}`); }
+    const agg = measure === "quantity"
+      ? `CASE WHEN count(DISTINCT uom)=1 THEN sum(quantity)::DOUBLE END AS quantity, any_value(uom) AS uom`
+      : `sum(value)::DOUBLE AS value`;
+    const sel = (group.length ? group.join(", ") + ", " : "") + agg;
+    const temporal = group.filter(g => g === "year" || g === "month");
+    const order = temporal.length ? temporal.join(", ") + " ASC" : `${measure} DESC`;
+    const sql = `SELECT ${sel} FROM ${this._src(tier,flow,y1,y2)} ${where.length?"WHERE "+where.join(" AND "):""} ${group.length?"GROUP BY "+group.join(", "):""} ORDER BY ${order} LIMIT ${parseInt(body.limit||1000)}`;
+    const rows = await this._q(sql);
+    await this._attachLabels(rows, group, flow);
+    return { columns: group.concat([measure]), rows, row_count: rows.length, elapsed_ms: Math.round(performance.now()-t) };
+  }
+  async _labels(view) {
+    if (!this._dim[view]) this._dim[view] = Object.fromEntries((await this._q(`SELECT code, en FROM ${this._dimUrl(view)} WHERE valid_to='999912'`)).map(r=>[r.code,r.en]));
+    return this._dim[view];
+  }
+  async _hsLabels(flow) {
+    const k = "hs_" + flow, cls = flow === "imp" ? "M" : "X";
+    if (!this._dim[k]) this._dim[k] = Object.fromEntries((await this._q(`SELECT hs, any_value(en) en FROM ${this._dimUrl("dim_hs")} WHERE valid_to='999912' AND (classification='both' OR classification='${cls}') GROUP BY hs`)).map(r=>[r.hs,r.en]));
+    return this._dim[k];
+  }
+  async _attachLabels(rows, group, flow) {
+    const views = { country:"dim_country", province:"dim_province", state:"dim_state", uom:"dim_uom" };
+    for (const d of group) if (views[d]) { const m = await this._labels(views[d]); for (const r of rows) r[d+"_label"] = m[r[d]] ?? null; }
+    if (group.includes("hs")) { const m = await this._hsLabels(flow); for (const r of rows) r.hs_label = m[r.hs] ?? null; }
+  }
+}
+
 // ---- init -----------------------------------------------------------------
 async function init() {
   try {
-    const h = await api("/api/health");
+    $("health").textContent = "connecting…";
+    DS = await makeDataSource();
+    const h = await DS.health();
     const years = [...new Set(h.flow_years.map(f => f.year))].sort((a,b)=>a-b);
     state.years = years;
     state.periodMin = h.period_min;   // YYYYMM ints
     state.periodMax = h.period_max;
     const mx = String(h.period_max);
     $("health").textContent =
-      `${years[0]}–${mx.slice(0,4)}-${mx.slice(4)} · ${h.flow_years.length} flow-years`;
+      `${DS.label} · ${years[0]}–${mx.slice(0,4)}-${mx.slice(4)}`;
     fillTimeSelects(years, h.period_min, h.period_max);
+    state.dims = await DS.dimensions();
   } catch (e) {
-    showError("Cannot reach the API at " + (API_BASE||"this server") +
-              ". Start it with: python api.py  (" + e.message + ")");
+    showError("Could not load data (" + e.message + "). For local use, start "
+              + "the API with: python api.py");
+    $("health").textContent = "";
     return;
   }
-  state.dims = await api("/api/dimensions");
   renderCountryPicker(""); renderProvincePicker();
   await loadHsRoot();
   wire();
@@ -340,7 +476,7 @@ function onHsSearch() {
 }
 async function searchHs(q) {
   try {
-    const r = await api(`/api/hs/search?flow=${state.flow}&q=${encodeURIComponent(q)}`);
+    const r = await DS.hsSearch(state.flow, q);
     const tree = $("hsTree"); tree.innerHTML = "";
     if (!r.results.length) {
       tree.innerHTML = '<div class="hint" style="padding:8px">No matching products.</div>';
@@ -354,7 +490,7 @@ function makeNode(item, level) {
   const node = document.createElement("div"); node.className = "node";
   const self = document.createElement("div"); self.className = "self";
   const tw = document.createElement("span"); tw.className = "tw";
-  const isLeaf = (state.flow === "imp" ? level >= 10 : level >= 8);
+  const isLeaf = level >= DS.maxLeaf(state.flow);
   tw.textContent = isLeaf ? "·" : "▸";
   const code = document.createElement("span"); code.className = "code"; code.textContent = item.code;
   const nm = document.createElement("span"); nm.className = "nm";
@@ -373,8 +509,8 @@ function makeNode(item, level) {
     if (open && !loaded) {
       loaded = true;
       tw.textContent = "…";
-      const r = await api(`/api/hs/children?flow=${state.flow}&code=${item.code}`);
-      r.children.forEach(ch => kids.appendChild(makeNode(ch, item.code.length === 2 ? 4 : item.code.length === 4 ? 6 : (state.flow==="imp"?10:8))));
+      const r = await DS.hsChildren(state.flow, item.code);
+      r.children.forEach(ch => kids.appendChild(makeNode(ch, item.code.length === 2 ? 4 : item.code.length === 4 ? 6 : DS.maxLeaf(state.flow))));
       tw.textContent = "▾";
     }
   };
@@ -473,11 +609,9 @@ async function runQuery() {
   const bd = body._bd; delete body._bd;
   $("runBtn").disabled = true; $("runBtn").textContent = "Running…";
   try {
-    const res = await api("/api/query", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    const res = await DS.query(body);
     state.lastBody = body;
+    state.lastRows = res.rows;
     render(res, bd);
   } catch (e) {
     showError(e.message);
@@ -600,19 +734,14 @@ function renderChart(rows, bd, measure, pct) {
   });
 }
 
-async function exportXlsx() {
-  if (!state.lastBody) return;
-  $("exportBtn").disabled = true;
-  try {
-    const r = await fetch(API_BASE + "/api/export", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(state.lastBody),
-    });
-    const blob = await r.blob();
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "cimt-query.xlsx"; a.click();
-    URL.revokeObjectURL(a.href);
-  } finally { $("exportBtn").disabled = false; }
+// Build the .xlsx client-side from the last result rows (works in both data
+// modes — no server round-trip needed).
+function exportXlsx() {
+  if (!state.lastRows || !state.lastRows.length) return;
+  const ws = XLSX.utils.json_to_sheet(state.lastRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Canada trade");
+  XLSX.writeFile(wb, "canada-trade.xlsx");
 }
 
 // ---- misc -----------------------------------------------------------------
@@ -642,7 +771,7 @@ function clearAll() {
   $("breakdown").value = "country"; $("measure").value = "value";
   $("transform").value = "level"; toggleTransform();
   if (state.chart) { state.chart.destroy(); state.chart = null; }
-  state.lastBody = null;
+  state.lastBody = null; state.lastRows = null;
   $("emptyState").style.display = ""; $("chartWrap").style.display = "none";
   $("tableCard").style.display = "none"; $("exportBtn").disabled = true;
   $("totalStat").textContent = ""; $("timeBadge").textContent = "";

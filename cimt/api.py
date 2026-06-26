@@ -94,6 +94,20 @@ def index():
             "Try /api/health."), 200
 
 
+@app.route("/r2/<path:p>")
+def r2_local(p):
+    """Serve the staged publish/ slice locally (CORS + HTTP range) so the
+    browser-WASM path can be tested before R2 exists. Production serves these
+    files from Cloudflare R2 instead; this route is a dev/self-host convenience."""
+    base = HERE / "data" / "publish" / "parquet"
+    resp = send_from_directory(base, p, conditional=True)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    resp.headers["Access-Control-Expose-Headers"] = \
+        "Content-Range, Accept-Ranges, Content-Length"
+    resp.headers["Accept-Ranges"] = "bytes"
+    return resp
+
+
 @app.route("/api/health")
 def health():
     if not PARQUET.exists():
