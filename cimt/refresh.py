@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import os
+import re
 import subprocess
 import sys
 import time
@@ -30,6 +32,9 @@ DETAIL = HERE / "data" / "parquet" / "detail"
 
 RETRY_TRIES = 8        # with --retry: re-check this many times…
 RETRY_INTERVAL = 900   # …15 min apart (~1h45m) for a late posting to land
+
+# R2 credentials for the online publish step. Plain KEY=VALUE or a TextEdit .rtf.
+R2_ENV_FILES = [Path.home() / "cimt_r2.env", Path.home() / "cimt_r2.env.rtf"]
 
 
 def log(msg: str) -> None:
@@ -57,6 +62,34 @@ def store_max_period() -> int | None:
         return None
 
 
+def load_r2_env() -> dict:
+    """R2 creds from ~/cimt_r2.env(.rtf) as a dict, or {} if none found."""
+    for p in R2_ENV_FILES:
+        if not p.exists():
+            continue
+        if p.suffix == ".rtf":
+            text = subprocess.run(["textutil", "-convert", "txt", "-stdout",
+                                   str(p)], capture_output=True, text=True).stdout
+        else:
+            text = p.read_text()
+        env = {}
+        for line in text.splitlines():
+            m = re.match(r"\s*(R2_[A-Z_]+)\s*=\s*(\S+)\s*$", line)
+            if m:
+                env[m.group(1)] = m.group(2)
+        if env:
+            return env
+    return {}
+
+
+def publish_online(r2: dict) -> None:
+    """Rebuild + upload the trimmed online slice to R2 (best-effort)."""
+    log("publishing trimmed slice to R2…")
+    rc = subprocess.run([sys.executable, "publish.py", "--stage", "--upload"],
+                        cwd=HERE, env={**os.environ, **r2}).returncode
+    log("R2 publish done" if rc == 0 else f"R2 publish failed (exit {rc})")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="CIMT monthly refresh")
     cur = dt.date.today().year
@@ -65,6 +98,8 @@ def main() -> int:
     ap.add_argument("--retry", action="store_true",
                     help="on a release day, re-check until a new month lands "
                          f"({RETRY_TRIES}x, {RETRY_INTERVAL//60} min apart)")
+    ap.add_argument("--no-publish", action="store_true",
+                    help="skip updating the online R2 slice")
     args = ap.parse_args()
 
     LOCK.parent.mkdir(parents=True, exist_ok=True)
@@ -103,6 +138,16 @@ def main() -> int:
         if rc != 0:
             log(f"dimensions failed (exit {rc})")
             return rc
+        # Keep the online R2 slice current (best-effort; local store is primary).
+        if args.no_publish:
+            log("--no-publish: skipping online R2 update")
+        else:
+            r2 = load_r2_env()
+            if r2:
+                publish_online(r2)
+            else:
+                log(f"no R2 creds ({' or '.join(str(p) for p in R2_ENV_FILES)}) "
+                    f"— skipping online publish")
     finally:
         LOCK.unlink(missing_ok=True)
     log(f"=== CIMT refresh done in {time.time()-t0:.0f}s ===")
