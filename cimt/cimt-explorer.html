@@ -645,7 +645,9 @@ function buildSeries() {
     if (!chips.length) return [{ label: null, codes: null }];
     const toMember = c => c.code === "__ALL__"
       ? { label: allLabel, codes: null }
-      : { label: bucket === "hs" ? c.code : (c.en || c.code), codes: [c.code] };
+      : { label: bucket === "hs" ? (c.en ? `${c.code} · ${c.en}` : c.code)
+                                 : (c.en || c.code),
+          codes: [c.code] };
     if (mode === "separate") return chips.map(toMember);
     if (chips.some(c => c.code === "__ALL__")) return [{ label: null, codes: null }];
     return [{ label: null, codes: chips.map(c => c.code) }];
@@ -796,6 +798,9 @@ const fmtCell = (d, measure, pct) => pct
   ? (d == null ? "—" : (d >= 0 ? "+" : "") + d.toFixed(1) + "%")
   : (d == null ? "—" : (measure === "value" ? fmtMoney(d) : fmtNum(d)));
 
+// Series labels can be long (HS descriptions); shorten for the legend/headers.
+const truncLabel = (s, n = 46) => s && s.length > n ? s.slice(0, n - 1) + "…" : s;
+
 // Rows = breakdown values; one value column per series (a pivot). With a single
 // series it also shows a Share column.
 function renderTablePivot(keys, labelByKey, series, bd, measure, pct) {
@@ -807,7 +812,7 @@ function renderTablePivot(keys, labelByKey, series, bd, measure, pct) {
     html += `<th class="num">${pct ? "Change" : (measure === "value" ? "Value (CA$)" : "Quantity")}</th>`;
     if (!pct) html += `<th class="num">Share</th>`;
   } else {
-    series.forEach(s => html += `<th class="num">${escapeHtml(s.label)}</th>`);
+    series.forEach(s => html += `<th class="num" title="${escapeHtml(s.label)}">${escapeHtml(truncLabel(s.label))}</th>`);
   }
   html += `</tr></thead><tbody>`;
   const grand = single
@@ -836,7 +841,7 @@ function renderChartMulti(keys, labelByKey, series, bd, measure, pct) {
     // single-series bar keeps the per-category rainbow; otherwise one colour/series
     const bg = (!isTime && !multi) ? keys.map((_, j) => PALETTE[j % PALETTE.length]) : color;
     return {
-      label: s.label,
+      label: truncLabel(s.label),
       data: keys.map(k => s.byKey.has(k) ? s.byKey.get(k) : null),
       backgroundColor: isTime ? "transparent" : bg,
       borderColor: color, borderWidth: isTime ? 2.5 : 0,
