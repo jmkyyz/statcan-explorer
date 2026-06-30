@@ -109,13 +109,19 @@ if [ "$ZIP_CHANGED" = false ] && [ "$PATCH_NEW" = "0" ]; then
 fi
 
 # ── 2. Publish to GitHub Releases ───────────────────────────────────────────
+# Keep the db-latest release/tag in place and replace the asset in-place with
+# --clobber, instead of deleting and recreating the whole release. This keeps
+# the release/tag stable and shrinks the window in which the download URL 404s
+# (the old delete-then-recreate could 404 a Render build for the whole upload).
 echo "==> Publishing to GitHub Releases (db-latest) ..."
-gh release delete db-latest --yes 2>/dev/null || true
-git push --delete origin db-latest 2>/dev/null || true
-git tag -d db-latest 2>/dev/null || true   # drop stale local tag so gh can recreate it
-gh release create db-latest lobbyist/lobby.db \
-  --title "Latest Lobbyist DB" \
-  --notes "Built $(date -u '+%Y-%m-%d %H:%M UTC') from lobbycanada.gc.ca open data"
+if ! gh release view db-latest >/dev/null 2>&1; then
+  gh release create db-latest \
+    --title "Latest Lobbyist DB" \
+    --notes "Lobbyist DB published by update_lobby_db.sh"
+fi
+gh release upload db-latest lobbyist/lobby.db --clobber
+gh release edit db-latest \
+  --notes "Built $(date -u '+%Y-%m-%d %H:%M UTC') from lobbycanada.gc.ca open data" >/dev/null 2>&1 || true
 
 # ── 3. Trigger Render redeploy ───────────────────────────────────────────────
 # We only get here when there was something new to publish, so a missing hook
