@@ -9,6 +9,17 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 DB="$SCRIPT_DIR/lobby.db"
 
+# --- Loud failure handling -------------------------------------------------
+# Anything that exits non-zero (or an explicit `fail`) prints a single
+# greppable !!! UPDATE FAILED !!! marker so a silent failure can't hide in the
+# log again (see the 13-day RENDER_DEPLOY_HOOK outage, June 2026).
+fail() {
+    echo ""
+    echo "!!! UPDATE FAILED !!! $1"
+    exit 1
+}
+trap 'rc=$?; [ $rc -ne 0 ] && echo "" && echo "!!! UPDATE FAILED !!! (line $LINENO, exit $rc)"' ERR
+
 echo "==> Checking for new data ..."
 cd "$REPO_ROOT"
 
@@ -107,16 +118,19 @@ gh release create db-latest lobbyist/lobby.db \
   --notes "Built $(date -u '+%Y-%m-%d %H:%M UTC') from lobbycanada.gc.ca open data"
 
 # ── 3. Trigger Render redeploy ───────────────────────────────────────────────
-if [ -n "$RENDER_DEPLOY_HOOK" ]; then
-  echo "==> Triggering Render redeploy ..."
-  curl -s -X POST "$RENDER_DEPLOY_HOOK"
-  echo ""
-  echo "    Render is rebuilding — takes ~2 min, then the app will have fresh data."
-else
-  echo ""
-  echo "    Skipping Render deploy (RENDER_DEPLOY_HOOK not set)."
-  echo "    Set it in your shell profile or trigger a redeploy manually in Render."
+# We only get here when there was something new to publish, so a missing hook
+# means a fresh DB is live on GitHub but the running site is now STALE. That is
+# a hard failure, not a skippable warning.
+if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+  fail "RENDER_DEPLOY_HOOK not set — new lobby.db published to GitHub but Render was NOT redeployed; live site is STALE. Set RENDER_DEPLOY_HOOK in ~/.zshenv (not ~/.zshrc — scheduled jobs don't source it)."
 fi
+
+echo "==> Triggering Render redeploy ..."
+if ! curl -fsS -X POST "$RENDER_DEPLOY_HOOK" >/dev/null; then
+  fail "Render deploy hook POST failed — new lobby.db published but redeploy was not accepted; live site is STALE."
+fi
+echo ""
+echo "    Render is rebuilding — takes ~2 min, then the app will have fresh data."
 
 echo ""
 echo "==> Done."
