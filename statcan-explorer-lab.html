@@ -831,41 +831,6 @@
         </div>
       </div>
 
-      <!-- ── CIMT Query Builder (shown when a CIMT category is selected) ── -->
-      <div id="cimtQueryBuilder" style="display:none">
-        <div class="dim-label" style="margin-top:4px">HS Heading (HS4)</div>
-        <select id="cimtHs4" style="width:100%;box-sizing:border-box;margin-bottom:0">
-          <option value="0">All merchandise (total)</option>
-        </select>
-        <div class="dim-label" style="margin-top:6px">Country / Partner</div>
-        <select id="cimtCountry" style="width:100%;box-sizing:border-box;margin-bottom:0">
-          <option value="1000">World (all countries)</option>
-        </select>
-        <div class="dim-label" style="margin-top:6px">Province</div>
-        <select id="cimtProvince" style="width:100%;box-sizing:border-box;margin-bottom:0">
-          <option value="1">Canada (total)</option>
-          <option value="10">Newfoundland and Labrador</option>
-          <option value="11">Prince Edward Island</option>
-          <option value="12">Nova Scotia</option>
-          <option value="13">New Brunswick</option>
-          <option value="24">Quebec</option>
-          <option value="35">Ontario</option>
-          <option value="46">Manitoba</option>
-          <option value="47">Saskatchewan</option>
-          <option value="48">Alberta</option>
-          <option value="59">British Columbia</option>
-        </select>
-        <div id="cimtRefLoading" style="display:none;font-size:11px;color:var(--muted);margin-top:5px">
-          Loading commodity &amp; country lists…
-        </div>
-        <button id="cimtAddBtn" onclick="addCimtSeries()"
-                style="width:100%;margin-top:8px;padding:6px 0;font-size:12px;
-                       background:var(--accent);color:#fff;border:none;border-radius:4px;
-                       cursor:pointer;font-weight:600">
-          + Add Series
-        </button>
-      </div>
-
       <div class="selected-series" id="selectedSeries"></div>
     </div>
 
@@ -1270,121 +1235,6 @@ function buildSeriesMap() {
     }
   }
   injectFredCategory();
-  injectCimtCategories();
-}
-
-function injectCimtCategories() {
-  const defs = [
-    { id: 'cimt_exports', label: 'Trade \u2014 CIMT Exports', flow: 0 },
-    { id: 'cimt_imports', label: 'Trade \u2014 CIMT Imports', flow: 1 },
-  ];
-  for (const d of defs) {
-    CATEGORIES[d.id] = {
-      id: d.id, label: d.label, sourceFreq: 'monthly',
-      series: [], isCimt: true, cimtFlow: d.flow,
-    };
-  }
-}
-
-// ── CIMT reference data (loaded lazily on first CIMT category selection) ──
-let cimtRefData = null;
-
-async function loadCimtRef() {
-  if (cimtRefData) { populateCimtDropdowns(); return; }
-  document.getElementById('cimtRefLoading').style.display = '';
-  document.getElementById('cimtAddBtn').disabled = true;
-  try {
-    const resp = await fetch(`${PROXY_URL}/api/cimt-ref`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    cimtRefData = await resp.json();
-    if (cimtRefData.error) throw new Error(cimtRefData.error);
-    populateCimtDropdowns();
-  } catch (e) {
-    toast(`Could not load CIMT reference data: ${e.message}`, 'error');
-  } finally {
-    document.getElementById('cimtRefLoading').style.display = 'none';
-    document.getElementById('cimtAddBtn').disabled = false;
-  }
-}
-
-function populateCimtDropdowns() {
-  if (!cimtRefData) return;
-  const hs4Sel = document.getElementById('cimtHs4');
-  hs4Sel.innerHTML = '<option value="0">All merchandise (total)</option>'
-    + cimtRefData.hs4.map(h => `<option value="${h.hs}">${h.hs} \u2014 ${h.en}</option>`).join('');
-  const cntSel = document.getElementById('cimtCountry');
-  cntSel.innerHTML = '<option value="1000">World (all countries)</option>'
-    + cimtRefData.countries.map(c => `<option value="${c.id}">${c.en}</option>`).join('');
-}
-
-function addCimtSeries() {
-  const cat = CATEGORIES[state.category];
-  if (!cat?.isCimt) return;
-  const maxSeries = 5;
-  if (state.activeSeries.length >= maxSeries) { toast(`Max ${maxSeries} series at once`, 'error'); return; }
-
-  const flow     = cat.cimtFlow;
-  const hs4      = document.getElementById('cimtHs4').value;
-  const country  = document.getElementById('cimtCountry').value;
-  const province = document.getElementById('cimtProvince').value;
-
-  const flowStr = flow === 0 ? 'exp' : 'imp';
-  const id = `cimt_${flowStr}__h${hs4}__c${country}__p${province}`;
-
-  if (state.activeSeries.includes(id)) { toast('This series is already added', 'error'); return; }
-
-  const hs4El    = document.getElementById('cimtHs4');
-  const hs4Text  = hs4El.options[hs4El.selectedIndex].text;
-  const cntEl    = document.getElementById('cimtCountry');
-  const cntText  = cntEl.options[cntEl.selectedIndex].text;
-  const provEl   = document.getElementById('cimtProvince');
-  const provText = provEl.options[provEl.selectedIndex].text;
-
-  const flowLabel = flow === 0 ? 'Exports' : 'Imports';
-  const provShort = provText.replace(/\s*\(.*\)/, '');
-  const hs4Short  = hs4 === '0' ? 'All mdse' : hs4;
-
-  const name      = `${flowLabel} \u2014 ${provText} \u2014 ${cntText} \u2014 ${hs4Text}`;
-  const chipLabel = `${flowLabel} \u00b7 ${provShort} \u00b7 ${cntText} \u00b7 ${hs4Short}`;
-
-  SERIES_MAP[id] = {
-    id, name, chipLabel,
-    tableId:    'CIMT',
-    sourceFreq: 'monthly',
-    category:   cat.label,
-    vectorId:   null,
-    cimtParams: { flow, hs4, country: parseInt(country), province: parseInt(province) },
-  };
-
-  state.activeSeries.push(id);
-  renderSeriesList();
-  updateEmptyState();
-}
-
-function ensureCimtSeriesInMap(id) {
-  if (SERIES_MAP[id]) return;
-  const m = id.match(/^cimt_(exp|imp)__h(\w+)__c(\d+)__p(\d+)$/);
-  if (!m) return;
-  const [, flowStr, hs4, countryStr, provinceStr] = m;
-  const flow = flowStr === 'exp' ? 0 : 1;
-  const flowLabel = flow === 0 ? 'Exports' : 'Imports';
-  SERIES_MAP[id] = {
-    id, name: `${flowLabel} series (${id})`, chipLabel: id,
-    tableId: 'CIMT', sourceFreq: 'monthly', category: '',
-    vectorId: null,
-    cimtParams: { flow, hs4, country: parseInt(countryStr), province: parseInt(provinceStr) },
-  };
-  if (cimtRefData) {
-    const hs4Info  = cimtRefData.hs4.find(h => h.hs === hs4);
-    const cntInfo  = cimtRefData.countries.find(c => c.id === parseInt(countryStr));
-    const provEl   = document.getElementById('cimtProvince');
-    const provOpt  = Array.from(provEl.options).find(o => o.value === provinceStr);
-    const provText = provOpt ? provOpt.text : provinceStr;
-    const hs4Text  = hs4 === '0' ? 'All merchandise' : (hs4Info ? `${hs4} \u2014 ${hs4Info.en}` : hs4);
-    const cntText  = parseInt(countryStr) === 1000 ? 'World (all countries)' : (cntInfo ? cntInfo.en : countryStr);
-    SERIES_MAP[id].name      = `${flowLabel} \u2014 ${provText} \u2014 ${cntText} \u2014 ${hs4Text}`;
-    SERIES_MAP[id].chipLabel = `${flowLabel} \u00b7 ${provText.replace(/\s*\(.*\)/,'')} \u00b7 ${cntText} \u00b7 ${hs4 === '0' ? 'All mdse' : hs4}`;
-  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1506,12 +1356,6 @@ function selectCategory(cat) {
   document.getElementById('breakdownGroup').style.display = 'none';
   updateFreqDropdown();
 
-  const isCimt = !!CATEGORIES[cat]?.isCimt;
-  document.getElementById('seriesDropdown').parentElement.style.display = isCimt ? 'none' : '';
-  const qb = document.getElementById('cimtQueryBuilder');
-  qb.style.display = isCimt ? '' : 'none';
-  if (isCimt) loadCimtRef();
-
   renderSeriesList();
   updateEmptyState();
 }
@@ -1525,13 +1369,6 @@ function renderSeriesList() {
   const maxSeries = 5;
 
   countEl.textContent = `${state.activeSeries.length} / ${maxSeries}`;
-
-  if (cat.isCimt) {
-    // CIMT categories use the query builder — skip dropdown, just render chips below
-    document.getElementById('cimtAddBtn').disabled = state.activeSeries.length >= maxSeries;
-    renderChips(chipsEl);
-    return;
-  }
 
   // Build list of already-selected top-level series IDs
   const selectedTopLevel = new Set(state.activeSeries.map(sid => sid.split('__')[0]));
@@ -1565,10 +1402,8 @@ function renderChips(chipsEl) {
     const curT   = state.seriesTransforms[sid] || 'level';
     const tOpts  = T_OPTS.map(([v,l]) => `<option value="${v}"${curT===v?' selected':''}>${l}</option>`).join('');
     const linkHref  = s.tableId === 'FRED'  ? `https://fred.stlouisfed.org/series/${s.vectorId}`
-                    : s.tableId === 'CIMT'  ? 'https://www150.statcan.gc.ca/n1/pub/71-607-x/71-607-x2021004-eng.htm'
                     : cansimUrl(s.tableId);
     const linkTitle = s.tableId === 'FRED'  ? `View ${s.vectorId} on FRED`
-                    : s.tableId === 'CIMT'  ? 'Open CIMT web app'
                     : `View table ${s.tableId} on StatCan`;
     return `<div class="series-chip" style="border-left-color:${color};">
       <div class="chip-dot" style="background:${color};margin-top:3px;"></div>
@@ -1872,13 +1707,13 @@ function doAddSeries(id) {
 // ═══════════════════════════════════════════════════════════
 // VECTOR HEALTH CHECK — flag terminated / empty StatCan vectors inline
 // ═══════════════════════════════════════════════════════════
-// Only StatCan WDS vectors are checked; FRED / CIMT / BOC use other data
+// Only StatCan WDS vectors are checked; FRED / BOC use other data
 // sources with their own liveness, so they're skipped. Results are cached by
 // vectorId so re-adding the same series doesn't re-query StatCan.
 async function checkVectorHealth(id) {
   const s = SERIES_MAP[id];
   if (!s || !s.vectorId) return;
-  if (['FRED', 'CIMT', 'BOC'].includes(s.tableId)) return;
+  if (['FRED', 'BOC'].includes(s.tableId)) return;
   const vid = String(s.vectorId).replace(/^[vV]/, '');
   if (!vid || state.vectorHealth[vid]) return;   // cached or in flight
 
@@ -2310,10 +2145,9 @@ async function fetchData() {
   const { fromDate, toDate } = computeDateRange();
 
   const seriesMeta   = state.activeSeries.map(sid => SERIES_MAP[sid]).filter(Boolean);
-  const statcanMeta  = seriesMeta.filter(sm => sm.tableId !== 'BOC' && sm.tableId !== 'FRED' && sm.tableId !== 'CIMT');
+  const statcanMeta  = seriesMeta.filter(sm => sm.tableId !== 'BOC' && sm.tableId !== 'FRED');
   const bocMeta      = seriesMeta.filter(sm => sm.tableId === 'BOC');
   const fredMeta     = seriesMeta.filter(sm => sm.tableId === 'FRED');
-  const cimtMeta     = seriesMeta.filter(sm => sm.tableId === 'CIMT');
 
   setLoading(true);
   toast('Fetching data…', 'info');
@@ -2393,25 +2227,6 @@ async function fetchData() {
         state.rawData[sm.id]     = s.data;
         state.seriesUnits[sm.id] = { uom: s.uom || '', uomCode: 0 };
       });
-    }
-
-    // ── CIMT fetch ────────────────────────────────────────────────────────
-    if (cimtMeta.length) {
-      for (const sm of cimtMeta) {
-        const { flow, hs4, country, province } = sm.cimtParams;
-        const url = `${PROXY_URL}/api/cimt?flow=${flow}&province=${province}&country=${country}`
-                  + `&hs4=${hs4}&start_date=${fromDate}&end_date=${toDate}`;
-        try {
-          const resp = await fetch(url);
-          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-          const json = await resp.json();
-          if (json.error) { toast(`CIMT: ${json.error}`, 'error'); continue; }
-          state.rawData[sm.id]     = json.series;
-          state.seriesUnits[sm.id] = { uom: 'dollars', uomCode: 81 };
-        } catch (e) {
-          toast(`CIMT fetch error: ${e.message}`, 'error');
-        }
-      }
     }
 
     if (!Object.keys(state.rawData).length) throw new Error('No data returned');
@@ -2930,7 +2745,6 @@ function defaultChartSource() {
   if (!tables.length) return 'Source: Statistics Canada';
   const labels = tables.map(t =>
     t === 'FRED' ? 'FRED (Federal Reserve Bank of St. Louis)'
-    : t === 'CIMT' ? 'Statistics Canada, Canadian International Merchandise Trade'
     : `Statistics Canada, Table ${t}`);
   return 'Source: ' + [...new Set(labels)].join('; ');
 }
@@ -3115,9 +2929,7 @@ function renderCatalogBrowser(query) {
         <span class="jump">→ open</span>
       </div>`;
 
-    if (cat.isCimt) {
-      html += `<div class="catalog-series-row"><span class="sname" style="color:var(--muted)">Interactive query builder — province × commodity × trading partner</span></div>`;
-    } else if (list.length === 0) {
+    if (list.length === 0) {
       html += `<div class="catalog-series-row"><span class="sname" style="color:var(--muted)">No series</span></div>`;
     } else {
       for (const s of list) {
@@ -3381,10 +3193,9 @@ function loadConfigObj(config) {
   }
 
   // Restore state
-  state.category         = config.category;
-  state.activeSeries     = [...(config.activeSeries || [])];
-  // Rebuild SERIES_MAP entries for any CIMT series in the saved config
-  state.activeSeries.filter(id => id.startsWith('cimt_')).forEach(ensureCimtSeriesInMap);
+  // Legacy in-app CIMT categories/series were removed — drop them from any older saved config
+  state.category         = CATEGORIES[config.category] ? config.category : Object.keys(CATEGORIES)[0];
+  state.activeSeries     = [...(config.activeSeries || [])].filter(id => !id.startsWith('cimt_'));
   state.seriesTransforms = { ...(config.seriesTransforms || {}) };
   state.formula          = config.formula || '';
   state.chartType        = config.chartType || 'line';
@@ -3400,7 +3211,7 @@ function loadConfigObj(config) {
   state.toYear   = ty; state.toMonth   = tm;
 
   // Update DOM controls
-  document.getElementById('categorySelect').value = config.category;
+  document.getElementById('categorySelect').value = state.category;
   document.getElementById('fromYear').value   = fy;
   document.getElementById('fromMonth').value  = fm;
   document.getElementById('toYear').value     = ty;
@@ -3417,8 +3228,8 @@ function loadConfigObj(config) {
   document.querySelectorAll('.tab').forEach(el =>
     el.classList.toggle('active', el.dataset.chart === state.chartType));
 
-  // Re-render sidebar (use selectCategory to handle CIMT query builder visibility)
-  selectCategory(config.category);
+  // Re-render sidebar
+  selectCategory(state.category);
   hideDimPanel();
   updateFormulaWarn();
 
