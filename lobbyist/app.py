@@ -40,7 +40,9 @@ def get_db():
         raise RuntimeError("lobby.db not found — run build_db.py first")
     con = sqlite3.connect(DB_PATH)
     con.row_factory = sqlite3.Row
-    con.execute("PRAGMA cache_size = -4096")   # 4 MB page cache (results cached in Python)
+    con.execute("PRAGMA cache_size = -16384")    # 16 MB page cache
+    con.execute("PRAGMA temp_store = MEMORY")    # temp tables (stats) stay in RAM
+    con.execute("PRAGMA mmap_size = 268435456")  # 256 MB — reads served from shared OS page cache
     try:
         yield con
     finally:
@@ -97,11 +99,8 @@ def _cache_set(key: str, val):
 
 # ── Filter helpers ───────────────────────────────────────────────────────────
 
-def build_filter_select(params: dict):
-    """
-    Returns (inner_sql, binds) — the SELECT DISTINCT comlog_id query
-    matching all active filters.  Used both for CTE and temp-table approaches.
-    """
+def build_filter_parts(params: dict):
+    """Returns (joins, wheres, binds) for the active filters."""
     date_from   = (params.get("date_from") or "2014-01").strip()
     date_to     = (params.get("date_to")   or "2099-12").strip()
     client_q    = (params.get("client_q")  or "").strip()
@@ -125,8 +124,10 @@ def build_filter_select(params: dict):
         binds.append(f"%{client_q}%")
 
     if reg_type:
-        wheres.append("c.reg_type = ?")
-        binds.append(int(reg_type))
+        # Comma-separated list, e.g. "1,3" when two of the three boxes are checked
+        types = [int(t) for t in reg_type.split(",") if t.strip()]
+        wheres.append(f"c.reg_type IN ({','.join('?' * len(types))})")
+        binds += types
 
     if institution or dpoh_q:
         joins.append("JOIN dpoh d ON c.comlog_id = d.comlog_id")
@@ -144,17 +145,18 @@ def build_filter_select(params: dict):
         wheres.append("s.subject_code = ?")
         binds.append(subject)
 
+    return joins, wheres, binds
+
+
+def build_filter_select(params: dict):
+    """The SELECT DISTINCT comlog_id query matching all active filters."""
+    joins, wheres, binds = build_filter_parts(params)
     sql = (
         f"SELECT DISTINCT c.comlog_id "
         f"FROM communications c {' '.join(joins)} "
         f"WHERE {' AND '.join(wheres)}"
     )
     return sql, binds
-
-
-def build_filtered_cte(params: dict):
-    inner, binds = build_filter_select(params)
-    return f"WITH filtered_ids AS ({inner})\n", binds
 
 
 # ── Static frontend ──────────────────────────────────────────────────────────
@@ -366,57 +368,86 @@ def stats():
 
 # ── Communications table (paginated) ─────────────────────────────────────────
 
+def _decorate_comms(con, ids):
+    """
+    Fetch display fields for a small page of comlog_ids, preserving order.
+    Each child table is queried separately — joining dpoh × subjects × details
+    in one query multiplies rows before aggregation and duplicates text.
+    """
+    if not ids:
+        return []
+    ph = ",".join("?" * len(ids))
+
+    comms = {}
+    for r in con.execute(f"""
+        SELECT comlog_id, comm_date, client_name, client_num,
+               reg_first || ' ' || reg_last AS lobbyist,
+               reg_type, is_amendment
+        FROM communications WHERE comlog_id IN ({ph})""", ids):
+        comms[r["comlog_id"]] = {
+            **dict(r),
+            "dpoh_names": [], "institutions": [],
+            "subjects": [], "subject_details": [],
+        }
+
+    for r in con.execute(f"""
+        SELECT comlog_id, dpoh_first, dpoh_last, institution
+        FROM dpoh WHERE comlog_id IN ({ph})""", ids):
+        c = comms[r["comlog_id"]]
+        name = f"{r['dpoh_first']} {r['dpoh_last']}".strip()
+        if name:
+            c["dpoh_names"].append(name)
+        if r["institution"]:
+            c["institutions"].append(r["institution"])
+
+    for r in con.execute(f"""
+        SELECT s.comlog_id, st.description
+        FROM subjects s JOIN subject_types st ON st.subject_code = s.subject_code
+        WHERE s.comlog_id IN ({ph})""", ids):
+        comms[r["comlog_id"]]["subjects"].append(r["description"])
+
+    for r in con.execute(f"""
+        SELECT comlog_id, detail_text FROM subject_details
+        WHERE comlog_id IN ({ph})""", ids):
+        comms[r["comlog_id"]]["subject_details"].append(r["detail_text"])
+
+    out = []
+    for cid in ids:
+        c = comms[cid]
+        # De-dupe preserving order; '|' separator because institution and
+        # DPOH names can themselves contain commas
+        c["dpoh_names"]      = "|".join(dict.fromkeys(c["dpoh_names"]))
+        c["institutions"]    = "|".join(dict.fromkeys(c["institutions"]))
+        c["subjects"]        = "|".join(dict.fromkeys(c["subjects"]))
+        c["subject_details"] = " || ".join(dict.fromkeys(c["subject_details"]))
+        out.append(c)
+    return out
+
+
 @app.route("/api/communications")
 def communications():
     limit  = min(int(request.args.get("limit", 50)), 200)
     offset = int(request.args.get("offset", 0))
 
-    # Serve pre-warmed result for the default unfiltered first page
-    filter_params = {k: v for k, v in request.args.items()
-                     if k not in ("limit", "offset") and v}
-    if offset == 0 and limit == 50 and _is_default_params(filter_params):
-        cached = _cache_get("__default_comms__")
-        if cached is not None:
-            return jsonify(cached)
-
-    cte, binds = build_filtered_cte(request.args)
+    joins, wheres, binds = build_filter_parts(request.args)
+    base = f"FROM communications c {' '.join(joins)} WHERE {' AND '.join(wheres)}"
+    # DISTINCT is only needed when a join can duplicate comlog_ids; without it
+    # the page query terminates early off idx_c_date instead of sorting everything
+    count_expr = "COUNT(DISTINCT c.comlog_id)" if joins else "COUNT(*)"
+    distinct   = "DISTINCT " if joins else ""
 
     with get_db() as con:
-        total = con.execute(
-            cte + "SELECT COUNT(*) FROM filtered_ids", binds
-        ).fetchone()[0]
+        total = con.execute(f"SELECT {count_expr} {base}", binds).fetchone()[0]
 
-        rows = con.execute(
-            cte + """
-            SELECT
-                c.comlog_id,
-                c.comm_date,
-                c.client_name,
-                c.client_num,
-                c.reg_first || ' ' || c.reg_last        AS lobbyist,
-                c.reg_type,
-                c.is_amendment,
-                GROUP_CONCAT(DISTINCT
-                    CASE WHEN d.dpoh_first != '' THEN d.dpoh_first || ' ' || d.dpoh_last
-                         ELSE d.dpoh_last END
-                )                                        AS dpoh_names,
-                GROUP_CONCAT(DISTINCT d.institution)     AS institutions,
-                GROUP_CONCAT(DISTINCT st.description)    AS subjects,
-                GROUP_CONCAT(sd.detail_text, ' || ')           AS subject_details
-            FROM filtered_ids fi
-            JOIN communications c  ON c.comlog_id  = fi.comlog_id
-            LEFT JOIN dpoh d       ON d.comlog_id  = fi.comlog_id
-            LEFT JOIN subjects s   ON s.comlog_id  = fi.comlog_id
-            LEFT JOIN subject_types st ON st.subject_code = s.subject_code
-            LEFT JOIN subject_details sd ON sd.comlog_id = fi.comlog_id
-            GROUP BY fi.comlog_id
-            ORDER BY c.comm_date DESC
-            LIMIT ? OFFSET ?
-            """,
+        ids = [r[0] for r in con.execute(
+            f"SELECT {distinct}c.comlog_id, c.comm_date {base} "
+            f"ORDER BY c.comm_date DESC LIMIT ? OFFSET ?",
             binds + [limit, offset],
-        ).fetchall()
+        ).fetchall()]
 
-    return jsonify({"total": total, "rows": rows_to_list(rows)})
+        rows = _decorate_comms(con, ids)
+
+    return jsonify({"total": total, "rows": rows})
 
 
 # ── Update check ─────────────────────────────────────────────────────────────
@@ -517,33 +548,8 @@ def _prewarm():
                 "SELECT value FROM meta WHERE key = 'default_stats'"
             ).fetchone()
 
-            # Pre-warm the default communications page — the slowest query on first load
-            default_comms = rows_to_list(con.execute("""
-                SELECT
-                    c.comlog_id, c.comm_date, c.client_name, c.client_num,
-                    c.reg_first || ' ' || c.reg_last AS lobbyist,
-                    c.reg_type, c.is_amendment,
-                    GROUP_CONCAT(DISTINCT
-                        CASE WHEN d.dpoh_first != '' THEN d.dpoh_first || ' ' || d.dpoh_last
-                             ELSE d.dpoh_last END
-                    ) AS dpoh_names,
-                    GROUP_CONCAT(DISTINCT d.institution) AS institutions,
-                    GROUP_CONCAT(DISTINCT st.description) AS subjects,
-                    GROUP_CONCAT(sd.detail_text, ' || ') AS subject_details
-                FROM communications c
-                LEFT JOIN dpoh d ON d.comlog_id = c.comlog_id
-                LEFT JOIN subjects s ON s.comlog_id = c.comlog_id
-                LEFT JOIN subject_types st ON st.subject_code = s.subject_code
-                LEFT JOIN subject_details sd ON sd.comlog_id = c.comlog_id
-                GROUP BY c.comlog_id
-                ORDER BY c.comm_date DESC
-                LIMIT 50 OFFSET 0
-            """).fetchall())
-            total_comms = con.execute("SELECT COUNT(*) FROM communications").fetchone()[0]
-
         _cache_set("__subjects__", subj)
         _cache_set("__institutions__", inst)
-        _cache_set("__default_comms__", {"total": total_comms, "rows": default_comms})
 
         if stats_row:
             default_stats = json.loads(stats_row[0])

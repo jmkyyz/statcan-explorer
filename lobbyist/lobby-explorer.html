@@ -659,7 +659,7 @@ function getFilters() {
   return {
     date_from:   `${document.getElementById("yearFrom").value}-${mFrom}`,
     date_to:     `${document.getElementById("yearTo").value}-${mTo}`,
-    reg_type:    checkedTypes.length === 1 ? checkedTypes[0] : "",
+    reg_type:    checkedTypes.length > 0 && checkedTypes.length < 3 ? checkedTypes.join(",") : "",
     subject:     document.getElementById("subjectSelect").value,
     institution: document.getElementById("institutionSelect").value,
     client_q,
@@ -815,13 +815,13 @@ function renderTable(d) {
 
   tbody.innerHTML = d.rows.map(r => {
     const type = REG_LABELS[r.reg_type] || r.reg_type;
-    const dpohList = (r.dpoh_names || "").split(",")
+    const dpohList = (r.dpoh_names || "").split("|")
       .map(s => s.trim()).filter(Boolean)
       .map(s => `<span class="tag">${s}</span>`).join(" ");
-    const instList = [...new Set((r.institutions || "").split(",")
-      .map(s => s.trim()).filter(Boolean))]
+    const instList = (r.institutions || "").split("|")
+      .map(s => s.trim()).filter(Boolean)
       .map(s => `<span class="tag red">${s}</span>`).join(" ");
-    const subjList = (r.subjects || "").split(",")
+    const subjList = (r.subjects || "").split("|")
       .map(s => s.trim()).filter(Boolean)
       .map(s => `<span class="tag green">${s}</span>`).join(" ");
     const details = (r.subject_details || "").trim();

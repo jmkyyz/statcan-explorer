@@ -7,7 +7,7 @@ services:
       pip install -r requirements.txt &&
       curl -L --fail --retry 5 --retry-all-errors --retry-delay 5 -o lobby.db
       "https://github.com/jmkyyz/statcan-explorer/releases/download/db-latest/lobby.db"
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --timeout 120 app:app
+    startCommand: gunicorn --workers 2 --threads 4 --bind 0.0.0.0:$PORT --timeout 120 app:app
     envVars:
       - key: PORT
         value: 10000
