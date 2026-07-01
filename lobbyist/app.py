@@ -99,6 +99,17 @@ def _cache_set(key: str, val):
 
 # ── Filter helpers ───────────────────────────────────────────────────────────
 
+def _month_bounds(date_from: str, date_to: str):
+    """Convert YYYY-MM bounds to a [start, end) comm_date range so queries
+    filter and sort on the same indexed column (idx_c_date)."""
+    try:
+        y, m = int(date_to[:4]), int(date_to[5:7])
+        end = f"{y + m // 12}-{m % 12 + 1:02d}-01"
+    except (ValueError, IndexError):
+        end = "2100-01-01"
+    return f"{date_from}-01", end
+
+
 def build_filter_parts(params: dict):
     """Returns (joins, wheres, binds) for the active filters."""
     date_from   = (params.get("date_from") or "2014-01").strip()
@@ -110,9 +121,10 @@ def build_filter_parts(params: dict):
     subject     = (params.get("subject")   or "").strip()
     dpoh_q      = (params.get("dpoh_q")    or "").strip()
 
+    start, end = _month_bounds(date_from, date_to)
     joins  = []
-    wheres = ["c.comm_month BETWEEN ? AND ?"]
-    binds  = [date_from, date_to]
+    wheres = ["c.comm_date >= ?", "c.comm_date < ?"]
+    binds  = [start, end]
 
     if client_exact:
         # Exact match — reproduces the Top-Clients ranking (which groups by the
@@ -546,6 +558,13 @@ def _prewarm():
 
             stats_row = con.execute(
                 "SELECT value FROM meta WHERE key = 'default_stats'"
+            ).fetchone()
+
+            # Touch idx_c_date so the first page-of-records query after a
+            # fresh deploy reads a warm index instead of cold disk
+            con.execute(
+                "SELECT COUNT(*) FROM communications "
+                "WHERE comm_date >= '2014-01-01' AND comm_date < '2100-01-01'"
             ).fetchone()
 
         _cache_set("__subjects__", subj)
