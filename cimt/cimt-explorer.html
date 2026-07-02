@@ -150,6 +150,12 @@
   .empty svg { width: 46px; height: 46px; opacity: .35; margin-bottom: 10px; }
   .err { background: #fde7e9; border: 1px solid #f1bbc0; color: #a4262c;
          padding: 10px 12px; border-radius: 6px; margin-bottom: 14px; }
+  .warnbox { background: #fff4ce; border: 1px solid #f0d886; color: #6d5900;
+         padding: 10px 12px; border-radius: 6px; margin-bottom: 14px; }
+  /* results no longer match the sidebar filters */
+  .stale-note { font-size: 11px; background: #fff4ce; border: 1px solid #f0d886;
+         border-radius: 4px; padding: 1px 6px; color: #6d5900; }
+  #chartWrap.stale, #tableCard.stale { opacity: .45; }
   .badge { font-size: 11px; background: var(--surface2); border: 1px solid var(--border);
            border-radius: 4px; padding: 1px 6px; color: var(--muted); }
   .hint { color: var(--muted); font-size: 11.5px; margin-top: 5px; }
@@ -179,6 +185,7 @@
         <button data-flow="exp_dom" class="on">Domestic exports</button>
         <button data-flow="exp_tot">All exports</button>
         <button data-flow="imp">Imports</button>
+        <button data-flow="balance">Balance</button>
       </div>
     </div>
 
@@ -209,6 +216,15 @@
       </div>
     </div>
 
+    <div class="group" id="stateGroup">
+      <label class="title">U.S. state <span class="opt">— optional, empty = all states</span></label>
+      <div id="stWrap">
+        <input type="text" id="stSearch" placeholder="Search U.S. states to add…" autocomplete="off">
+        <div class="picker" id="stPicker" style="display:none"></div>
+      </div>
+      <div class="chips" id="stChips"></div>
+    </div>
+
     <div class="group">
       <label class="title">Time range</label>
       <div class="trow"><span class="tlab">From</span>
@@ -222,11 +238,26 @@
       <select id="breakdown">
         <option value="country">Partner country (ranking)</option>
         <option value="province">Province (ranking)</option>
+        <option value="state">U.S. state (ranking)</option>
         <option value="hs2">Product — chapter (HS2)</option>
         <option value="hs4">Product — heading (HS4)</option>
         <option value="hs6">Product — subheading (HS6)</option>
-        <option value="year">Over time — yearly</option>
+        <option value="year">Over time — annual (full years)</option>
+        <option value="ytd">Over time — year-to-date</option>
         <option value="month" selected>Over time — monthly</option>
+        <option value="m12">Over time — 12-month sum</option>
+        <option value="country_year">Top partners over time — annual</option>
+        <option value="country_month">Top partners over time — monthly</option>
+      </select>
+    </div>
+
+    <div class="group" id="topNGroup" style="display:none">
+      <label class="title">Show top</label>
+      <select id="topN">
+        <option value="5">5</option>
+        <option value="10">10</option>
+        <option value="20" selected>20</option>
+        <option value="50">50</option>
       </select>
     </div>
 
@@ -261,11 +292,14 @@
 
   <main>
     <div id="errBox"></div>
+    <div id="warnBox"></div>
     <div class="card">
       <div class="toolbar">
         <h2 id="resultTitle">Results</h2>
         <span class="stat" id="totalStat"></span>
+        <span class="stale-note" id="staleNote" style="display:none">filters changed — run again</span>
         <span class="badge" id="timeBadge"></span>
+        <button class="ghost" id="pngBtn" disabled>⤓ Chart .png</button>
         <button class="ghost" id="exportBtn" disabled>⤓ Export .xlsx</button>
       </div>
       <div id="chartWrap" style="position:relative;height:340px;display:none">
@@ -292,10 +326,11 @@ const PALETTE = ["#8b4061","#8ecad4","#c7a479","#d46868","#d1d3d4",
 const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 const state = {
-  flow: "exp_dom",
+  flow: "exp_dom",   // imp | exp_tot | exp_dom | balance (= exp_tot − imp)
   hs: [],            // [{code,en}]  (code "__ALL__" = total over all products)
   countries: [],     // [{code,en}]  (code "__ALL__" = world total)
   provinces: [],     // [{code,en}]
+  states: [],        // [{code,en}]  U.S. state filter (local API mode only)
   productMode: "combined",   // combined (sum) | separate (one series each)
   countryMode: "combined",
   dims: null,
@@ -306,10 +341,16 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
-const fmtMoney = (v) => v == null ? "—" :
-  (Math.abs(v) >= 1e9 ? "$" + (v/1e9).toFixed(2) + "B" :
-   Math.abs(v) >= 1e6 ? "$" + (v/1e6).toFixed(1) + "M" :
-   "$" + v.toLocaleString());
+// The balance flow is computed client-side from exp_tot − imp; anything that
+// needs a *real* flow (HS tree labels, leaf depth) uses the export side.
+const qFlow = () => state.flow === "balance" ? "exp_tot" : state.flow;
+const topN = () => +$("topN").value;
+const fmtMoney = (v) => {
+  if (v == null) return "—";
+  const a = Math.abs(v), s = v < 0 ? "−$" : "$";   // balances go negative
+  return a >= 1e9 ? s + (a/1e9).toFixed(2) + "B" :
+         a >= 1e6 ? s + (a/1e6).toFixed(1) + "M" : s + a.toLocaleString();
+};
 const fmtNum = (v) => v == null ? "—" : Number(v).toLocaleString();
 
 async function api(path, opts) {
@@ -475,7 +516,13 @@ async function init() {
   renderCountryPicker(""); renderProvincePills();
   await loadHsRoot();
   wire();
-  toggleTransform();
+  if (DS.mode === "wasm") {   // the online slice carries no U.S. state column
+    $("stateGroup").style.display = "none";
+    $("breakdown").querySelector('[value="state"]').disabled = true;
+  }
+  const restored = restoreFromUrl();
+  onBreakdownChange();
+  if (restored) runQuery();   // a shared link opens straight onto its chart
 }
 
 const yr = (p) => String(p).slice(0, 4);
@@ -505,7 +552,7 @@ function onHsSearch() {
 }
 async function searchHs(q) {
   try {
-    const r = await DS.hsSearch(state.flow, q);
+    const r = await DS.hsSearch(qFlow(), q);
     const tree = $("hsTree"); tree.innerHTML = "";
     if (!r.results.length) {
       tree.innerHTML = '<div class="hint" style="padding:8px">No matching products.</div>';
@@ -519,7 +566,7 @@ function makeNode(item, level) {
   const node = document.createElement("div"); node.className = "node";
   const self = document.createElement("div"); self.className = "self";
   const tw = document.createElement("span"); tw.className = "tw";
-  const isLeaf = level >= DS.maxLeaf(state.flow);
+  const isLeaf = level >= DS.maxLeaf(qFlow());
   tw.textContent = isLeaf ? "·" : "▸";
   const code = document.createElement("span"); code.className = "code"; code.textContent = item.code;
   const nm = document.createElement("span"); nm.className = "nm";
@@ -538,8 +585,8 @@ function makeNode(item, level) {
     if (open && !loaded) {
       loaded = true;
       tw.textContent = "…";
-      const r = await DS.hsChildren(state.flow, item.code);
-      r.children.forEach(ch => kids.appendChild(makeNode(ch, item.code.length === 2 ? 4 : item.code.length === 4 ? 6 : DS.maxLeaf(state.flow))));
+      const r = await DS.hsChildren(qFlow(), item.code);
+      r.children.forEach(ch => kids.appendChild(makeNode(ch, item.code.length === 2 ? 4 : item.code.length === 4 ? 6 : DS.maxLeaf(qFlow()))));
       tw.textContent = "▾";
     }
   };
@@ -556,6 +603,14 @@ function renderCountryPicker(filter) {
     .slice(0, 300)
     .forEach(c => box.appendChild(makeOpt(c, "countries")));
 }
+function renderStatePicker(filter) {
+  const box = $("stPicker"); box.innerHTML = "";
+  const f = (filter || "").toLowerCase();
+  state.dims.states
+    .filter(c => !f || c.code.toLowerCase().includes(f) || (c.en || "").toLowerCase().includes(f))
+    .slice(0, 300)
+    .forEach(c => box.appendChild(makeOpt(c, "states")));
+}
 // Province: compact toggle pills (all 13 visible, no scroll box).
 function renderProvincePills() {
   const box = $("provPicker"); box.innerHTML = "";
@@ -568,7 +623,7 @@ function renderProvincePills() {
       const i = state.provinces.findIndex(x => x.code === p.code);
       if (i >= 0) state.provinces.splice(i, 1);
       else state.provinces.push({ code: p.code, en: p.en });
-      renderProvincePills();
+      renderProvincePills(); markDirty();
     };
     box.appendChild(pill);
   });
@@ -585,16 +640,17 @@ function makeOpt(item, bucket) {
 }
 
 // ---- chips ----------------------------------------------------------------
-const BUCKET_CHIPS = { hs: "hsChips", countries: "ctryChips" };
+const BUCKET_CHIPS = { hs: "hsChips", countries: "ctryChips", states: "stChips" };
 function addChip(bucket, item) {
   if (state[bucket].some(x => x.code === item.code)) return;
   state[bucket].push(item);
-  renderChips(bucket);
+  renderChips(bucket); markDirty();
 }
 function removeChip(bucket, code) {
   state[bucket] = state[bucket].filter(x => x.code !== code);
-  renderChips(bucket);
+  renderChips(bucket); markDirty();
   if (bucket === "countries") renderCountryPicker($("ctrySearch").value);
+  if (bucket === "states") renderStatePicker($("stSearch").value);
 }
 function renderChips(bucket) {
   const box = $(BUCKET_CHIPS[bucket]); box.innerHTML = "";
@@ -629,17 +685,27 @@ function updateModeToggle(bucket) {
 const BREAKDOWNS = {
   country:  { group: ["country"], dim: "country", chart: "bar", level: null },
   province: { group: ["province"], dim: "province", chart: "bar", level: null },
+  state:    { group: ["state"], dim: "state", chart: "bar", level: null },
   hs2:      { group: ["hs"], dim: "hs", chart: "bar", level: 2 },
   hs4:      { group: ["hs"], dim: "hs", chart: "bar", level: 4 },
   hs6:      { group: ["hs"], dim: "hs", chart: "bar", level: 6 },
-  year:     { group: ["year"], dim: "year", chart: "line", level: null },
+  // fullYears: trim the queried period to complete calendar years, so the
+  // incomplete current year doesn't paint a fake year-end drop.
+  // agg: client-side aggregation over a monthly query (see aggregateOverTime).
+  year:     { group: ["year"], dim: "year", chart: "line", level: null, fullYears: true },
+  ytd:      { group: ["year","month"], dim: "year", chart: "line", level: null, agg: "ytd" },
   month:    { group: ["year","month"], dim: "ym", chart: "line", level: null },
+  m12:      { group: ["year","month"], dim: "ym", chart: "line", level: null, agg: "m12" },
+  // pivot: rank partners over the selection, then one time series per top-N
+  country_year:  { group: ["year","country"], dim: "year", chart: "line", level: null, pivot: "country", fullYears: true },
+  country_month: { group: ["year","month","country"], dim: "ym", chart: "line", level: null, pivot: "country" },
 };
 
 // A "series" = one line/bar: a label + optional product/country filters. An
 // "All products"/"All countries" chip means no filter on that dimension (the
-// total). Multiple selections + "Separate" => one series each; "Combined" sums.
-function buildSeries() {
+// total). Multiple selections + "Separate" => one series each; "Combined" sums
+// (labelled with the joined names so the chart legend can name what's summed).
+function buildSeries(bd) {
   const member = (bucket, mode, allLabel) => {
     const chips = state[bucket];
     if (!chips.length) return [{ label: null, codes: null }];
@@ -649,11 +715,20 @@ function buildSeries() {
                                  : (c.en || c.code),
           codes: [c.code] };
     if (mode === "separate") return chips.map(toMember);
-    if (chips.some(c => c.code === "__ALL__")) return [{ label: null, codes: null }];
-    return [{ label: null, codes: chips.map(c => c.code) }];
+    if (chips.some(c => c.code === "__ALL__")) return [{ label: allLabel, codes: null }];
+    if (chips.length === 1) return [toMember(chips[0])];
+    // Shorten each name before joining so every code stays visible in the legend.
+    return [{ label: chips.map(c => truncLabel(toMember(c).label, 30)).join(" + "),
+              codes: chips.map(c => c.code) }];
   };
   const prod = member("hs", state.productMode, "All products");
-  const ctry = member("countries", state.countryMode, "All countries");
+  // Pivot breakdowns split by partner themselves; country chips (if any) just
+  // restrict which partners compete for the top N.
+  const ctry = bd && bd.pivot === "country"
+    ? [{ label: null,
+         codes: state.countries.length && !state.countries.some(c => c.code === "__ALL__")
+           ? state.countries.map(c => c.code) : null }]
+    : member("countries", state.countryMode, "All countries");
   const out = [];
   for (const p of prod) for (const c of ctry)
     out.push({ label: [p.label, c.label].filter(Boolean).join(" · ") || "Total",
@@ -661,41 +736,157 @@ function buildSeries() {
   return out;
 }
 
-function buildBody(bd, s) {
+// Selected time range as YYYYMM ints, "to" clamped to the data's last month.
+function periodRange() {
+  const from = (+$("yearFrom").value)*100 + (+$("monthFrom").value);
+  const to = (+$("yearTo").value)*100 + (+$("monthTo").value);
+  return { from, to: Math.min(to, state.periodMax || to) };
+}
+
+// The period actually queried: fullYears breakdowns snap inward to complete
+// calendar years so a partial current year can't paint a fake year-end drop.
+function queryPeriod(bd) {
+  let { from, to } = periodRange();
+  if (bd.fullYears) {
+    if (to % 100 !== 12) to = (Math.floor(to/100) - 1)*100 + 12;
+    if (from % 100 !== 1) from = (Math.floor(from/100) + 1)*100 + 1;
+  }
+  return { from, to };
+}
+
+function buildBody(bd, s, flow, limit) {
+  flow = flow || state.flow;
   const filters = {};
   if (s.hs) filters.hs = s.hs;
   if (s.country) filters.country = s.country;
-  if (state.provinces.length && state.flow !== "exp_tot")
+  // province of clearance: not on total exports, so not on the balance either
+  if (state.provinces.length && flow !== "exp_tot" && state.flow !== "balance")
     filters.province = state.provinces.map(c => c.code).filter(c => c !== "__ALL__");
-  filters.period = {
-    from: (+$("yearFrom").value)*100 + (+$("monthFrom").value),
-    to:   (+$("yearTo").value)*100 + (+$("monthTo").value),
-  };
+  if (state.states.length) filters.state = state.states.map(c => c.code);
+  filters.period = queryPeriod(bd);
   const deepest = (s.hs || []).reduce((m, c) => Math.max(m, c.length), 0);
   const need = Math.max(bd.level || 0, deepest);
   const hs_level = need <= 2 ? 2 : need <= 4 ? 4 : need <= 6 ? 6 : need <= 8 ? 8 : 10;
-  return { flow: state.flow, hs_level, filters,
-           group_by: bd.group, measure: $("measure").value, limit: 5000 };
+  return { flow, hs_level, filters,
+           group_by: bd.group, measure: $("measure").value, limit: limit || 5000 };
 }
 
 async function runQuery() {
   showError("");
   const bd = BREAKDOWNS[$("breakdown").value];
-  const specs = buildSeries();
+  const specs = buildSeries(bd);
   $("runBtn").disabled = true; $("runBtn").textContent = "Running…";
+  const t0 = performance.now();
   try {
-    const results = [];
-    for (const s of specs) {
-      const res = await DS.query(buildBody(bd, s));
-      results.push({ label: s.label, rows: res.rows, elapsed: res.elapsed_ms });
-    }
+    const results = (await Promise.all(specs.map(s => runSpec(bd, s)))).flat();
     state.lastResults = results;
-    render(results, bd);
+    updateUrl();
+    render(results, bd, Math.round(performance.now() - t0));
   } catch (e) {
     showError(e.message);
   } finally {
     $("runBtn").disabled = false; $("runBtn").textContent = "Run query";
   }
+}
+
+// One spec -> one or more rendered series. Plain breakdowns give one series;
+// "top partners over time" pivots give one series per top-ranked partner.
+async function runSpec(bd, s) {
+  if (!bd.pivot) {
+    let rows = await fetchSeriesRows(bd, s, 5000);
+    // Only U.S. trade carries a state; drop the (dominant) non-U.S. bucket.
+    if (bd.dim === "state") rows = rows.filter(r => r.state != null);
+    if (bd.agg) rows = aggregateOverTime(rows, bd.agg);
+    return [{ label: s.label, rows }];
+  }
+  // Rank partners over the whole selection first, then fetch time series for
+  // just the top N. The balance ranks by magnitude (surpluses AND deficits).
+  const rankBd = { group: [bd.pivot], dim: bd.pivot, chart: "bar", level: null };
+  let rank = await fetchSeriesRows(rankBd, s, 1000);
+  if (state.flow === "balance")
+    rank = rank.slice().sort((a, b) => Math.abs(b.value ?? 0) - Math.abs(a.value ?? 0));
+  const top = rank.slice(0, topN());
+  if (!top.length) return [{ label: s.label, rows: [] }];
+  const rows = await fetchSeriesRows(bd,
+    Object.assign({}, s, { country: top.map(r => r.country) }), 100000);
+  const pre = s.label && s.label !== "Total" ? truncLabel(s.label, 24) + " · " : "";
+  return top.map(r => ({ label: pre + (r.country_label || r.country),
+                         rows: rows.filter(x => x.country === r.country) }));
+}
+
+// Rows for one series. Flow "balance" = total exports − imports, merged by key.
+async function fetchSeriesRows(bd, s, limit) {
+  if (state.flow !== "balance")
+    return (await DS.query(buildBody(bd, s, state.flow, limit))).rows;
+  const [ex, im] = await Promise.all([
+    DS.query(buildBody(bd, s, "exp_tot", limit)),
+    DS.query(buildBody(bd, s, "imp", limit)),
+  ]);
+  return mergeBalance(ex.rows, im.rows, bd);
+}
+
+function mergeBalance(expRows, impRows, bd) {
+  // Key on the query's group columns (not the display dim — e.g. the YTD
+  // breakdown displays by year but queries by year+month).
+  const keyOf = (r) => bd.group.map(g => r[g]).join("|");
+  const m = new Map();
+  for (const r of expRows) m.set(keyOf(r), Object.assign({}, r));
+  for (const r of impRows) {
+    const k = keyOf(r), e = m.get(k);
+    if (e) e.value = (e.value ?? 0) - (r.value ?? 0);
+    else m.set(k, Object.assign({}, r, { value: -(r.value ?? 0) }));
+  }
+  const rows = [...m.values()];
+  rows.sort(bd.group.includes("year")
+    ? (a, b) => (a.year*100 + (a.month || 0)) - (b.year*100 + (b.month || 0))
+    : (a, b) => (b.value ?? 0) - (a.value ?? 0));   // stable: per-partner order kept
+  return rows;
+}
+
+// Client-side time aggregations over a (year,month) query.
+//   ytd: per-year sum of months 1..M, M = last available month in range — every
+//        year is truncated the same way so the current year compares fairly.
+//   m12: trailing-12-month rolling sum, one point per month.
+// A month with no row means zero trade (the bulk files only hold months where
+// trade occurred), so absent months count as 0; quantity goes null on mixed UoM.
+function aggregateOverTime(rows, kind) {
+  if (!rows.length) return [];
+  const measure = $("measure").value === "quantity" ? "quantity" : "value";
+  const { from, to } = periodRange();
+  const byKey = new Map(rows.map(r => [r.year*100 + r.month, r]));
+  const window = (keys) => {
+    let sum = 0, uom = null;
+    for (const k of keys) {
+      const r = byKey.get(k);
+      if (!r) continue;
+      if (r[measure] == null) return { v: null, uom: null };
+      if (measure === "quantity") {
+        if (uom == null) uom = r.uom;
+        else if (r.uom !== uom) return { v: null, uom: null };
+      }
+      sum += r[measure];
+    }
+    return { v: sum, uom };
+  };
+  const out = [];
+  if (kind === "ytd") {
+    const M = to % 100;
+    for (let y = Math.floor(from/100); y <= Math.floor(to/100); y++) {
+      if (y*100 + 1 < from) continue;   // need January in range to be comparable
+      const { v, uom } = window(Array.from({ length: M }, (_, i) => y*100 + i + 1));
+      out.push({ year: y, [measure]: v, uom });
+    }
+  } else {                              // m12
+    const seq = [];
+    for (let y = Math.floor(from/100), m = from % 100; y*100 + m <= to;
+         m === 12 ? (m = 1, y++) : m++)
+      seq.push(y*100 + m);
+    for (let i = 11; i < seq.length; i++) {
+      const { v, uom } = window(seq.slice(i - 11, i + 1));
+      out.push({ year: Math.floor(seq[i]/100), month: seq[i] % 100, [measure]: v, uom });
+    }
+  }
+  return out;
 }
 
 function rowKey(r, bd) {
@@ -734,7 +925,7 @@ function computeDisplay(rows, bd, measure, transform) {
   });
 }
 
-function render(results, bd) {
+function render(results, bd, wallMs) {
   const measure = $("measure").value;
   const isTime = bd.chart === "line";
   const transform = isTime ? $("transform").value : "level";
@@ -756,19 +947,42 @@ function render(results, bd) {
     totalByKey.set(k, (totalByKey.get(k) || 0) + (x[measure] || 0));
   }));
   let keys = [...labelByKey.keys()];
+  // Balance rankings order by magnitude so big deficits rank next to surpluses.
+  const mag = state.flow === "balance" ? Math.abs : (v) => v;
   keys.sort(isTime ? (a, b) => a - b
-                   : (a, b) => (totalByKey.get(b) || 0) - (totalByKey.get(a) || 0));
-  if (!isTime) keys = keys.slice(0, 20);
+                   : (a, b) => mag(totalByKey.get(b) || 0) - mag(totalByKey.get(a) || 0));
+  const allKeyCount = keys.length;
+  if (!isTime) keys = keys.slice(0, topN());
 
   const hasData = keys.length > 0;
   $("emptyState").style.display = hasData ? "none" : "";
   $("chartWrap").style.display = hasData ? "" : "none";
   $("tableCard").style.display = hasData ? "" : "none";
   $("exportBtn").disabled = !hasData;
-  const ms = results.reduce((s, r) => s + (r.elapsed || 0), 0);
-  $("timeBadge").textContent = `${ms} ms · ` +
-    (series.length > 1 ? `${series.length} series · ` : "") + `${keys.length} pts`;
+  $("pngBtn").disabled = !hasData;
+  $("timeBadge").textContent = `${wallMs ?? 0} ms · ` +
+    (series.length > 1 ? `${series.length} series · ` : "") +
+    (!isTime && allKeyCount > keys.length
+      ? `top ${keys.length} of ${allKeyCount}` : `${keys.length} pts`);
   $("resultTitle").textContent = titleFor(bd, series);
+
+  const warns = selectionWarnings();
+  if (bd.fullYears) {
+    const t = periodRange().to;
+    if (t % 100 !== 12)
+      warns.push(`Annual totals cover complete calendar years only — `
+        + `${Math.floor(t/100)} is excluded (data runs through `
+        + `${MONTHS[(t%100)-1]}). Use “Over time — year-to-date” to include it.`);
+  }
+  if (bd.dim === "state")
+    warns.push("U.S. states apply to U.S. trade only — trade with other "
+      + "countries carries no state and is excluded from this breakdown.");
+  if (measure === "quantity" && series.some(s => s.rows.some(r => r[measure] == null)))
+    warns.push("Some cells show “—”: quantities are only totalled where every "
+      + "detail row shares one unit of measure, and this selection mixes units there.");
+  showWarn(warns);
+  clearDirty();
+  state.lastMeta = buildMeta(series);
 
   if (pct) {
     $("totalStat").innerHTML = `Showing <b>% change</b> vs ` +
@@ -787,11 +1001,23 @@ function render(results, bd) {
 }
 
 function titleFor(bd, series) {
-  const flowName = { imp: "Imports", exp_tot: "Exports",
-                     exp_dom: "Domestic exports" }[state.flow];
-  const by = $("breakdown").selectedOptions[0].textContent.replace(/ \(.*\)/, "");
-  const cmp = series && series.length > 1 ? ` — ${series.length} series` : "";
-  return `${flowName} by ${by.toLowerCase()}${cmp}`;
+  const flowName = { imp: "Imports", exp_tot: "Exports", exp_dom: "Domestic exports",
+                     balance: "Trade balance" }[state.flow];
+  const M = periodRange().to % 100;
+  const part = {
+    country: " by partner country", province: " by province", state: " by U.S. state",
+    hs2: " by HS chapter", hs4: " by HS heading", hs6: " by HS subheading",
+    year: ", annual", month: ", monthly",
+    ytd: `, year-to-date (Jan–${MONTHS[M-1]})`,
+    m12: ", 12-month sum",
+    country_year: ` — top ${topN()} partners, annual`,
+    country_month: ` — top ${topN()} partners, monthly`,
+  }[$("breakdown").value] || "";
+  let t = flowName + part;
+  if (!bd.pivot && series.length === 1 && series[0].label && series[0].label !== "Total")
+    t += " — " + truncLabel(series[0].label, 60);
+  else if (!bd.pivot && series.length > 1) t += ` — ${series.length} series`;
+  return t;
 }
 
 const fmtCell = (d, measure, pct) => pct
@@ -805,7 +1031,8 @@ const truncLabel = (s, n = 46) => s && s.length > n ? s.slice(0, n - 1) + "…" 
 // series it also shows a Share column.
 function renderTablePivot(keys, labelByKey, series, bd, measure, pct) {
   const head = bd.dim === "ym" ? "Period" : bd.dim === "year" ? "Year" :
-               bd.dim === "country" ? "Country" : bd.dim === "province" ? "Province" : "HS code";
+               bd.dim === "country" ? "Country" : bd.dim === "province" ? "Province" :
+               bd.dim === "state" ? "U.S. state" : "HS code";
   const single = series.length === 1;
   let html = `<thead><tr><th>${head}</th>`;
   if (single) {
@@ -841,7 +1068,8 @@ function renderChartMulti(keys, labelByKey, series, bd, measure, pct) {
     // single-series bar keeps the per-category rainbow; otherwise one colour/series
     const bg = (!isTime && !multi) ? keys.map((_, j) => PALETTE[j % PALETTE.length]) : color;
     return {
-      label: truncLabel(s.label),
+      // a lone series can carry a long combined label; give it more room
+      label: truncLabel(s.label, multi ? 46 : 90),
       data: keys.map(k => s.byKey.has(k) ? s.byKey.get(k) : null),
       backgroundColor: isTime ? "transparent" : bg,
       borderColor: color, borderWidth: isTime ? 2.5 : 0,
@@ -854,7 +1082,14 @@ function renderChartMulti(keys, labelByKey, series, bd, measure, pct) {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: multi, position: "top", labels: { boxWidth: 12, font: { size: 11 } } },
+        // Legend also shows for a single named series (one product, or a
+        // Combined sum) so the chart says what it's plotting; hidden only for
+        // the unfiltered "Total". Single-series bars are rainbow-coloured, so
+        // drop the (meaningless) colour box there; no toggling either.
+        legend: { display: multi || (series[0].label && series[0].label !== "Total"),
+                  position: "top",
+                  labels: { boxWidth: (multi || isTime) ? 12 : 0, font: { size: 11 } },
+                  onClick: multi ? undefined : () => {} },
         tooltip: { callbacks: { label: (c) =>
           (multi ? c.dataset.label + ": " : "") + fmt(c.parsed.y ?? c.parsed) } } },
       scales: { y: { ticks: { callback: (v) => fmt(v) } },
@@ -875,80 +1110,234 @@ function buildExportRows(keys, labelByKey, series, bd, measure, pct) {
   });
 }
 
+// Everything needed to reproduce/cite the result, captured at render time so
+// the export matches the data even if the sidebar has changed since.
+function buildMeta(series) {
+  const opt = (id) => $(id).selectedOptions[0].textContent;
+  const list = (arr) => arr.length
+    ? arr.map(c => c.code === "__ALL__" ? c.en : `${c.code} ${c.en || ""}`.trim()).join("; ")
+    : "(all)";
+  return [
+    ["Source", "Statistics Canada, Canadian International Merchandise Trade "
+               + "(customs basis), bulk tables 71-607-X"],
+    ["Trade flow", { imp: "Imports", exp_tot: "Exports (total)",
+                     exp_dom: "Exports (domestic)",
+                     balance: "Trade balance (total exports − imports)" }[state.flow]],
+    ["Products (HS)", list(state.hs)],
+    ["Product mode", state.productMode],
+    ["Partner countries", list(state.countries)],
+    ["Partner mode", state.countryMode],
+    ["Provinces of clearance", list(state.provinces)],
+    ["U.S. states", list(state.states)],
+    ["Period", `${$("yearFrom").value}-${String($("monthFrom").value).padStart(2,"0")}`
+             + ` to ${$("yearTo").value}-${String($("monthTo").value).padStart(2,"0")}`],
+    ["Breakdown", opt("breakdown")],
+    ["Show", opt("transform")],
+    ["Measure", opt("measure")],
+    ["Series", series.map(s => s.label).join(" | ")],
+    ["Data mode", DS.label],
+    ["Retrieved", new Date().toISOString().slice(0, 10)],
+    ["Link", location.href],
+  ];
+}
+
 // Build the .xlsx client-side from the last result (works in both data modes).
 function exportXlsx() {
   if (!state.lastExport || !state.lastExport.length) return;
-  const ws = XLSX.utils.json_to_sheet(state.lastExport);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Canada trade");
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(state.lastExport), "Canada trade");
+  if (state.lastMeta)
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(state.lastMeta), "Metadata");
   XLSX.writeFile(wb, "canada-trade.xlsx");
+}
+
+// Chart canvas -> PNG download (white background; the canvas is transparent).
+function downloadPng() {
+  if (!state.chart) return;
+  const src = state.chart.canvas;
+  const c = document.createElement("canvas");
+  c.width = src.width; c.height = src.height;
+  const g = c.getContext("2d");
+  g.fillStyle = "#ffffff"; g.fillRect(0, 0, c.width, c.height);
+  g.drawImage(src, 0, 0);
+  const a = document.createElement("a");
+  a.download = "canada-trade.png"; a.href = c.toDataURL("image/png"); a.click();
 }
 
 // ---- misc -----------------------------------------------------------------
 function showError(msg) {
   $("errBox").innerHTML = msg ? `<div class="err">${escapeHtml(msg)}</div>` : "";
 }
+function showWarn(msgs) {
+  $("warnBox").innerHTML = (msgs || [])
+    .map(m => `<div class="warnbox">${escapeHtml(m)}</div>`).join("");
+}
+
+// Non-blocking data-correctness warnings about the current selection.
+function selectionWarnings() {
+  const msgs = [];
+  if (state.productMode === "combined" && state.hs.length > 1) {
+    if (state.hs.some(c => c.code === "__ALL__"))
+      msgs.push("The “Total — all products” chip already covers everything, so this "
+        + "Combined sum is just the total. Switch to Separate to compare, or remove "
+        + "the other product chips.");
+    else {
+      const codes = state.hs.map(c => c.code);
+      for (const a of codes) for (const b of codes)
+        if (a !== b && b.startsWith(a))
+          msgs.push(`HS ${a} already includes ${b}, so the Combined sum counts `
+            + `${b} twice. Remove one, or switch to Separate.`);
+    }
+  }
+  if (state.countryMode === "combined" && state.countries.length > 1
+      && state.countries.some(c => c.code === "__ALL__"))
+    msgs.push("The “World — all countries” chip already covers everything, so this "
+      + "Combined sum is just the world total. Switch to Separate to compare, or "
+      + "remove the other country chips.");
+  return msgs;
+}
+
+// Dim stale results when any filter changes after a run.
+function markDirty() {
+  if (!state.lastResults) return;
+  $("chartWrap").classList.add("stale"); $("tableCard").classList.add("stale");
+  $("staleNote").style.display = "";
+}
+function clearDirty() {
+  $("chartWrap").classList.remove("stale"); $("tableCard").classList.remove("stale");
+  $("staleNote").style.display = "none";
+}
+
+// Central flow switch: keeps the segmented control, province/measure
+// availability, and the HS tree's classification in sync.
+function setFlow(flow) {
+  state.flow = flow;
+  $("flowSeg").querySelectorAll("button").forEach(x =>
+    x.classList.toggle("on", x.dataset.flow === flow));
+  // total exports carry no province of clearance — nor, therefore, the balance
+  const noProv = flow === "exp_tot" || flow === "balance";
+  $("provGroup").style.display = noProv ? "none" : "";
+  $("breakdown").querySelector('[value="province"]').disabled = noProv;
+  if (noProv && $("breakdown").value === "province") {
+    $("breakdown").value = "month"; onBreakdownChange();
+  }
+  // a quantity balance is unit-nonsense; the balance is dollars only
+  $("measure").querySelector('[value="quantity"]').disabled = flow === "balance";
+  if (flow === "balance") $("measure").value = "value";
+  onHsSearch();   // relabel the HS tree for the flow's classification
+}
+
+// ---- shareable URLs --------------------------------------------------------
+// The whole query lives in one ?q= JSON param (codes AND names, so chips can
+// be rebuilt without lookups). Rewritten after every successful run.
+function updateUrl() {
+  const pair = (arr) => arr.map(c => [c.code, c.en]);
+  const q = { f: state.flow, h: pair(state.hs), c: pair(state.countries),
+              s: pair(state.states), p: state.provinces.map(x => x.code),
+              pm: state.productMode, cm: state.countryMode,
+              from: (+$("yearFrom").value)*100 + (+$("monthFrom").value),
+              to: (+$("yearTo").value)*100 + (+$("monthTo").value),
+              bd: $("breakdown").value, tr: $("transform").value,
+              ms: $("measure").value, n: $("topN").value };
+  const u = new URL(location.href);
+  u.searchParams.set("q", JSON.stringify(q));
+  history.replaceState(null, "", u);
+}
+
+function restoreFromUrl() {
+  const raw = new URLSearchParams(location.search).get("q");
+  if (!raw) return false;
+  let q; try { q = JSON.parse(raw); } catch { return false; }
+  const chips = (v) => (v || []).map(([code, en]) => ({ code, en }));
+  if (q.f) setFlow(q.f);
+  state.hs = chips(q.h); state.countries = chips(q.c);
+  state.states = DS.mode === "wasm" ? [] : chips(q.s);   // no states in the slice
+  state.provinces = (q.p || []).map(c =>
+    ({ code: c, en: (state.dims.provinces.find(p => p.code === c) || {}).en }));
+  renderChips("hs"); renderChips("countries"); renderChips("states");
+  renderProvincePills();
+  const setMode = (segId, key, val) => {
+    if (!val) return;
+    state[key] = val;
+    $(segId).querySelectorAll("button").forEach(b =>
+      b.classList.toggle("on", b.dataset.mode === val));
+  };
+  setMode("hsMode", "productMode", q.pm); setMode("ctryMode", "countryMode", q.cm);
+  const setSel = (id, v) => { if (v != null &&
+    [...$(id).options].some(o => o.value == v && !o.disabled)) $(id).value = v; };
+  if (q.from) { setSel("yearFrom", yr(q.from)); setSel("monthFrom", mo(q.from)); }
+  if (q.to) { setSel("yearTo", yr(q.to)); setSel("monthTo", mo(q.to)); }
+  setSel("breakdown", q.bd); setSel("transform", q.tr);
+  setSel("measure", q.ms); setSel("topN", q.n);
+  onBreakdownChange();
+  return true;
+}
 function escapeHtml(s) {
   return String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 }
 
-function toggleTransform() {
-  // The Show (level / % change) control only applies to "over time" breakdowns.
-  $("transformGroup").style.display =
-    BREAKDOWNS[$("breakdown").value].chart === "line" ? "" : "none";
+function onBreakdownChange() {
+  const bd = BREAKDOWNS[$("breakdown").value];
+  // Show (level / % change) only applies over time; Top N to rankings & pivots.
+  $("transformGroup").style.display = bd.chart === "line" ? "" : "none";
+  $("topNGroup").style.display = (bd.chart === "bar" || bd.pivot) ? "" : "none";
 }
 
 function clearAll() {
-  state.hs = []; state.countries = []; state.provinces = [];
+  state.hs = []; state.countries = []; state.provinces = []; state.states = [];
   state.productMode = "combined"; state.countryMode = "combined";
-  renderChips("hs"); renderChips("countries");
-  $("hsSearch").value = ""; $("ctrySearch").value = "";
-  $("ctryPicker").style.display = "none";
-  renderCountryPicker(""); renderProvincePills(); loadHsRoot();
-  $("flowSeg").querySelectorAll("button").forEach(x => x.classList.remove("on"));
-  $("flowSeg").querySelector('[data-flow="exp_dom"]').classList.add("on");
-  state.flow = "exp_dom"; $("provGroup").style.display = "";
+  renderChips("hs"); renderChips("countries"); renderChips("states");
+  $("hsSearch").value = ""; $("ctrySearch").value = ""; $("stSearch").value = "";
+  $("ctryPicker").style.display = "none"; $("stPicker").style.display = "none";
+  renderCountryPicker(""); renderProvincePills();
+  setFlow("exp_dom");   // also reloads the HS tree + re-enables options
   $("yearFrom").value = yr(state.periodMin); $("monthFrom").value = mo(state.periodMin);
   $("yearTo").value = yr(state.periodMax);  $("monthTo").value = mo(state.periodMax);
   $("breakdown").value = "month"; $("measure").value = "value";
-  $("transform").value = "level"; toggleTransform();
+  $("transform").value = "level"; $("topN").value = "20"; onBreakdownChange();
   if (state.chart) { state.chart.destroy(); state.chart = null; }
-  state.lastResults = null; state.lastExport = null;
+  state.lastResults = null; state.lastExport = null; state.lastMeta = null;
   $("emptyState").style.display = ""; $("chartWrap").style.display = "none";
-  $("tableCard").style.display = "none"; $("exportBtn").disabled = true;
+  $("tableCard").style.display = "none";
+  $("exportBtn").disabled = true; $("pngBtn").disabled = true;
   $("totalStat").textContent = ""; $("timeBadge").textContent = "";
-  $("resultTitle").textContent = "Results"; showError("");
+  $("resultTitle").textContent = "Results";
+  showError(""); showWarn([]); clearDirty();
+  const u = new URL(location.href);
+  u.searchParams.delete("q"); history.replaceState(null, "", u);
 }
 
 function wire() {
-  $("flowSeg").querySelectorAll("button").forEach(b => b.onclick = () => {
-    $("flowSeg").querySelectorAll("button").forEach(x => x.classList.remove("on"));
-    b.classList.add("on"); state.flow = b.dataset.flow;
-    // total exports have no province dimension
-    $("provGroup").style.display = state.flow === "exp_tot" ? "none" : "";
-    onHsSearch();
-  });
+  $("flowSeg").querySelectorAll("button").forEach(b =>
+    b.onclick = () => { setFlow(b.dataset.flow); markDirty(); });
   $("hsSearch").oninput = onHsSearch;
-  // Country list stays collapsed until you click into the search; it hides again
-  // when focus leaves the box (selected countries remain as chips below).
-  const showCtry = () => { renderCountryPicker($("ctrySearch").value); $("ctryPicker").style.display = ""; };
-  $("ctrySearch").onfocus = showCtry;
-  $("ctrySearch").oninput = showCtry;
-  $("ctryWrap").addEventListener("focusout", () => setTimeout(() => {
-    if (!$("ctryWrap").contains(document.activeElement)) $("ctryPicker").style.display = "none";
-  }, 150));
-  $("breakdown").onchange = toggleTransform;
+  // Country/state lists stay collapsed until you click into the search; they
+  // hide again when focus leaves the box (selections remain as chips below).
+  [["ctrySearch", "ctryPicker", "ctryWrap", renderCountryPicker],
+   ["stSearch", "stPicker", "stWrap", renderStatePicker]]
+  .forEach(([inp, pick, wrap, renderFn]) => {
+    const show = () => { renderFn($(inp).value); $(pick).style.display = ""; };
+    $(inp).onfocus = show;
+    $(inp).oninput = show;
+    $(wrap).addEventListener("focusout", () => setTimeout(() => {
+      if (!$(wrap).contains(document.activeElement)) $(pick).style.display = "none";
+    }, 150));
+  });
+  $("breakdown").onchange = () => { onBreakdownChange(); markDirty(); };
+  ["yearFrom", "monthFrom", "yearTo", "monthTo", "transform", "measure", "topN"]
+    .forEach(id => $(id).onchange = markDirty);
   $("hsAddAll").onclick = () => addChip("hs", { code: "__ALL__", en: "Total — all products" });
   $("ctryAddAll").onclick = () => addChip("countries", { code: "__ALL__", en: "World — all countries" });
   [["hsMode", "productMode"], ["ctryMode", "countryMode"]].forEach(([id, key]) => {
     $(id).querySelectorAll("button").forEach(b => b.onclick = () => {
       $(id).querySelectorAll("button").forEach(x => x.classList.remove("on"));
-      b.classList.add("on"); state[key] = b.dataset.mode;
+      b.classList.add("on"); state[key] = b.dataset.mode; markDirty();
     });
   });
   $("runBtn").onclick = runQuery;
   $("clearBtn").onclick = clearAll;
   $("exportBtn").onclick = exportXlsx;
+  $("pngBtn").onclick = downloadPng;
 }
 
 init();

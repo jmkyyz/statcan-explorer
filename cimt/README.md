@@ -133,12 +133,27 @@ month-precise ranges, and sorts time-series breakdowns chronologically.
 ## Query-builder UI (Phase 3)
 
 `cimt-explorer.html` (served at `/`) — single-file vanilla-JS app, Chart.js, the
-StatCan Explorer design system. Pick a flow; optionally filter by product (HS
-tree drill-down), partner country, province, and a month-precise time range;
-"break down by" country / province / HS chapter-heading-subheading / yearly /
-monthly; for over-time views, show level or period-over-period / year-over-year
-% change. Results render as a chart + share table with an `.xlsx` export. Run
-queries are national by default (province filter optional).
+StatCan Explorer design system. Pick a flow — imports, total/domestic exports,
+or **balance** (total exports − imports, value-only, ranked by magnitude);
+optionally filter by product (HS tree drill-down), partner country, province,
+**U.S. state** (local API mode only — the online slice has no state column),
+and a month-precise time range. "Break down by" country / province / U.S. state
+/ HS chapter-heading-subheading / over time / **top-N partners over time**
+(ranks partners over the selection, then one line each); rankings show an
+adjustable top N (5/10/20/50). Over-time views come in four flavours that all
+avoid the partial-current-year cliff: **annual** (complete calendar years only,
+with a note when the current year is excluded), **year-to-date** (every year
+truncated to the latest available month, so the current year compares fairly),
+**monthly**, and **12-month sum** (trailing rolling total). For over-time views,
+show level or period-over-period / year-over-year % change. Multi-selections plot Combined
+(sum) or Separate; series run in parallel and every chart is legend-labelled
+with what it plots. Non-blocking warnings flag overlapping HS prefixes in a
+Combined sum (double-counting) and mixed units-of-measure in quantity mode;
+stale results dim until re-run. The whole query lives in a shareable `?q=` URL
+(a shared link re-opens straight onto its chart). Results render as a chart
+(+ `.png` download) and share table with an `.xlsx` export that includes a
+metadata sheet (source, filters, retrieval date, link). Queries are national
+by default (province filter optional).
 
 ## Monthly refresh (Phase 4)
 

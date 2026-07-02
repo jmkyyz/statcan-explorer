@@ -47,9 +47,9 @@ TIERS = {2: "hs2", 4: "hs4", 6: "hs6", 8: "hs8"}  # else -> detail
 app = Flask(__name__)
 CORS(app)
 
-# A single in-process DuckDB connection; it reads Parquet files directly.
-# Fine for local single-user. For the multi-user Phase 5 deployment, hand each
-# request its own con.cursor() (DuckDB connections aren't thread-safe to share).
+# One parent DuckDB connection holds the catalog (label views); every request
+# runs on its own con.cursor() because Flask serves requests on threads and
+# the UI issues parallel queries — DuckDB connections aren't thread-safe to share.
 con = duckdb.connect(database=":memory:")
 
 
@@ -113,10 +113,11 @@ def health():
     if not PARQUET.exists():
         return jsonify(ok=False, error=f"no store at {PARQUET}"), 503
     det = _q(PARQUET / "detail")
-    rows = con.execute(
+    c = con.cursor()
+    rows = c.execute(
         f"SELECT flow, year, count(*) n FROM {det} "
         f"GROUP BY 1,2 ORDER BY 2,1").fetchall()
-    pmin, pmax = con.execute(
+    pmin, pmax = c.execute(
         f"SELECT min(year*100+month), max(year*100+month) FROM {det}").fetchone()
     return jsonify(ok=True, data_dir=str(PARQUET),
                    period_min=pmin, period_max=pmax,
@@ -127,13 +128,14 @@ def health():
 @app.route("/api/dimensions")
 def dimensions():
     """Small lookup lists to populate UI dropdowns."""
+    c = con.cursor()
     def rows(view, extra=""):
         if not (DIM / f"{view}.parquet").exists():
             return []
-        return [dict(zip(("code", "en"), r)) for r in con.execute(
+        return [dict(zip(("code", "en"), r)) for r in c.execute(
             f"SELECT DISTINCT code, en FROM {view} "
             f"WHERE valid_to='999912' {extra} ORDER BY code").fetchall()]
-    hs2 = [dict(zip(("code", "en"), r)) for r in con.execute(
+    hs2 = [dict(zip(("code", "en"), r)) for r in c.execute(
         "SELECT DISTINCT hs, en FROM dim_hs WHERE hs_len=2 AND valid_to='999912' "
         "ORDER BY hs").fetchall()] if (DIM / "dim_hs.parquet").exists() else []
     return jsonify(
@@ -177,7 +179,8 @@ def hs_children():
           ON p.hs = d.hs
         ORDER BY p.hs"""
     params = [flow] + ([code + "%"] if code else [])
-    out = [{"code": r[0], "en": r[1]} for r in con.execute(sql, params).fetchall()]
+    out = [{"code": r[0], "en": r[1]}
+           for r in con.cursor().execute(sql, params).fetchall()]
     return jsonify(parent=code, children=out)
 
 
@@ -197,7 +200,7 @@ def hs_search():
     ql = q.lower()
     # Rank: code-prefix first, then label word-start (e.g. "gold" -> "Gold…"
     # ahead of "mangolds"), then any substring; broader (shorter) codes first.
-    rows = con.execute("""
+    rows = con.cursor().execute("""
         SELECT hs, any_value(en) en, any_value(hs_len) hs_len
         FROM dim_hs
         WHERE valid_to='999912' AND (classification='both' OR classification=?)
@@ -290,18 +293,18 @@ LABEL_VIEWS = {"country": "dim_country", "province": "dim_province",
                "state": "dim_state", "uom": "dim_uom"}
 
 
-def attach_labels(rows: list[dict], cols: list[str], flow: str) -> None:
+def attach_labels(rows: list[dict], cols: list[str], flow: str, cur) -> None:
     """Add a `<dim>_label` to each row for grouped code dimensions, in place."""
     for dim in cols:
         view = LABEL_VIEWS.get(dim)
         if view and (DIM / f"{view}.parquet").exists():
-            m = dict(con.execute(
+            m = dict(cur.execute(
                 f"SELECT code, en FROM {view} WHERE valid_to='999912'").fetchall())
             for r in rows:
                 r[f"{dim}_label"] = m.get(r[dim])
     if "hs" in cols and (DIM / "dim_hs.parquet").exists():
         cls = FLOW_CLASS.get(flow, "M")
-        m = dict(con.execute(
+        m = dict(cur.execute(
             "SELECT hs, any_value(en) FROM dim_hs WHERE valid_to='999912' "
             "AND (classification='both' OR classification=?) GROUP BY hs",
             [cls]).fetchall())
@@ -317,10 +320,11 @@ def query():
     except ValueError as e:
         return jsonify(error=str(e)), 400
     t = time.time()
-    rel = con.execute(sql, params)
-    cols = [c[0] for c in rel.description]
+    c = con.cursor()
+    rel = c.execute(sql, params)
+    cols = [col[0] for col in rel.description]
     rows = [dict(zip(cols, r)) for r in rel.fetchall()]
-    attach_labels(rows, group_cols, body.get("flow"))
+    attach_labels(rows, group_cols, body.get("flow"), c)
     return jsonify(columns=cols, rows=rows, row_count=len(rows),
                    elapsed_ms=round((time.time() - t) * 1000, 1), sql=sql)
 
@@ -332,7 +336,7 @@ def export():
         sql, params, _ = _build_query(body)
     except ValueError as e:
         return jsonify(error=str(e)), 400
-    df = con.execute(sql, params).fetch_arrow_table()
+    df = con.cursor().execute(sql, params).fetch_arrow_table()
     buf = io.BytesIO()
     # Use DuckDB's own XLSX writer via a temp file would need the excel ext;
     # write a pandas-free .xlsx through pyarrow->openpyxl.
