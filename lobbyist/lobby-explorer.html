@@ -241,7 +241,8 @@
     padding: 2px 8px;
     font-size: 11px;
     margin: 1px;
-    white-space: nowrap;
+    max-width: 100%;
+    overflow-wrap: break-word;
   }
   .tag.red { background: #fee2e2; color: var(--red); }
   .tag.green { background: #d1fae5; color: #065f46; }
@@ -1110,9 +1111,22 @@ const subjTooltip = document.getElementById("subj-tooltip");
 
 document.getElementById("main").addEventListener("mouseover", e => {
   const cell = e.target.closest(".subj-cell");
-  if (!cell || !cell.dataset.detail) { subjTooltip.style.display = "none"; return; }
+  if (!cell || (!cell.dataset.detail && !cell.querySelector(".tag"))) {
+    subjTooltip.style.display = "none";
+    return;
+  }
 
-  subjTooltip.innerHTML = [...new Set(cell.dataset.detail.split(" || "))].map(d => `• ${d}`).join("<br>");
+  if (cell.dataset.detail) {
+    subjTooltip.innerHTML = [...new Set(cell.dataset.detail.split(" || "))].map(d => `• ${d}`).join("<br>");
+  } else {
+    // Registry detail text is only in the weekly bulk file (recently added
+    // records lack it until the next rebuild) and only exists for reports
+    // filed after Oct 2024.
+    const date = cell.closest("tr")?.cells[1]?.textContent || "";
+    subjTooltip.innerHTML = date >= "2024-10"
+      ? `<em style="opacity:.8">Subject-matter details for this recently added record will appear after the next weekly data refresh.</em>`
+      : `<em style="opacity:.8">No subject-matter details — only reports filed after October 2024 include them.</em>`;
+  }
   subjTooltip.style.display = "block";
 
   const rect = cell.getBoundingClientRect();
