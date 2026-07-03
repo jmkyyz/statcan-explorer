@@ -1,4 +1,4 @@
-# StatCan Data Explorer — Setup Guide
+# StatCan Econ Explorer — Setup Guide
 
 This is a two-part application:
 

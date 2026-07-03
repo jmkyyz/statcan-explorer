@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>StatCan Explorer</title>
+<title>StatCan Econ Explorer</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
@@ -692,7 +692,7 @@
         <path d="M4 15l4-6 4 2 4-5 4 4"/>
       </svg>
     </span>
-    <h1>StatCan Explorer</h1>
+    <h1>StatCan Econ Explorer</h1>
   </div>
   <span>Statistics Canada · Data Workbench</span>
   <button class="catalog-btn" onclick="openCatalog()" title="Browse the full catalog of categories and series">📖 <span class="catalog-btn-full">View Full Catalog</span><span class="catalog-btn-short">Catalog</span></button>
@@ -3280,7 +3280,7 @@ function confirmSaveConfig() {
   const encoded = _encodeConfig(config);
   if (encoded) {
     window.history.replaceState(null, '', '#cfg=' + encoded);
-    document.title = 'StatCan Explorer — ' + name;
+    document.title = 'StatCan Econ Explorer — ' + name;
     showBookmarkPrompt(name);
   }
   cancelSaveConfig();
@@ -3442,7 +3442,7 @@ autoLoadTemplate();
   flex-shrink: 0;
 ">
   Data from Statistics Canada WDS – <a href="https://www.statcan.gc.ca" target="_blank" rel="noopener" style="color: var(--accent); text-decoration: none;">Statcan.gc.ca</a><br>
-  StatCan Data Explorer was created by Claude under direction from Jason Kirby
+  StatCan Econ Explorer was created by Claude under direction from Jason Kirby
 </footer>
 
 </body>
