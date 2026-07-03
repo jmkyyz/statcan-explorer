@@ -78,6 +78,13 @@ export default function App() {
           </main>
         </div>
       </div>
+
+      <footer className="mt-8 border-t border-slate-200 dark:border-slate-800 py-5 px-4 text-center text-xs text-slate-400 dark:text-slate-500 leading-relaxed">
+        Data from Transport Canada's iZEV program via the Open Government Portal –{' '}
+        <a href="https://open.canada.ca" target="_blank" rel="noopener" className="underline hover:text-slate-600 dark:hover:text-slate-300">open.canada.ca</a>
+        <br />
+        EV Incentive Tracker was created by Claude under direction from Jason Kirby
+      </footer>
     </div>
   )
 }
