@@ -46,8 +46,14 @@ export default function App() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <header className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-sm">
         <div className="max-w-screen-xl mx-auto px-4 py-4 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white font-bold text-sm shrink-0">
-            EV
+          <div className="w-8 h-8 rounded-lg bg-blue-500 flex items-center justify-center text-white shrink-0">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="7" cy="17" r="2" />
+              <circle cx="17" cy="17" r="2" />
+              <path d="M5 17H3v-6l2-4h8l4 4h2a2 2 0 0 1 2 2v4h-2" />
+              <path d="M9 17h6" />
+              <path d="M12.5 10.5l-1.8 2.7h3l-1.8 2.7" />
+            </svg>
           </div>
           <div>
             <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100 leading-tight">
