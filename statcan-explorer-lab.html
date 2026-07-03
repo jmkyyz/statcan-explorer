@@ -896,14 +896,14 @@
         <span style="color:var(--muted);font-size:11px;text-transform:none;letter-spacing:0;margin-left:4px;">optional</span>
       </h3>
       <div id="formulaLetterKey" style="font-size:11px;color:var(--muted);margin-bottom:4px;line-height:1.6;display:none"></div>
-      <div class="control-group" style="display:flex;gap:4px;align-items:center">
-        <input type="text" id="formulaInput" placeholder="e.g. 100*(A+B+C+D)/E"
-               style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px"
-               oninput="updateFormula(this.value)" onkeydown="if(event.key==='Enter')applyFormula()">
-        <button onclick="applyFormula()" title="Apply formula"
-                style="flex-shrink:0;padding:0 10px;height:28px;border:1px solid var(--accent);background:var(--accent);border-radius:4px;cursor:pointer;font-size:11px;color:#fff;font-family:var(--font-ui);font-weight:600">Apply</button>
-        <button onclick="clearFormula()" title="Clear formula"
-                style="flex-shrink:0;padding:0 7px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:4px;cursor:pointer;font-size:12px;color:var(--muted)">✕</button>
+      <div id="formulaRows"></div>
+      <div style="display:flex;gap:4px;align-items:center;margin-top:2px">
+        <button onclick="addFormula()" title="Add another formula line"
+                style="flex-shrink:0;padding:0 8px;height:26px;border:1px dashed var(--border);background:var(--surface2);border-radius:4px;cursor:pointer;font-size:11px;color:var(--muted);font-family:var(--font-ui)">+ Add line</button>
+        <button onclick="applyFormulas()" title="Apply formulas"
+                style="flex-shrink:0;padding:0 12px;height:26px;border:1px solid var(--accent);background:var(--accent);border-radius:4px;cursor:pointer;font-size:11px;color:#fff;font-family:var(--font-ui);font-weight:600">Apply</button>
+        <button onclick="clearFormulas()" title="Clear all formulas"
+                style="flex-shrink:0;padding:0 7px;height:26px;border:1px solid var(--border);background:var(--surface2);border-radius:4px;cursor:pointer;font-size:12px;color:var(--muted)">✕</button>
       </div>
       <p class="formula-hint" id="formulaHint"></p>
       <p id="formulaTransformWarn" style="display:none;font-size:11px;color:#b45309;background:#fffbeb;border:1px solid #fcd34d;border-radius:4px;padding:4px 8px;margin-top:4px;line-height:1.4"></p>
@@ -1017,8 +1017,9 @@ const state = {
   processedData: {},
   seriesUnits: {},
   vectorHealth: {},       // vectorId → { status, terminated, empty, lastRefPer }
-  formula: '',
-  formulaResult: null,
+  formulas: [{ expr: '', label: '' }],  // one row per formula line; label = optional override
+  formulaResults: [],                   // computed: [{ expr, label, points:[{label,value}] }]
+  activeFormulaIdx: 0,                   // row that preset buttons target
   autoUpdateTo: true,
   // Pending breakdown selection
   pendingSeriesId: null,
@@ -1032,30 +1033,70 @@ let chartInst = null;
 // ═══════════════════════════════════════════════════════════
 // FRED — hardcoded U.S. series
 // ═══════════════════════════════════════════════════════════
-const FRED_SERIES = [
-  { id: 'fred_unrate',    name: 'Unemployment Rate (SA)',     chipLabel: 'Unemployment Rate SA (US)',    vectorId: 'UNRATE',    sourceFreq: 'monthly'   },
-  { id: 'fred_unratensa', name: 'Unemployment Rate (NSA)',    chipLabel: 'Unemployment Rate NSA (US)',   vectorId: 'UNRATENSA', sourceFreq: 'monthly'   },
-  { id: 'fred_payems',    name: 'Nonfarm Payrolls (SA)',      chipLabel: 'Nonfarm Payrolls SA (US)',     vectorId: 'PAYEMS',    sourceFreq: 'monthly'   },
-  { id: 'fred_paynsa',    name: 'Nonfarm Payrolls (NSA)',     chipLabel: 'Nonfarm Payrolls NSA (US)',    vectorId: 'PAYNSA',    sourceFreq: 'monthly'   },
-  { id: 'fred_cpiaucsl',  name: 'CPI All Items (SA)',         chipLabel: 'CPI All Items SA (US)',        vectorId: 'CPIAUCSL',  sourceFreq: 'monthly'   },
-  { id: 'fred_cpiaucns',  name: 'CPI All Items (NSA)',        chipLabel: 'CPI All Items NSA (US)',       vectorId: 'CPIAUCNS',  sourceFreq: 'monthly'   },
-  { id: 'fred_gdp',       name: 'GDP (Nominal)',              chipLabel: 'GDP Nominal (US)',             vectorId: 'GDP',       sourceFreq: 'quarterly' },
-  { id: 'fred_gdpc1',     name: 'Real GDP',                  chipLabel: 'Real GDP (US)',                vectorId: 'GDPC1',     sourceFreq: 'quarterly' },
-];
+// U.S. (FRED) catalog — fetched from /api/fred-catalog at load, then flattened
+// by buildSeriesMap() exactly like the StatCan catalog. Four 🇺🇸 categories:
+// GDP & yields are flat (dims:0); Employment & Prices open FRED release tables
+// as dim1 sub-series, with the FRED hierarchy preserved via per-row `level`
+// (dimOptionsHtml indents the dropdown by level, like StatCan commodity trees).
+// The `.vectors` value holds a FRED series id; the fetch path already routes
+// tableId:'FRED' ids to /api/fred, so no engine changes are needed.
+let FRED_CATALOG = null;
 
-function injectFredCategory() {
-  const catId = 'united_states';
-  CATEGORIES[catId] = {
-    id: catId, label: '🇺🇸 United States', sourceFreq: 'monthly',
-    series: FRED_SERIES.map(s => ({ id: s.id, name: s.name, tableId: 'FRED', dims: 0 })),
-  };
-  FRED_SERIES.forEach(s => {
-    SERIES_MAP[s.id] = {
-      id: s.id, name: s.name, chipLabel: s.chipLabel,
-      category: '🇺🇸 United States', vectorId: s.vectorId,
-      tableId: 'FRED', sourceFreq: s.sourceFreq,
-    };
-  });
+// Fetch (and cache) the FRED catalog. Safe to call repeatedly — returns the
+// cached copy when present, retries the fetch when a previous attempt failed,
+// so a transient error at page load doesn't permanently lose the 🇺🇸 categories
+// (e.g. when a later XLSX upload rebuilds CATEGORIES from scratch).
+async function loadFredCatalog() {
+  if (FRED_CATALOG) return FRED_CATALOG;
+  try {
+    const r = await fetch('/api/fred-catalog');
+    if (r.ok) FRED_CATALOG = await r.json();
+  } catch (_) { /* U.S. categories simply won't appear this round */ }
+  return FRED_CATALOG;
+}
+
+function buildFredCategories() {
+  if (!FRED_CATALOG || !Array.isArray(FRED_CATALOG.categories)) return;
+  for (const cat of FRED_CATALOG.categories) {
+    const series = cat.series.map(s => {
+      if (!s.dims) {
+        return {
+          id: s.id, name: s.name, tableId: 'FRED', dims: 0, freq: s.freq,
+          vectors: { '': s.fredId },
+          labels:  { '': { full: s.name, short: s.chipShort || s.name } },
+        };
+      }
+      if (s.dims === 2) {
+        // dims:2 — e.g. GDP expenditure mirroring StatCan's Prices → Estimates.
+        // Row hierarchy indents the dim2 (Estimates) dropdown.
+        const vectors = {}, labels = {}, lv2 = {};
+        for (const row of s.rows) {
+          const key = `${row.dim1}__${row.value}`;
+          vectors[key] = row.fredId;
+          labels[key]  = { full: row.full || row.value, short: row.short || row.value };
+          lv2[row.value] = row.level;
+        }
+        return {
+          id: s.id, name: s.name, tableId: 'FRED', dims: 2, freq: s.freq,
+          dim1Name: s.dim1Name || 'Prices', dim2Name: s.dim2Name || 'Estimates',
+          vectors, labels, dimLevels: { 2: lv2 },
+        };
+      }
+      // dims:1 — a FRED release table opened as dim1 sub-series
+      const vectors = {}, labels = {}, levels = {};
+      for (const row of s.rows) {
+        vectors[row.value] = row.fredId;
+        labels[row.value]  = { full: row.full || row.value, short: row.short || row.value };
+        levels[row.value]  = row.level;
+      }
+      return {
+        id: s.id, name: s.name, tableId: 'FRED', dims: 1, freq: s.freq,
+        dim1Name: s.dim1Name || 'Series',
+        vectors, labels, dimLevels: { 1: levels },
+      };
+    });
+    CATEGORIES[cat.id] = { id: cat.id, label: cat.label, sourceFreq: cat.sourceFreq, series };
+  }
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1174,6 +1215,7 @@ function parseRows(rows) {
 }
 
 function buildSeriesMap() {
+  buildFredCategories();   // append 🇺🇸 categories (if the FRED catalog loaded)
   SERIES_MAP = {};
   for (const [, cat] of Object.entries(CATEGORIES)) {
     for (const s of cat.series) {
@@ -1234,7 +1276,6 @@ function buildSeriesMap() {
       }
     }
   }
-  injectFredCategory();
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -1263,10 +1304,11 @@ function loadFile(file) {
     return;
   }
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const wb = XLSX.read(e.target.result, { type: 'array' });
       CATEGORIES = parseExcel(wb);
+      await loadFredCatalog();   // retry if the page-load fetch failed
       buildSeriesMap();
       const count = Object.values(CATEGORIES).reduce((n, c) => n + c.series.length, 0);
       if (count === 0) { toast('No series found — check spreadsheet format', 'error'); return; }
@@ -1299,6 +1341,7 @@ function activateUI(filename, count) {
    'transformSection','formulaSection','btnSection'].forEach(id => {
     document.getElementById(id).style.display = '';
   });
+  renderFormulaRows();
 
   // Init first category
   state.category = Object.keys(CATEGORIES)[0];
@@ -2037,7 +2080,7 @@ function updateFormulaWarn() {
   const el = document.getElementById('formulaTransformWarn');
   if (!el) return;
   const nonLevel = Object.values(state.seriesTransforms).filter(t => t && t !== 'level');
-  const active = !!state.formulaResult?.length && nonLevel.length > 0;
+  const active = state.formulaResults.length > 0 && nonLevel.length > 0;
   el.style.display = active ? '' : 'none';
   if (active) el.textContent = `⚠ Formula is running on transformed values — set all series to Level for ratios or shares.`;
 }
@@ -2048,8 +2091,10 @@ function clearChart() {
   state.processedData = {};
   state.seriesUnits = {};
   state.seriesTransforms = {};
-  state.formulaResult = null;
-  state.formula = '';
+  state.formulas = [{ expr: '', label: '' }];
+  state.formulaResults = [];
+  state.activeFormulaIdx = 0;
+  renderFormulaRows();
   state.frequency = 'original';
   state.pendingSeriesId = null;
   state.pendingDim1 = null;
@@ -2062,11 +2107,8 @@ function clearChart() {
   document.getElementById('toYear').value    = new Date().getFullYear();
   document.getElementById('toMonth').value   = 12;
   document.getElementById('freqSelect').value = 'original';
-  const inp = document.getElementById('formulaInput');
-  if (inp) inp.value = '';
   const hint = document.getElementById('formulaHint');
   if (hint) hint.textContent = '';
-  document.querySelectorAll('.formula-preset').forEach(b => b.classList.remove('formula-active'));
   hideDimPanel();
   renderSeriesList();
   if (chartInst) { chartInst.destroy(); chartInst = null; }
@@ -2435,7 +2477,7 @@ function applyAndRender() {
     srcEl.style.display = 'none';
   }
 
-  computeFormula();
+  computeFormulas();
   renderChart();
   renderTable();
   document.getElementById('exportBtn').style.display = '';
@@ -2447,19 +2489,20 @@ function applyAndRender() {
 // ═══════════════════════════════════════════════════════════
 // Globe & Mail official accessible chart palette
 const PALETTE = ['#8b4061', '#8ecad4', '#c7a479', '#d46868', '#d1d3d4'];
+const FORMULA_PALETTE = ['#8b4061', '#0f6cbd', '#107c41', '#c19c00', '#8764b8'];
 
 function renderChart() {
   const empty  = document.getElementById('chartEmpty');
   const canvas = document.getElementById('myChart');
   const sids   = state.activeSeries.filter(s => state.processedData[s]?.length);
 
-  if (!sids.length && !state.formulaResult?.length) {
+  if (!sids.length && !state.formulaResults.length) {
     empty.style.display = 'flex'; canvas.style.display = 'none'; return;
   }
   empty.style.display = 'none';
   canvas.style.display = '';
 
-  const formulaLabels = state.formulaResult?.map(p => p.label) ?? [];
+  const formulaLabels = state.formulaResults.flatMap(f => f.points.map(p => p.label));
   const allLabels = [...new Set([
     ...sids.flatMap(s => state.processedData[s].map(p => p.label)),
     ...formulaLabels,
@@ -2474,8 +2517,7 @@ function renderChart() {
   const isStacked = state.chartType === 'stacked';
   const isArea    = state.chartType === 'area';
 
-  const formulaActive = !!state.formulaResult?.length;
-  const FORMULA_COLOR = '#8b4061';
+  const formulaActive = state.formulaResults.length > 0;
 
   const activeUoms = [...new Set(sids.map(sid => state.seriesUnits?.[sid]?.uom).filter(Boolean))];
   const yAxisUnit  = formulaActive ? ''
@@ -2502,15 +2544,18 @@ function renderChart() {
   });
 
   if (formulaActive) {
-    const fdmap = Object.fromEntries(state.formulaResult.map(p => [p.label, p.value]));
-    const fdata = allLabels.map(l => fdmap[l] ?? null);
-    datasets.push({
-      type: 'line', label: formulaLabel(state.formula), data: fdata,
-      borderColor: FORMULA_COLOR,
-      backgroundColor: isArea ? FORMULA_COLOR + '28' : 'transparent',
-      fill: isArea, tension: 0.35,
-      pointRadius: allLabels.length > 80 ? 0 : 3,
-      pointHoverRadius: 5, borderWidth: 2.5,
+    state.formulaResults.forEach((f, fi) => {
+      const color = FORMULA_PALETTE[fi % FORMULA_PALETTE.length];
+      const fdmap = Object.fromEntries(f.points.map(p => [p.label, p.value]));
+      const fdata = allLabels.map(l => fdmap[l] ?? null);
+      datasets.push({
+        type: 'line', label: f.label || formulaLabel(f.expr), data: fdata,
+        borderColor: color,
+        backgroundColor: isArea ? color + '28' : 'transparent',
+        fill: isArea, tension: 0.35,
+        pointRadius: allLabels.length > 80 ? 0 : 3,
+        pointHoverRadius: 5, borderWidth: 2.5,
+      });
     });
   }
 
@@ -2582,11 +2627,11 @@ function renderChart() {
 function renderTable() {
   const wrap = document.getElementById('tableWrap');
   const sids = state.activeSeries.filter(s => state.processedData[s]?.length);
-  const hasFormula = !!state.formulaResult?.length;
+  const hasFormula = state.formulaResults.length > 0;
   if (!sids.length && !hasFormula) { wrap.style.display = 'none'; return; }
   wrap.style.display = '';
 
-  const formulaLabels = hasFormula ? state.formulaResult.map(p => p.label) : [];
+  const formulaLabels = state.formulaResults.flatMap(f => f.points.map(p => p.label));
   const allLabels = [...new Set([
     ...sids.flatMap(s => state.processedData[s].map(p => p.label)),
     ...formulaLabels,
@@ -2599,15 +2644,23 @@ function renderTable() {
   const isSeriesChg = sid => { const t = state.seriesTransforms[sid] || 'level'; return t !== 'level' && t !== 'index'; };
 
   if (hasFormula) {
-    const fdmap = Object.fromEntries(state.formulaResult.map(p => [p.label, p.value]));
+    const cols = state.formulaResults.map((f, fi) => ({
+      color: FORMULA_PALETTE[fi % FORMULA_PALETTE.length],
+      name:  f.label || formulaLabel(f.expr),
+      dmap:  Object.fromEntries(f.points.map(p => [p.label, p.value])),
+    }));
+    const fLabels = [...new Set(formulaLabels)].sort();
     document.getElementById('tableHead').innerHTML =
-      `<tr><th>Period</th><th style="color:#8b4061">${formulaLabel(state.formula)}</th></tr>`;
+      `<tr><th>Period</th>${cols.map(c => `<th style="color:${c.color}">${c.name}</th>`).join('')}</tr>`;
     document.getElementById('tableBody').innerHTML =
-      formulaLabels.slice(-60).map(label => {
-        const v = fdmap[label];
-        if (v == null) return `<tr><td>${label}</td><td class="num">—</td></tr>`;
-        const cls = v > 0 ? '' : v < 0 ? 'neg' : '';
-        return `<tr><td>${label}</td><td class="num ${cls}" style="color:#8b4061">${v.toLocaleString('en-CA', { maximumFractionDigits: 4 })}</td></tr>`;
+      fLabels.slice(-60).map(label => {
+        const cells = cols.map(c => {
+          const v = c.dmap[label];
+          if (v == null) return '<td class="num">—</td>';
+          const cls = v > 0 ? '' : v < 0 ? 'neg' : '';
+          return `<td class="num ${cls}" style="color:${c.color}">${v.toLocaleString('en-CA', { maximumFractionDigits: 4 })}</td>`;
+        }).join('');
+        return `<tr><td>${label}</td>${cells}</tr>`;
       }).join('');
   } else {
     document.getElementById('tableHead').innerHTML =
@@ -2647,18 +2700,14 @@ function exportXlsx() {
   const names    = sids.map(sid => { const s = SERIES_MAP[sid]; return s ? (s.chipLabel || s.name) : sid; });
 
   const allLabels = [...new Set(sids.flatMap(s => state.processedData[s].map(p => p.label)))].sort();
-  const hasFormula = !!state.formulaResult?.length;
-  const fdmapXls   = hasFormula ? Object.fromEntries(state.formulaResult.map(p => [p.label, p.value])) : {};
-  const formulaLabels = hasFormula ? state.formulaResult.map(p => p.label) : [];
-  const allLabelsXls  = [...new Set([...allLabels, ...formulaLabels])].sort();
+  const hasFormula = state.formulaResults.length > 0;
 
-  const rows = allLabelsXls.map(label => {
+  const rows = allLabels.map(label => {
     const row = [label];
     for (const sid of sids) {
       const dmap = Object.fromEntries(state.processedData[sid].map(p => [p.label, p.value]));
       row.push(dmap[label] ?? '');
     }
-    if (hasFormula) row.push(fdmapXls[label] ?? '');
     return row;
   });
 
@@ -2669,14 +2718,20 @@ function exportXlsx() {
 
   let wsData;
   if (hasFormula) {
+    const fcols = state.formulaResults.map(f => ({
+      name: f.label || formulaLabel(f.expr),
+      expr: f.expr,
+      dmap: Object.fromEntries(f.points.map(p => [p.label, p.value])),
+    }));
+    const fLabels = [...new Set(state.formulaResults.flatMap(f => f.points.map(p => p.label)))].sort();
     wsData = XLSX.utils.aoa_to_sheet([
       [`Statistics Canada — ${cat?.label}`],
-      [`Formula: ${formulaLabel(state.formula)}`, `Output Frequency: ${fLabel}`, `Exported: ${new Date().toLocaleDateString('en-CA')}`],
+      [`Formulas: ${fcols.map(c => `${c.name} [${c.expr}]`).join('   |   ')}`, `Output Frequency: ${fLabel}`, `Exported: ${new Date().toLocaleDateString('en-CA')}`],
       [`From: ${state.fromYear}-${String(state.fromMonth).padStart(2,'0')}`, `To: ${state.toYear}-${String(state.toMonth).padStart(2,'0')}`],
-      [], ['Period', state.formula],
-      ...(state.formulaResult || []).map(p => [p.label, p.value])
+      [], ['Period', ...fcols.map(c => c.name)],
+      ...fLabels.map(label => [label, ...fcols.map(c => c.dmap[label] ?? '')])
     ]);
-    wsData['!cols'] = [{ wch: 14 }, { wch: 28 }];
+    wsData['!cols'] = [{ wch: 14 }, ...fcols.map(() => ({ wch: 28 }))];
   } else {
     wsData = XLSX.utils.aoa_to_sheet([
       [`Statistics Canada — ${cat?.label}`],
@@ -2983,10 +3038,11 @@ function formulaLabel(expr) {
   });
 }
 
-function computeFormula() {
-  state.formulaResult = null;
-  let expr = state.formula.trim().toUpperCase();
-  if (!expr) return;
+// Evaluate a single formula expression → array of {label,value}, or null.
+// Toasts on error. Pure w.r.t. state (reads active series + processed data).
+function evalFormulaExpr(rawExpr) {
+  let expr = (rawExpr || '').trim().toUpperCase();
+  if (!expr) return null;
 
   // Pre-process convenience functions and fix ^ → ** (exponentiation)
   expr = expr
@@ -2996,13 +3052,13 @@ function computeFormula() {
 
   const LETTERS = ['A', 'B', 'C', 'D', 'E'];
   const usedLetters = LETTERS.filter(l => new RegExp(`\\b${l}\\b`).test(expr));
-  if (!usedLetters.length) return;
+  if (!usedLetters.length) return null;
 
   for (const l of usedLetters) {
     const idx = LETTERS.indexOf(l);
     const sid = state.activeSeries[idx];
     if (!sid || !state.processedData[sid]?.length) {
-      toast(`Formula error: series ${l} has no data`, 'error'); return;
+      toast(`Formula error: series ${l} has no data`, 'error'); return null;
     }
   }
 
@@ -3011,7 +3067,7 @@ function computeFormula() {
     .replace(/\b(ABS|SQRT|LOG10|LOG2|LOG|MIN|MAX|ROUND|FLOOR|CEIL|POW|A|B|C|D|E)\b/g, '')
     .replace(/[0-9.+\-*/().%,\s]/g, '');
   if (check.length) {
-    toast('Formula contains invalid characters', 'error'); return;
+    toast('Formula contains invalid characters', 'error'); return null;
   }
 
   const dmaps = {};
@@ -3024,7 +3080,7 @@ function computeFormula() {
   const labelSets    = usedLetters.map(l => new Set(Object.keys(dmaps[l])));
   const commonLabels = [...labelSets[0]].filter(lbl => labelSets.every(s => s.has(lbl))).sort();
   if (!commonLabels.length) {
-    toast('Formula: no overlapping periods between selected series', 'error'); return;
+    toast('Formula: no overlapping periods between selected series', 'error'); return null;
   }
 
   const results = [];
@@ -3051,37 +3107,91 @@ function computeFormula() {
       if (isFinite(v)) results.push({ label, value: v });
     } catch (e) {
       toast(`Formula error: ${e.message}`, 'error');
-      state.formulaResult = null; return;
+      return null;
     }
   }
-  state.formulaResult = results.length ? results : null;
+  return results.length ? results : null;
 }
 
-function updateFormula(val) {
-  state.formula = val;
+// Evaluate every formula row → state.formulaResults (skips blank rows).
+function computeFormulas() {
+  state.formulaResults = [];
+  for (const f of state.formulas) {
+    if (!f.expr || !f.expr.trim()) continue;
+    const points = evalFormulaExpr(f.expr);
+    if (points) state.formulaResults.push({ expr: f.expr, label: (f.label || '').trim(), points });
+  }
+}
+
+// Render one input row per formula: expression + optional label + remove button.
+function renderFormulaRows() {
+  const host = document.getElementById('formulaRows');
+  if (!host) return;
+  if (!state.formulas.length) state.formulas = [{ expr: '', label: '' }];
+  const multi = state.formulas.length > 1;
+  host.innerHTML = state.formulas.map((f, i) => `
+    <div style="display:flex;gap:4px;align-items:center;margin-bottom:4px">
+      <input type="text" value="${escHtml(f.expr)}" placeholder="e.g. B/A"
+             onfocus="state.activeFormulaIdx=${i}"
+             oninput="updateFormulaExpr(${i}, this.value)"
+             onkeydown="if(event.key==='Enter')applyFormulas()"
+             style="flex:1;min-width:0;font-family:var(--font-mono);font-size:11px;height:28px;border:1px solid var(--border);border-radius:4px;padding:0 6px">
+      <input type="text" value="${escHtml(f.label)}" placeholder="label"
+             oninput="updateFormulaLabel(${i}, this.value)"
+             onkeydown="if(event.key==='Enter')applyFormulas()"
+             title="Optional legend label"
+             style="width:78px;flex-shrink:0;font-size:11px;height:28px;border:1px solid var(--border);border-radius:4px;padding:0 6px">
+      ${multi ? `<button onclick="removeFormula(${i})" title="Remove line"
+             style="flex-shrink:0;padding:0 7px;height:28px;border:1px solid var(--border);background:var(--surface2);border-radius:4px;cursor:pointer;font-size:12px;color:var(--muted)">✕</button>` : ''}
+    </div>`).join('');
   document.querySelectorAll('.formula-preset').forEach(btn => {
-    btn.classList.toggle('formula-active', btn.dataset.expr === val.toUpperCase());
+    const cur = (state.formulas[state.activeFormulaIdx]?.expr || '').toUpperCase();
+    btn.classList.toggle('formula-active', btn.dataset.expr === cur);
   });
+}
+
+function updateFormulaExpr(i, val) {
+  if (!state.formulas[i]) return;
+  state.formulas[i].expr = val;
+  state.activeFormulaIdx = i;
+  document.querySelectorAll('.formula-preset').forEach(btn =>
+    btn.classList.toggle('formula-active', btn.dataset.expr === val.toUpperCase()));
   const hint = document.getElementById('formulaHint');
   if (hint) hint.textContent = val.trim() ? '↵ Press Enter to apply' : '';
 }
 
-function setFormula(expr) {
-  const inp = document.getElementById('formulaInput');
-  inp.value = expr;
-  state.formula = expr;
-  document.querySelectorAll('.formula-preset').forEach(btn => {
-    btn.classList.toggle('formula-active', btn.dataset.expr === expr);
-  });
-  applyFormula();
+function updateFormulaLabel(i, val) {
+  if (state.formulas[i]) state.formulas[i].label = val;
 }
 
-function clearFormula() {
-  const inp = document.getElementById('formulaInput');
-  inp.value = '';
-  state.formula = '';
-  state.formulaResult = null;
-  document.querySelectorAll('.formula-preset').forEach(btn => btn.classList.remove('formula-active'));
+function addFormula() {
+  state.formulas.push({ expr: '', label: '' });
+  state.activeFormulaIdx = state.formulas.length - 1;
+  renderFormulaRows();
+  document.querySelectorAll('#formulaRows input')[(state.formulas.length - 1) * 2]?.focus();
+}
+
+function removeFormula(i) {
+  state.formulas.splice(i, 1);
+  if (!state.formulas.length) state.formulas = [{ expr: '', label: '' }];
+  state.activeFormulaIdx = Math.min(state.activeFormulaIdx, state.formulas.length - 1);
+  renderFormulaRows();
+  applyFormulas();
+}
+
+// Preset buttons write into the currently-focused formula row.
+function setFormula(expr) {
+  const i = Math.min(state.activeFormulaIdx, state.formulas.length - 1);
+  state.formulas[i].expr = expr;
+  renderFormulaRows();
+  applyFormulas();
+}
+
+function clearFormulas() {
+  state.formulas = [{ expr: '', label: '' }];
+  state.formulaResults = [];
+  state.activeFormulaIdx = 0;
+  renderFormulaRows();
   const hint = document.getElementById('formulaHint');
   if (hint) hint.textContent = '';
   updateFormulaWarn();
@@ -3089,10 +3199,10 @@ function clearFormula() {
   renderTable();
 }
 
-function applyFormula() {
+function applyFormulas() {
   const hint = document.getElementById('formulaHint');
   if (hint) hint.textContent = '';
-  computeFormula();
+  computeFormulas();
   updateFormulaWarn();
   renderChart();
   renderTable();
@@ -3163,7 +3273,7 @@ function confirmSaveConfig() {
     toYear:           parseInt(document.getElementById('toYear').value),
     toMonth:          parseInt(document.getElementById('toMonth').value),
     frequency:        document.getElementById('freqSelect').value,
-    formula:          state.formula,
+    formulas:         state.formulas.filter(f => f.expr && f.expr.trim()),
     chartType:        state.chartType,
   };
 
@@ -3197,12 +3307,16 @@ function loadConfigObj(config) {
   state.category         = CATEGORIES[config.category] ? config.category : Object.keys(CATEGORIES)[0];
   state.activeSeries     = [...(config.activeSeries || [])].filter(id => !id.startsWith('cimt_'));
   state.seriesTransforms = { ...(config.seriesTransforms || {}) };
-  state.formula          = config.formula || '';
+  // Backward-compat: older configs stored a single `formula` string.
+  state.formulas = Array.isArray(config.formulas) && config.formulas.length
+    ? config.formulas.map(f => ({ expr: f.expr || '', label: f.label || '' }))
+    : (config.formula ? [{ expr: config.formula, label: '' }] : [{ expr: '', label: '' }]);
+  state.activeFormulaIdx = 0;
   state.chartType        = config.chartType || 'line';
   state.rawData          = {};
   state.processedData    = {};
   state.seriesUnits      = {};
-  state.formulaResult    = null;
+  state.formulaResults   = [];
   state.autoUpdateTo     = false;
 
   const fy = config.fromYear  || 2024, fm = config.fromMonth || 1;
@@ -3217,12 +3331,7 @@ function loadConfigObj(config) {
   document.getElementById('toYear').value     = ty;
   document.getElementById('toMonth').value    = tm;
   document.getElementById('freqSelect').value = config.frequency || 'original';
-  const fInp = document.getElementById('formulaInput');
-  if (fInp) {
-    fInp.value = config.formula || '';
-    document.querySelectorAll('.formula-preset').forEach(b =>
-      b.classList.toggle('formula-active', b.dataset.expr === (config.formula || '').toUpperCase()));
-  }
+  renderFormulaRows();
 
   // Sync chart-type tabs
   document.querySelectorAll('.tab').forEach(el =>
@@ -3271,6 +3380,10 @@ async function autoLoadTemplate() {
   try {
     // Fast path: pre-built JSON catalog from the proxy. Avoids ~10s of
     // in-browser XLSX decoding on large catalogs (JSON.parse is ~100x faster).
+    // Fetch the FRED catalog (optional; app works without it) in PARALLEL
+    // with the main catalog so the second request adds no latency.
+    const fredPromise = loadFredCatalog();
+
     let rows = null;
     try {
       const r = await fetch('/api/catalog-rows');
@@ -3289,6 +3402,7 @@ async function autoLoadTemplate() {
       if (!resp.ok) throw new Error(`Server returned ${resp.status}`);
       CATEGORIES = parseExcel(XLSX.read(await resp.arrayBuffer(), { type: 'array' }));
     }
+    await fredPromise;
     buildSeriesMap();
     const count = Object.values(CATEGORIES).reduce((n, c) => n + c.series.length, 0);
     if (count === 0) throw new Error('No series found in template');

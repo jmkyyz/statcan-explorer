@@ -1,0 +1,4493 @@
+{
+ "categories": [
+  {
+   "id": "us_gdp",
+   "label": "🇺🇸 GDP",
+   "sourceFreq": "quarterly",
+   "series": [
+    {
+     "id": "us_gdp_exp",
+     "name": "Gross domestic product (expenditure-based)",
+     "chipShort": "US GDP",
+     "tableId": "FRED",
+     "freq": "quarterly",
+     "dims": 2,
+     "dim1Name": "Prices",
+     "dim2Name": "Estimates",
+     "rows": [
+      {
+       "value": "Gross domestic product",
+       "fredId": "GDP",
+       "level": 1,
+       "short": "Gross domestic product",
+       "full": "Gross domestic product",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Personal consumption expenditures",
+       "fredId": "PCEC",
+       "level": 2,
+       "short": "Personal consumption expenditures",
+       "full": "Personal consumption expenditures",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Goods",
+       "fredId": "DGDSRC1Q027SBEA",
+       "level": 3,
+       "short": "Goods",
+       "full": "Goods",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Durable goods",
+       "fredId": "PCDG",
+       "level": 4,
+       "short": "Durable goods",
+       "full": "Durable goods",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Nondurable goods",
+       "fredId": "PCND",
+       "level": 4,
+       "short": "Nondurable goods",
+       "full": "Nondurable goods",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Services",
+       "fredId": "PCESV",
+       "level": 3,
+       "short": "Services",
+       "full": "Services",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Gross private domestic investment",
+       "fredId": "GPDI",
+       "level": 2,
+       "short": "Gross private domestic investment",
+       "full": "Gross private domestic investment",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Fixed investment",
+       "fredId": "FPI",
+       "level": 3,
+       "short": "Fixed investment",
+       "full": "Fixed investment",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Nonresidential",
+       "fredId": "PNFI",
+       "level": 4,
+       "short": "Nonresidential",
+       "full": "Nonresidential",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Structures",
+       "fredId": "B009RC1Q027SBEA",
+       "level": 5,
+       "short": "Structures",
+       "full": "Structures",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Equipment",
+       "fredId": "Y033RC1Q027SBEA",
+       "level": 5,
+       "short": "Equipment",
+       "full": "Equipment",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Intellectual property products",
+       "fredId": "Y001RC1Q027SBEA",
+       "level": 5,
+       "short": "Intellectual property products",
+       "full": "Intellectual property products",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Residential",
+       "fredId": "PRFI",
+       "level": 4,
+       "short": "Residential",
+       "full": "Residential",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Change in private inventories",
+       "fredId": "CBI",
+       "level": 3,
+       "short": "Change in private inventories",
+       "full": "Change in private inventories",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Net exports of goods and services",
+       "fredId": "NETEXP",
+       "level": 2,
+       "short": "Net exports of goods and services",
+       "full": "Net exports of goods and services",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Exports",
+       "fredId": "EXPGS",
+       "level": 3,
+       "short": "Exports",
+       "full": "Exports",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Goods (A253RC1Q027SBEA)",
+       "fredId": "A253RC1Q027SBEA",
+       "level": 4,
+       "short": "Goods",
+       "full": "Goods",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Services (A646RC1Q027SBEA)",
+       "fredId": "A646RC1Q027SBEA",
+       "level": 4,
+       "short": "Services",
+       "full": "Services",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Imports",
+       "fredId": "IMPGS",
+       "level": 3,
+       "short": "Imports",
+       "full": "Imports",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Goods (A255RC1Q027SBEA)",
+       "fredId": "A255RC1Q027SBEA",
+       "level": 4,
+       "short": "Goods",
+       "full": "Goods",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Services (B656RC1Q027SBEA)",
+       "fredId": "B656RC1Q027SBEA",
+       "level": 4,
+       "short": "Services",
+       "full": "Services",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Government consumption expenditures and gross investment",
+       "fredId": "GCE",
+       "level": 2,
+       "short": "Government consumption expenditures and gross investment",
+       "full": "Government consumption expenditures and gross investment",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Federal",
+       "fredId": "FGCE",
+       "level": 3,
+       "short": "Federal",
+       "full": "Federal",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "National defense",
+       "fredId": "FDEFX",
+       "level": 4,
+       "short": "National defense",
+       "full": "National defense",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Nondefense",
+       "fredId": "FNDEFX",
+       "level": 4,
+       "short": "Nondefense",
+       "full": "Nondefense",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "State and local",
+       "fredId": "SLCE",
+       "level": 3,
+       "short": "State and local",
+       "full": "State and local",
+       "dim1": "Current dollars"
+      },
+      {
+       "value": "Gross domestic product",
+       "fredId": "GDPC1",
+       "level": 1,
+       "short": "Gross domestic product",
+       "full": "Gross domestic product",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Personal consumption expenditures",
+       "fredId": "PCECC96",
+       "level": 2,
+       "short": "Personal consumption expenditures",
+       "full": "Personal consumption expenditures",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Goods",
+       "fredId": "DGDSRX1Q020SBEA",
+       "level": 3,
+       "short": "Goods",
+       "full": "Goods",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Durable goods",
+       "fredId": "PCDGCC96",
+       "level": 4,
+       "short": "Durable goods",
+       "full": "Durable goods",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Nondurable goods",
+       "fredId": "PCNDGC96",
+       "level": 4,
+       "short": "Nondurable goods",
+       "full": "Nondurable goods",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Services",
+       "fredId": "PCESVC96",
+       "level": 3,
+       "short": "Services",
+       "full": "Services",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Gross private domestic investment",
+       "fredId": "GPDIC1",
+       "level": 2,
+       "short": "Gross private domestic investment",
+       "full": "Gross private domestic investment",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Fixed investment",
+       "fredId": "FPIC1",
+       "level": 3,
+       "short": "Fixed investment",
+       "full": "Fixed investment",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Nonresidential",
+       "fredId": "PNFIC1",
+       "level": 4,
+       "short": "Nonresidential",
+       "full": "Nonresidential",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Structures",
+       "fredId": "B009RX1Q020SBEA",
+       "level": 5,
+       "short": "Structures",
+       "full": "Structures",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Equipment",
+       "fredId": "Y033RX1Q020SBEA",
+       "level": 5,
+       "short": "Equipment",
+       "full": "Equipment",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Intellectual property products",
+       "fredId": "Y001RX1Q020SBEA",
+       "level": 5,
+       "short": "Intellectual property products",
+       "full": "Intellectual property products",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Residential",
+       "fredId": "PRFIC1",
+       "level": 4,
+       "short": "Residential",
+       "full": "Residential",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Change in private inventories",
+       "fredId": "CBIC1",
+       "level": 3,
+       "short": "Change in private inventories",
+       "full": "Change in private inventories",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Net exports of goods and services",
+       "fredId": "NETEXC",
+       "level": 2,
+       "short": "Net exports of goods and services",
+       "full": "Net exports of goods and services",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Exports",
+       "fredId": "EXPGSC1",
+       "level": 3,
+       "short": "Exports",
+       "full": "Exports",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Goods (A253RX1Q020SBEA)",
+       "fredId": "A253RX1Q020SBEA",
+       "level": 4,
+       "short": "Goods",
+       "full": "Goods",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Services (A646RX1Q020SBEA)",
+       "fredId": "A646RX1Q020SBEA",
+       "level": 4,
+       "short": "Services",
+       "full": "Services",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Imports",
+       "fredId": "IMPGSC1",
+       "level": 3,
+       "short": "Imports",
+       "full": "Imports",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Goods (A255RX1Q020SBEA)",
+       "fredId": "A255RX1Q020SBEA",
+       "level": 4,
+       "short": "Goods",
+       "full": "Goods",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Services (B656RX1Q020SBEA)",
+       "fredId": "B656RX1Q020SBEA",
+       "level": 4,
+       "short": "Services",
+       "full": "Services",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Government consumption expenditures and gross investment",
+       "fredId": "GCEC1",
+       "level": 2,
+       "short": "Government consumption expenditures and gross investment",
+       "full": "Government consumption expenditures and gross investment",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Federal",
+       "fredId": "FGCEC1",
+       "level": 3,
+       "short": "Federal",
+       "full": "Federal",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "National defense",
+       "fredId": "A824RX1Q020SBEA",
+       "level": 4,
+       "short": "National defense",
+       "full": "National defense",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Nondefense",
+       "fredId": "A825RX1Q020SBEA",
+       "level": 4,
+       "short": "Nondefense",
+       "full": "Nondefense",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "State and local",
+       "fredId": "SLCEC1",
+       "level": 3,
+       "short": "State and local",
+       "full": "State and local",
+       "dim1": "Chained (2017) dollars"
+      },
+      {
+       "value": "Residual",
+       "fredId": "A960RX1Q020SBEA",
+       "level": 2,
+       "short": "Residual",
+       "full": "Residual",
+       "dim1": "Chained (2017) dollars"
+      }
+     ]
+    },
+    {
+     "id": "us_gdp_percap",
+     "name": "Real GDP per capita",
+     "chipShort": "Real GDP per capita (US)",
+     "tableId": "FRED",
+     "freq": "quarterly",
+     "dims": 0,
+     "fredId": "A939RX0Q048SBEA"
+    }
+   ]
+  },
+  {
+   "id": "us_emp",
+   "label": "🇺🇸 Employment",
+   "sourceFreq": "monthly",
+   "series": [
+    {
+     "id": "us_emp_ind_sa",
+     "name": "Employment by industry (SA)",
+     "chipShort": "Emp by industry SA (US)",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 1,
+     "dim1Name": "Series",
+     "rows": [
+      {
+       "value": "Total nonfarm",
+       "fredId": "PAYEMS",
+       "level": 1,
+       "short": "Total nonfarm",
+       "full": "Total nonfarm"
+      },
+      {
+       "value": "Total private",
+       "fredId": "USPRIV",
+       "level": 2,
+       "short": "Total private",
+       "full": "Total private"
+      },
+      {
+       "value": "Goods-producing",
+       "fredId": "USGOOD",
+       "level": 3,
+       "short": "Goods-producing",
+       "full": "Goods-producing"
+      },
+      {
+       "value": "Mining and logging",
+       "fredId": "USMINE",
+       "level": 4,
+       "short": "Mining and logging",
+       "full": "Mining and logging"
+      },
+      {
+       "value": "Logging",
+       "fredId": "CES1011330001",
+       "level": 5,
+       "short": "Logging",
+       "full": "Logging"
+      },
+      {
+       "value": "Mining",
+       "fredId": "CES1021000001",
+       "level": 5,
+       "short": "Mining",
+       "full": "Mining"
+      },
+      {
+       "value": "Oil and gas extraction",
+       "fredId": "CES1021100001",
+       "level": 6,
+       "short": "Oil and gas extraction",
+       "full": "Oil and gas extraction"
+      },
+      {
+       "value": "Mining, except oil and gas",
+       "fredId": "CES1021200001",
+       "level": 6,
+       "short": "Mining, except oil and gas",
+       "full": "Mining, except oil and gas"
+      },
+      {
+       "value": "Coal mining",
+       "fredId": "CES1021210001",
+       "level": 7,
+       "short": "Coal mining",
+       "full": "Coal mining"
+      },
+      {
+       "value": "Support activities for mining",
+       "fredId": "CES1021300001",
+       "level": 6,
+       "short": "Support activities for mining",
+       "full": "Support activities for mining"
+      },
+      {
+       "value": "Construction",
+       "fredId": "USCONS",
+       "level": 4,
+       "short": "Construction",
+       "full": "Construction"
+      },
+      {
+       "value": "Construction of buildings",
+       "fredId": "CES2023600001",
+       "level": 5,
+       "short": "Construction of buildings",
+       "full": "Construction of buildings"
+      },
+      {
+       "value": "Residential building",
+       "fredId": "CES2023610001",
+       "level": 6,
+       "short": "Residential building",
+       "full": "Residential building"
+      },
+      {
+       "value": "Nonresidential building",
+       "fredId": "CES2023620001",
+       "level": 6,
+       "short": "Nonresidential building",
+       "full": "Nonresidential building"
+      },
+      {
+       "value": "Heavy and civil engineering construction",
+       "fredId": "CES2023700001",
+       "level": 5,
+       "short": "Heavy and civil engineering construction",
+       "full": "Heavy and civil engineering construction"
+      },
+      {
+       "value": "Specialty trade contractors",
+       "fredId": "CES2023800001",
+       "level": 5,
+       "short": "Specialty trade contractors",
+       "full": "Specialty trade contractors"
+      },
+      {
+       "value": "Residential specialty trade contractors",
+       "fredId": "CES2023800101",
+       "level": 6,
+       "short": "Residential specialty trade contractors",
+       "full": "Residential specialty trade contractors"
+      },
+      {
+       "value": "Nonresidential specialty trade contractors",
+       "fredId": "CES2023800201",
+       "level": 6,
+       "short": "Nonresidential specialty trade contractors",
+       "full": "Nonresidential specialty trade contractors"
+      },
+      {
+       "value": "Manufacturing",
+       "fredId": "MANEMP",
+       "level": 4,
+       "short": "Manufacturing",
+       "full": "Manufacturing"
+      },
+      {
+       "value": "Durable goods",
+       "fredId": "DMANEMP",
+       "level": 5,
+       "short": "Durable goods",
+       "full": "Durable goods"
+      },
+      {
+       "value": "Wood products",
+       "fredId": "CES3132100001",
+       "level": 6,
+       "short": "Wood products",
+       "full": "Wood products"
+      },
+      {
+       "value": "Nonmetallic mineral products",
+       "fredId": "CES3132700001",
+       "level": 6,
+       "short": "Nonmetallic mineral products",
+       "full": "Nonmetallic mineral products"
+      },
+      {
+       "value": "Primary metals",
+       "fredId": "CES3133100001",
+       "level": 6,
+       "short": "Primary metals",
+       "full": "Primary metals"
+      },
+      {
+       "value": "Fabricated metal products",
+       "fredId": "CES3133200001",
+       "level": 6,
+       "short": "Fabricated metal products",
+       "full": "Fabricated metal products"
+      },
+      {
+       "value": "Machinery",
+       "fredId": "CES3133300001",
+       "level": 6,
+       "short": "Machinery",
+       "full": "Machinery"
+      },
+      {
+       "value": "Computer and electronic products",
+       "fredId": "CES3133400001",
+       "level": 6,
+       "short": "Computer and electronic products",
+       "full": "Computer and electronic products"
+      },
+      {
+       "value": "Computer and peripheral equipment",
+       "fredId": "CES3133410001",
+       "level": 7,
+       "short": "Computer and peripheral equipment",
+       "full": "Computer and peripheral equipment"
+      },
+      {
+       "value": "Communication equipment",
+       "fredId": "CES3133420001",
+       "level": 7,
+       "short": "Communication equipment",
+       "full": "Communication equipment"
+      },
+      {
+       "value": "Semiconductors and electronic components",
+       "fredId": "CES3133440001",
+       "level": 7,
+       "short": "Semiconductors and electronic components",
+       "full": "Semiconductors and electronic components"
+      },
+      {
+       "value": "Electronic instruments",
+       "fredId": "CES3133450001",
+       "level": 7,
+       "short": "Electronic instruments",
+       "full": "Electronic instruments"
+      },
+      {
+       "value": "Electrical equipment and appliances",
+       "fredId": "CES3133500001",
+       "level": 6,
+       "short": "Electrical equipment and appliances",
+       "full": "Electrical equipment and appliances"
+      },
+      {
+       "value": "Transportation equipment",
+       "fredId": "CES3133600001",
+       "level": 6,
+       "short": "Transportation equipment",
+       "full": "Transportation equipment"
+      },
+      {
+       "value": "Motor vehicles and parts",
+       "fredId": "CES3133600101",
+       "level": 7,
+       "short": "Motor vehicles and parts",
+       "full": "Motor vehicles and parts"
+      },
+      {
+       "value": "Furniture and related products",
+       "fredId": "CES3133700001",
+       "level": 6,
+       "short": "Furniture and related products",
+       "full": "Furniture and related products"
+      },
+      {
+       "value": "Miscellaneous durable goods manufacturing",
+       "fredId": "CES3133900001",
+       "level": 6,
+       "short": "Miscellaneous durable goods manufacturing",
+       "full": "Miscellaneous durable goods manufacturing"
+      },
+      {
+       "value": "Nondurable goods",
+       "fredId": "NDMANEMP",
+       "level": 5,
+       "short": "Nondurable goods",
+       "full": "Nondurable goods"
+      },
+      {
+       "value": "Food manufacturing",
+       "fredId": "CES3231100001",
+       "level": 6,
+       "short": "Food manufacturing",
+       "full": "Food manufacturing"
+      },
+      {
+       "value": "Textile mills",
+       "fredId": "CES3231300001",
+       "level": 6,
+       "short": "Textile mills",
+       "full": "Textile mills"
+      },
+      {
+       "value": "Textile product mills",
+       "fredId": "CES3231400001",
+       "level": 6,
+       "short": "Textile product mills",
+       "full": "Textile product mills"
+      },
+      {
+       "value": "Apparel",
+       "fredId": "CES3231500001",
+       "level": 6,
+       "short": "Apparel",
+       "full": "Apparel"
+      },
+      {
+       "value": "Paper and paper products",
+       "fredId": "CES3232200001",
+       "level": 6,
+       "short": "Paper and paper products",
+       "full": "Paper and paper products"
+      },
+      {
+       "value": "Printing and related support activities",
+       "fredId": "CES3232300001",
+       "level": 6,
+       "short": "Printing and related support activities",
+       "full": "Printing and related support activities"
+      },
+      {
+       "value": "Petroleum and coal products",
+       "fredId": "CES3232400001",
+       "level": 6,
+       "short": "Petroleum and coal products",
+       "full": "Petroleum and coal products"
+      },
+      {
+       "value": "Chemicals",
+       "fredId": "CES3232500001",
+       "level": 6,
+       "short": "Chemicals",
+       "full": "Chemicals"
+      },
+      {
+       "value": "Plastics and rubber products",
+       "fredId": "CES3232600001",
+       "level": 6,
+       "short": "Plastics and rubber products",
+       "full": "Plastics and rubber products"
+      },
+      {
+       "value": "Miscellaneous nondurable goods manufacturing",
+       "fredId": "CES3232900001",
+       "level": 6,
+       "short": "Miscellaneous nondurable goods manufacturing",
+       "full": "Miscellaneous nondurable goods manufacturing"
+      },
+      {
+       "value": "Private service-providing",
+       "fredId": "CES0800000001",
+       "level": 3,
+       "short": "Private service-providing",
+       "full": "Private service-providing"
+      },
+      {
+       "value": "Trade, transportation, and utilities",
+       "fredId": "USTPU",
+       "level": 4,
+       "short": "Trade, transportation, and utilities",
+       "full": "Trade, transportation, and utilities"
+      },
+      {
+       "value": "Wholesale trade",
+       "fredId": "USWTRADE",
+       "level": 5,
+       "short": "Wholesale trade",
+       "full": "Wholesale trade"
+      },
+      {
+       "value": "Durable goods (CES4142300001)",
+       "fredId": "CES4142300001",
+       "level": 6,
+       "short": "Durable goods",
+       "full": "Durable goods"
+      },
+      {
+       "value": "Nondurable goods (CES4142400001)",
+       "fredId": "CES4142400001",
+       "level": 6,
+       "short": "Nondurable goods",
+       "full": "Nondurable goods"
+      },
+      {
+       "value": "Electronic markets and agents and brokers",
+       "fredId": "CES4142500001",
+       "level": 6,
+       "short": "Electronic markets and agents and brokers",
+       "full": "Electronic markets and agents and brokers"
+      },
+      {
+       "value": "Retail trade",
+       "fredId": "USTRADE",
+       "level": 5,
+       "short": "Retail trade",
+       "full": "Retail trade"
+      },
+      {
+       "value": "Motor vehicles and parts dealers",
+       "fredId": "CES4244100001",
+       "level": 6,
+       "short": "Motor vehicles and parts dealers",
+       "full": "Motor vehicles and parts dealers"
+      },
+      {
+       "value": "Automobile dealers",
+       "fredId": "CES4244110001",
+       "level": 6,
+       "short": "Automobile dealers",
+       "full": "Automobile dealers"
+      },
+      {
+       "value": "Furniture and home furnishings stores",
+       "fredId": "CES4244200001",
+       "level": 6,
+       "short": "Furniture and home furnishings stores",
+       "full": "Furniture and home furnishings stores"
+      },
+      {
+       "value": "Electronics and appliance stores",
+       "fredId": "CES4244300001",
+       "level": 6,
+       "short": "Electronics and appliance stores",
+       "full": "Electronics and appliance stores"
+      },
+      {
+       "value": "Building material and garden supply stores",
+       "fredId": "CES4244400001",
+       "level": 6,
+       "short": "Building material and garden supply stores",
+       "full": "Building material and garden supply stores"
+      },
+      {
+       "value": "Food and beverage stores",
+       "fredId": "CES4244500001",
+       "level": 6,
+       "short": "Food and beverage stores",
+       "full": "Food and beverage stores"
+      },
+      {
+       "value": "Health and personal care stores",
+       "fredId": "CES4244600001",
+       "level": 6,
+       "short": "Health and personal care stores",
+       "full": "Health and personal care stores"
+      },
+      {
+       "value": "Gasoline stations",
+       "fredId": "CES4244700001",
+       "level": 6,
+       "short": "Gasoline stations",
+       "full": "Gasoline stations"
+      },
+      {
+       "value": "Clothing and clothing accessories stores",
+       "fredId": "CES4244800001",
+       "level": 6,
+       "short": "Clothing and clothing accessories stores",
+       "full": "Clothing and clothing accessories stores"
+      },
+      {
+       "value": "Sporting goods, hobby, book, and music stores",
+       "fredId": "CES4245100001",
+       "level": 6,
+       "short": "Sporting goods, hobby, book, and music stores",
+       "full": "Sporting goods, hobby, book, and music stores"
+      },
+      {
+       "value": "General merchandise stores",
+       "fredId": "CES4245200001",
+       "level": 6,
+       "short": "General merchandise stores",
+       "full": "General merchandise stores"
+      },
+      {
+       "value": "Department stores",
+       "fredId": "CES4245210001",
+       "level": 6,
+       "short": "Department stores",
+       "full": "Department stores"
+      },
+      {
+       "value": "Miscellaneous store retailers",
+       "fredId": "CES4245300001",
+       "level": 6,
+       "short": "Miscellaneous store retailers",
+       "full": "Miscellaneous store retailers"
+      },
+      {
+       "value": "Nonstore retailers",
+       "fredId": "CES4245400001",
+       "level": 6,
+       "short": "Nonstore retailers",
+       "full": "Nonstore retailers"
+      },
+      {
+       "value": "Transportation and warehousing",
+       "fredId": "CES4300000001",
+       "level": 5,
+       "short": "Transportation and warehousing",
+       "full": "Transportation and warehousing"
+      },
+      {
+       "value": "Air transportation",
+       "fredId": "CES4348100001",
+       "level": 6,
+       "short": "Air transportation",
+       "full": "Air transportation"
+      },
+      {
+       "value": "Rail transportation",
+       "fredId": "CES4348200001",
+       "level": 6,
+       "short": "Rail transportation",
+       "full": "Rail transportation"
+      },
+      {
+       "value": "Water transportation",
+       "fredId": "CES4348300001",
+       "level": 6,
+       "short": "Water transportation",
+       "full": "Water transportation"
+      },
+      {
+       "value": "Truck transportation",
+       "fredId": "CES4348400001",
+       "level": 6,
+       "short": "Truck transportation",
+       "full": "Truck transportation"
+      },
+      {
+       "value": "Transit and ground passenger transportation",
+       "fredId": "CES4348500001",
+       "level": 6,
+       "short": "Transit and ground passenger transportation",
+       "full": "Transit and ground passenger transportation"
+      },
+      {
+       "value": "Pipeline transportation",
+       "fredId": "CES4348600001",
+       "level": 6,
+       "short": "Pipeline transportation",
+       "full": "Pipeline transportation"
+      },
+      {
+       "value": "Scenic and sightseeing transportation",
+       "fredId": "CES4348700001",
+       "level": 6,
+       "short": "Scenic and sightseeing transportation",
+       "full": "Scenic and sightseeing transportation"
+      },
+      {
+       "value": "Support activities for transportation",
+       "fredId": "CES4348800001",
+       "level": 6,
+       "short": "Support activities for transportation",
+       "full": "Support activities for transportation"
+      },
+      {
+       "value": "Couriers and messengers",
+       "fredId": "CES4349200001",
+       "level": 6,
+       "short": "Couriers and messengers",
+       "full": "Couriers and messengers"
+      },
+      {
+       "value": "Warehousing and storage",
+       "fredId": "CES4349300001",
+       "level": 6,
+       "short": "Warehousing and storage",
+       "full": "Warehousing and storage"
+      },
+      {
+       "value": "Utilities",
+       "fredId": "CES4422000001",
+       "level": 5,
+       "short": "Utilities",
+       "full": "Utilities"
+      },
+      {
+       "value": "Information",
+       "fredId": "USINFO",
+       "level": 4,
+       "short": "Information",
+       "full": "Information"
+      },
+      {
+       "value": "Publishing industries, except Internet",
+       "fredId": "CES5051100001",
+       "level": 5,
+       "short": "Publishing industries, except Internet",
+       "full": "Publishing industries, except Internet"
+      },
+      {
+       "value": "Motion picture and sound recording industries",
+       "fredId": "CES5051200001",
+       "level": 5,
+       "short": "Motion picture and sound recording industries",
+       "full": "Motion picture and sound recording industries"
+      },
+      {
+       "value": "Broadcasting, except Internet",
+       "fredId": "CES5051500001",
+       "level": 5,
+       "short": "Broadcasting, except Internet",
+       "full": "Broadcasting, except Internet"
+      },
+      {
+       "value": "Telecommunications",
+       "fredId": "CES5051700001",
+       "level": 5,
+       "short": "Telecommunications",
+       "full": "Telecommunications"
+      },
+      {
+       "value": "Data processing, hosting and related services",
+       "fredId": "CES5051800001",
+       "level": 5,
+       "short": "Data processing, hosting and related services",
+       "full": "Data processing, hosting and related services"
+      },
+      {
+       "value": "Other information services",
+       "fredId": "CES5051900001",
+       "level": 5,
+       "short": "Other information services",
+       "full": "Other information services"
+      },
+      {
+       "value": "Financial activities",
+       "fredId": "USFIRE",
+       "level": 4,
+       "short": "Financial activities",
+       "full": "Financial activities"
+      },
+      {
+       "value": "Finance and insurance",
+       "fredId": "CES5552000001",
+       "level": 5,
+       "short": "Finance and insurance",
+       "full": "Finance and insurance"
+      },
+      {
+       "value": "Monetary authorities - central bank",
+       "fredId": "CES5552100001",
+       "level": 6,
+       "short": "Monetary authorities - central bank",
+       "full": "Monetary authorities - central bank"
+      },
+      {
+       "value": "Credit intermediation and related activities",
+       "fredId": "CES5552200001",
+       "level": 6,
+       "short": "Credit intermediation and related activities",
+       "full": "Credit intermediation and related activities"
+      },
+      {
+       "value": "Depository credit intermediation",
+       "fredId": "CES5552210001",
+       "level": 7,
+       "short": "Depository credit intermediation",
+       "full": "Depository credit intermediation"
+      },
+      {
+       "value": "Commercial banking",
+       "fredId": "CES5552211001",
+       "level": 8,
+       "short": "Commercial banking",
+       "full": "Commercial banking"
+      },
+      {
+       "value": "Securities, commodity contracts, investments, and funds and trusts",
+       "fredId": "CES5552300001",
+       "level": 6,
+       "short": "Securities, commodity contracts, investments, and funds and trusts",
+       "full": "Securities, commodity contracts, investments, and funds and trusts"
+      },
+      {
+       "value": "Insurance carriers and related activities",
+       "fredId": "CES5552400001",
+       "level": 6,
+       "short": "Insurance carriers and related activities",
+       "full": "Insurance carriers and related activities"
+      },
+      {
+       "value": "Real estate and rental and leasing",
+       "fredId": "CES5553000001",
+       "level": 5,
+       "short": "Real estate and rental and leasing",
+       "full": "Real estate and rental and leasing"
+      },
+      {
+       "value": "Real estate",
+       "fredId": "CES5553100001",
+       "level": 6,
+       "short": "Real estate",
+       "full": "Real estate"
+      },
+      {
+       "value": "Rental and leasing services",
+       "fredId": "CES5553200001",
+       "level": 6,
+       "short": "Rental and leasing services",
+       "full": "Rental and leasing services"
+      },
+      {
+       "value": "Lessors of nonfinancial intangible assets",
+       "fredId": "CES5553300001",
+       "level": 6,
+       "short": "Lessors of nonfinancial intangible assets",
+       "full": "Lessors of nonfinancial intangible assets"
+      },
+      {
+       "value": "Professional and business services",
+       "fredId": "USPBS",
+       "level": 4,
+       "short": "Professional and business services",
+       "full": "Professional and business services"
+      },
+      {
+       "value": "Professional, scientific, and technical services",
+       "fredId": "CES6054000001",
+       "level": 5,
+       "short": "Professional, scientific, and technical services",
+       "full": "Professional, scientific, and technical services"
+      },
+      {
+       "value": "Legal services",
+       "fredId": "CES6054110001",
+       "level": 6,
+       "short": "Legal services",
+       "full": "Legal services"
+      },
+      {
+       "value": "Accounting and bookkeeping services",
+       "fredId": "CES6054120001",
+       "level": 6,
+       "short": "Accounting and bookkeeping services",
+       "full": "Accounting and bookkeeping services"
+      },
+      {
+       "value": "Architectural and engineering services",
+       "fredId": "CES6054130001",
+       "level": 6,
+       "short": "Architectural and engineering services",
+       "full": "Architectural and engineering services"
+      },
+      {
+       "value": "Computer systems design and related services",
+       "fredId": "CES6054150001",
+       "level": 6,
+       "short": "Computer systems design and related services",
+       "full": "Computer systems design and related services"
+      },
+      {
+       "value": "Management and technical consulting services",
+       "fredId": "CES6054160001",
+       "level": 6,
+       "short": "Management and technical consulting services",
+       "full": "Management and technical consulting services"
+      },
+      {
+       "value": "Management of companies and enterprises",
+       "fredId": "CES6055000001",
+       "level": 5,
+       "short": "Management of companies and enterprises",
+       "full": "Management of companies and enterprises"
+      },
+      {
+       "value": "Administrative and waste services",
+       "fredId": "CES6056000001",
+       "level": 5,
+       "short": "Administrative and waste services",
+       "full": "Administrative and waste services"
+      },
+      {
+       "value": "Administrative and support services",
+       "fredId": "CES6056100001",
+       "level": 6,
+       "short": "Administrative and support services",
+       "full": "Administrative and support services"
+      },
+      {
+       "value": "Employment services",
+       "fredId": "CES6056130001",
+       "level": 7,
+       "short": "Employment services",
+       "full": "Employment services"
+      },
+      {
+       "value": "Temporary help services",
+       "fredId": "TEMPHELPS",
+       "level": 8,
+       "short": "Temporary help services",
+       "full": "Temporary help services"
+      },
+      {
+       "value": "Business support services",
+       "fredId": "CES6056140001",
+       "level": 7,
+       "short": "Business support services",
+       "full": "Business support services"
+      },
+      {
+       "value": "Services to buildings and dwellings",
+       "fredId": "CES6056170001",
+       "level": 7,
+       "short": "Services to buildings and dwellings",
+       "full": "Services to buildings and dwellings"
+      },
+      {
+       "value": "Waste management and remediation services",
+       "fredId": "CES6056200001",
+       "level": 6,
+       "short": "Waste management and remediation services",
+       "full": "Waste management and remediation services"
+      },
+      {
+       "value": "Education and health services",
+       "fredId": "USEHS",
+       "level": 4,
+       "short": "Education and health services",
+       "full": "Education and health services"
+      },
+      {
+       "value": "Educational services",
+       "fredId": "CES6561000001",
+       "level": 5,
+       "short": "Educational services",
+       "full": "Educational services"
+      },
+      {
+       "value": "Health care and social assistance",
+       "fredId": "CES6562000001",
+       "level": 5,
+       "short": "Health care and social assistance",
+       "full": "Health care and social assistance"
+      },
+      {
+       "value": "Health care",
+       "fredId": "CES6562000101",
+       "level": 6,
+       "short": "Health care",
+       "full": "Health care"
+      },
+      {
+       "value": "Ambulatory health care services",
+       "fredId": "CES6562100001",
+       "level": 7,
+       "short": "Ambulatory health care services",
+       "full": "Ambulatory health care services"
+      },
+      {
+       "value": "Offices of physicians",
+       "fredId": "CES6562110001",
+       "level": 8,
+       "short": "Offices of physicians",
+       "full": "Offices of physicians"
+      },
+      {
+       "value": "Outpatient care centers",
+       "fredId": "CES6562140001",
+       "level": 8,
+       "short": "Outpatient care centers",
+       "full": "Outpatient care centers"
+      },
+      {
+       "value": "Home health care services",
+       "fredId": "CES6562160001",
+       "level": 8,
+       "short": "Home health care services",
+       "full": "Home health care services"
+      },
+      {
+       "value": "Hospitals",
+       "fredId": "CES6562200001",
+       "level": 7,
+       "short": "Hospitals",
+       "full": "Hospitals"
+      },
+      {
+       "value": "Nursing and residential care facilities",
+       "fredId": "CES6562300001",
+       "level": 7,
+       "short": "Nursing and residential care facilities",
+       "full": "Nursing and residential care facilities"
+      },
+      {
+       "value": "Nursing care facilities",
+       "fredId": "CES6562310001",
+       "level": 8,
+       "short": "Nursing care facilities",
+       "full": "Nursing care facilities"
+      },
+      {
+       "value": "Social assistance",
+       "fredId": "CES6562400001",
+       "level": 7,
+       "short": "Social assistance",
+       "full": "Social assistance"
+      },
+      {
+       "value": "Child day care services",
+       "fredId": "CES6562440001",
+       "level": 8,
+       "short": "Child day care services",
+       "full": "Child day care services"
+      },
+      {
+       "value": "Leisure and hospitality",
+       "fredId": "USLAH",
+       "level": 4,
+       "short": "Leisure and hospitality",
+       "full": "Leisure and hospitality"
+      },
+      {
+       "value": "Arts, entertainment, and recreation",
+       "fredId": "CES7071000001",
+       "level": 5,
+       "short": "Arts, entertainment, and recreation",
+       "full": "Arts, entertainment, and recreation"
+      },
+      {
+       "value": "Performing arts and spectator sports",
+       "fredId": "CES7071100001",
+       "level": 6,
+       "short": "Performing arts and spectator sports",
+       "full": "Performing arts and spectator sports"
+      },
+      {
+       "value": "Museums, historical sites, and similar institutions",
+       "fredId": "CES7071200001",
+       "level": 6,
+       "short": "Museums, historical sites, and similar institutions",
+       "full": "Museums, historical sites, and similar institutions"
+      },
+      {
+       "value": "Amusements, gambling, and recreation",
+       "fredId": "CES7071300001",
+       "level": 6,
+       "short": "Amusements, gambling, and recreation",
+       "full": "Amusements, gambling, and recreation"
+      },
+      {
+       "value": "Accommodation and food services",
+       "fredId": "CES7072000001",
+       "level": 5,
+       "short": "Accommodation and food services",
+       "full": "Accommodation and food services"
+      },
+      {
+       "value": "Accommodation",
+       "fredId": "CES7072100001",
+       "level": 6,
+       "short": "Accommodation",
+       "full": "Accommodation"
+      },
+      {
+       "value": "Food services and drinking places",
+       "fredId": "CES7072200001",
+       "level": 6,
+       "short": "Food services and drinking places",
+       "full": "Food services and drinking places"
+      },
+      {
+       "value": "Other services",
+       "fredId": "USSERV",
+       "level": 4,
+       "short": "Other services",
+       "full": "Other services"
+      },
+      {
+       "value": "Repair and maintenance",
+       "fredId": "CES8081100001",
+       "level": 5,
+       "short": "Repair and maintenance",
+       "full": "Repair and maintenance"
+      },
+      {
+       "value": "Personal and laundry services",
+       "fredId": "CES8081200001",
+       "level": 5,
+       "short": "Personal and laundry services",
+       "full": "Personal and laundry services"
+      },
+      {
+       "value": "Membership associations and organizations",
+       "fredId": "CES8081300001",
+       "level": 5,
+       "short": "Membership associations and organizations",
+       "full": "Membership associations and organizations"
+      },
+      {
+       "value": "Government",
+       "fredId": "USGOVT",
+       "level": 2,
+       "short": "Government",
+       "full": "Government"
+      },
+      {
+       "value": "Federal",
+       "fredId": "CES9091000001",
+       "level": 3,
+       "short": "Federal",
+       "full": "Federal"
+      },
+      {
+       "value": "Federal, except U.S. Postal Service",
+       "fredId": "CES9091100001",
+       "level": 4,
+       "short": "Federal, except U.S. Postal Service",
+       "full": "Federal, except U.S. Postal Service"
+      },
+      {
+       "value": "U.S. Postal Service",
+       "fredId": "CES9091912001",
+       "level": 4,
+       "short": "U.S. Postal Service",
+       "full": "U.S. Postal Service"
+      },
+      {
+       "value": "State government",
+       "fredId": "CES9092000001",
+       "level": 3,
+       "short": "State government",
+       "full": "State government"
+      },
+      {
+       "value": "State government education",
+       "fredId": "CES9092161101",
+       "level": 4,
+       "short": "State government education",
+       "full": "State government education"
+      },
+      {
+       "value": "State government, excluding education",
+       "fredId": "CES9092200001",
+       "level": 4,
+       "short": "State government, excluding education",
+       "full": "State government, excluding education"
+      },
+      {
+       "value": "Local government",
+       "fredId": "CES9093000001",
+       "level": 3,
+       "short": "Local government",
+       "full": "Local government"
+      },
+      {
+       "value": "Local government education",
+       "fredId": "CES9093161101",
+       "level": 4,
+       "short": "Local government education",
+       "full": "Local government education"
+      },
+      {
+       "value": "Local government, excluding education",
+       "fredId": "CES9093200001",
+       "level": 4,
+       "short": "Local government, excluding education",
+       "full": "Local government, excluding education"
+      }
+     ]
+    },
+    {
+     "id": "us_emp_ind_nsa",
+     "name": "Employment by industry (NSA)",
+     "chipShort": "Emp by industry NSA (US)",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 1,
+     "dim1Name": "Series",
+     "rows": [
+      {
+       "value": "Total nonfarm",
+       "fredId": "PAYNSA",
+       "level": 1,
+       "short": "Total nonfarm",
+       "full": "Total nonfarm"
+      },
+      {
+       "value": "Total private",
+       "fredId": "CEU0500000001",
+       "level": 2,
+       "short": "Total private",
+       "full": "Total private"
+      },
+      {
+       "value": "Goods-producing",
+       "fredId": "CEU0600000001",
+       "level": 3,
+       "short": "Goods-producing",
+       "full": "Goods-producing"
+      },
+      {
+       "value": "Mining and logging",
+       "fredId": "CEU1000000001",
+       "level": 4,
+       "short": "Mining and logging",
+       "full": "Mining and logging"
+      },
+      {
+       "value": "Logging",
+       "fredId": "CEU1011330001",
+       "level": 5,
+       "short": "Logging",
+       "full": "Logging"
+      },
+      {
+       "value": "Mining",
+       "fredId": "CEU1021000001",
+       "level": 5,
+       "short": "Mining",
+       "full": "Mining"
+      },
+      {
+       "value": "Oil and gas extraction",
+       "fredId": "CEU1021100001",
+       "level": 6,
+       "short": "Oil and gas extraction",
+       "full": "Oil and gas extraction"
+      },
+      {
+       "value": "Mining, except oil and gas",
+       "fredId": "CEU1021200001",
+       "level": 6,
+       "short": "Mining, except oil and gas",
+       "full": "Mining, except oil and gas"
+      },
+      {
+       "value": "Coal mining",
+       "fredId": "CEU1021210001",
+       "level": 7,
+       "short": "Coal mining",
+       "full": "Coal mining"
+      },
+      {
+       "value": "Support activities for mining",
+       "fredId": "CEU1021300001",
+       "level": 6,
+       "short": "Support activities for mining",
+       "full": "Support activities for mining"
+      },
+      {
+       "value": "Construction",
+       "fredId": "CEU2000000001",
+       "level": 4,
+       "short": "Construction",
+       "full": "Construction"
+      },
+      {
+       "value": "Construction of buildings",
+       "fredId": "CEU2023600001",
+       "level": 5,
+       "short": "Construction of buildings",
+       "full": "Construction of buildings"
+      },
+      {
+       "value": "Residential building",
+       "fredId": "CEU2023610001",
+       "level": 6,
+       "short": "Residential building",
+       "full": "Residential building"
+      },
+      {
+       "value": "Nonresidential building",
+       "fredId": "CEU2023620001",
+       "level": 6,
+       "short": "Nonresidential building",
+       "full": "Nonresidential building"
+      },
+      {
+       "value": "Heavy and civil engineering construction",
+       "fredId": "CEU2023700001",
+       "level": 5,
+       "short": "Heavy and civil engineering construction",
+       "full": "Heavy and civil engineering construction"
+      },
+      {
+       "value": "Specialty trade contractors",
+       "fredId": "CEU2023800001",
+       "level": 5,
+       "short": "Specialty trade contractors",
+       "full": "Specialty trade contractors"
+      },
+      {
+       "value": "Residential specialty trade contractors",
+       "fredId": "CEU2023800101",
+       "level": 6,
+       "short": "Residential specialty trade contractors",
+       "full": "Residential specialty trade contractors"
+      },
+      {
+       "value": "Nonresidential specialty trade contractors",
+       "fredId": "CEU2023800201",
+       "level": 6,
+       "short": "Nonresidential specialty trade contractors",
+       "full": "Nonresidential specialty trade contractors"
+      },
+      {
+       "value": "Manufacturing",
+       "fredId": "CEU3000000001",
+       "level": 4,
+       "short": "Manufacturing",
+       "full": "Manufacturing"
+      },
+      {
+       "value": "Durable goods",
+       "fredId": "CEU3100000001",
+       "level": 5,
+       "short": "Durable goods",
+       "full": "Durable goods"
+      },
+      {
+       "value": "Wood products",
+       "fredId": "CEU3132100001",
+       "level": 6,
+       "short": "Wood products",
+       "full": "Wood products"
+      },
+      {
+       "value": "Nonmetallic mineral products",
+       "fredId": "CEU3132700001",
+       "level": 6,
+       "short": "Nonmetallic mineral products",
+       "full": "Nonmetallic mineral products"
+      },
+      {
+       "value": "Primary metals",
+       "fredId": "CEU3133100001",
+       "level": 6,
+       "short": "Primary metals",
+       "full": "Primary metals"
+      },
+      {
+       "value": "Fabricated metal products",
+       "fredId": "CEU3133200001",
+       "level": 6,
+       "short": "Fabricated metal products",
+       "full": "Fabricated metal products"
+      },
+      {
+       "value": "Machinery",
+       "fredId": "CEU3133300001",
+       "level": 6,
+       "short": "Machinery",
+       "full": "Machinery"
+      },
+      {
+       "value": "Computer and electronic products",
+       "fredId": "CEU3133400001",
+       "level": 6,
+       "short": "Computer and electronic products",
+       "full": "Computer and electronic products"
+      },
+      {
+       "value": "Computer and peripheral equipment",
+       "fredId": "CEU3133410001",
+       "level": 7,
+       "short": "Computer and peripheral equipment",
+       "full": "Computer and peripheral equipment"
+      },
+      {
+       "value": "Communication equipment",
+       "fredId": "CEU3133420001",
+       "level": 7,
+       "short": "Communication equipment",
+       "full": "Communication equipment"
+      },
+      {
+       "value": "Semiconductors and electronic components",
+       "fredId": "CEU3133440001",
+       "level": 7,
+       "short": "Semiconductors and electronic components",
+       "full": "Semiconductors and electronic components"
+      },
+      {
+       "value": "Electronic instruments",
+       "fredId": "CEU3133450001",
+       "level": 7,
+       "short": "Electronic instruments",
+       "full": "Electronic instruments"
+      },
+      {
+       "value": "Electrical equipment and appliances",
+       "fredId": "CEU3133500001",
+       "level": 6,
+       "short": "Electrical equipment and appliances",
+       "full": "Electrical equipment and appliances"
+      },
+      {
+       "value": "Transportation equipment",
+       "fredId": "CEU3133600001",
+       "level": 6,
+       "short": "Transportation equipment",
+       "full": "Transportation equipment"
+      },
+      {
+       "value": "Motor vehicles and parts",
+       "fredId": "CEU3133600101",
+       "level": 7,
+       "short": "Motor vehicles and parts",
+       "full": "Motor vehicles and parts"
+      },
+      {
+       "value": "Furniture and related products",
+       "fredId": "CEU3133700001",
+       "level": 6,
+       "short": "Furniture and related products",
+       "full": "Furniture and related products"
+      },
+      {
+       "value": "Miscellaneous durable goods manufacturing",
+       "fredId": "CEU3133900001",
+       "level": 6,
+       "short": "Miscellaneous durable goods manufacturing",
+       "full": "Miscellaneous durable goods manufacturing"
+      },
+      {
+       "value": "Nondurable goods",
+       "fredId": "CEU3200000001",
+       "level": 5,
+       "short": "Nondurable goods",
+       "full": "Nondurable goods"
+      },
+      {
+       "value": "Food manufacturing",
+       "fredId": "CEU3231100001",
+       "level": 6,
+       "short": "Food manufacturing",
+       "full": "Food manufacturing"
+      },
+      {
+       "value": "Textile mills",
+       "fredId": "CEU3231300001",
+       "level": 6,
+       "short": "Textile mills",
+       "full": "Textile mills"
+      },
+      {
+       "value": "Textile product mills",
+       "fredId": "CEU3231400001",
+       "level": 6,
+       "short": "Textile product mills",
+       "full": "Textile product mills"
+      },
+      {
+       "value": "Apparel",
+       "fredId": "CEU3231500001",
+       "level": 6,
+       "short": "Apparel",
+       "full": "Apparel"
+      },
+      {
+       "value": "Paper and paper products",
+       "fredId": "CEU3232200001",
+       "level": 6,
+       "short": "Paper and paper products",
+       "full": "Paper and paper products"
+      },
+      {
+       "value": "Printing and related support activities",
+       "fredId": "CEU3232300001",
+       "level": 6,
+       "short": "Printing and related support activities",
+       "full": "Printing and related support activities"
+      },
+      {
+       "value": "Petroleum and coal products",
+       "fredId": "CEU3232400001",
+       "level": 6,
+       "short": "Petroleum and coal products",
+       "full": "Petroleum and coal products"
+      },
+      {
+       "value": "Chemicals",
+       "fredId": "CEU3232500001",
+       "level": 6,
+       "short": "Chemicals",
+       "full": "Chemicals"
+      },
+      {
+       "value": "Plastics and rubber products",
+       "fredId": "CEU3232600001",
+       "level": 6,
+       "short": "Plastics and rubber products",
+       "full": "Plastics and rubber products"
+      },
+      {
+       "value": "Miscellaneous nondurable goods manufacturing",
+       "fredId": "CEU3232900001",
+       "level": 6,
+       "short": "Miscellaneous nondurable goods manufacturing",
+       "full": "Miscellaneous nondurable goods manufacturing"
+      },
+      {
+       "value": "Private service-providing",
+       "fredId": "CEU0800000001",
+       "level": 3,
+       "short": "Private service-providing",
+       "full": "Private service-providing"
+      },
+      {
+       "value": "Trade, transportation, and utilities",
+       "fredId": "CEU4000000001",
+       "level": 4,
+       "short": "Trade, transportation, and utilities",
+       "full": "Trade, transportation, and utilities"
+      },
+      {
+       "value": "Wholesale trade",
+       "fredId": "CEU4142000001",
+       "level": 5,
+       "short": "Wholesale trade",
+       "full": "Wholesale trade"
+      },
+      {
+       "value": "Durable goods (CEU4142300001)",
+       "fredId": "CEU4142300001",
+       "level": 6,
+       "short": "Durable goods",
+       "full": "Durable goods"
+      },
+      {
+       "value": "Nondurable goods (CEU4142400001)",
+       "fredId": "CEU4142400001",
+       "level": 6,
+       "short": "Nondurable goods",
+       "full": "Nondurable goods"
+      },
+      {
+       "value": "Electronic markets and agents and brokers",
+       "fredId": "CEU4142500001",
+       "level": 6,
+       "short": "Electronic markets and agents and brokers",
+       "full": "Electronic markets and agents and brokers"
+      },
+      {
+       "value": "Retail trade",
+       "fredId": "CEU4200000001",
+       "level": 5,
+       "short": "Retail trade",
+       "full": "Retail trade"
+      },
+      {
+       "value": "Motor vehicles and parts dealers",
+       "fredId": "CEU4244100001",
+       "level": 6,
+       "short": "Motor vehicles and parts dealers",
+       "full": "Motor vehicles and parts dealers"
+      },
+      {
+       "value": "Automobile dealers",
+       "fredId": "CEU4244110001",
+       "level": 6,
+       "short": "Automobile dealers",
+       "full": "Automobile dealers"
+      },
+      {
+       "value": "Furniture and home furnishings stores",
+       "fredId": "CEU4244200001",
+       "level": 6,
+       "short": "Furniture and home furnishings stores",
+       "full": "Furniture and home furnishings stores"
+      },
+      {
+       "value": "Electronics and appliance stores",
+       "fredId": "CEU4244300001",
+       "level": 6,
+       "short": "Electronics and appliance stores",
+       "full": "Electronics and appliance stores"
+      },
+      {
+       "value": "Building material and garden supply stores",
+       "fredId": "CEU4244400001",
+       "level": 6,
+       "short": "Building material and garden supply stores",
+       "full": "Building material and garden supply stores"
+      },
+      {
+       "value": "Food and beverage stores",
+       "fredId": "CEU4244500001",
+       "level": 6,
+       "short": "Food and beverage stores",
+       "full": "Food and beverage stores"
+      },
+      {
+       "value": "Health and personal care stores",
+       "fredId": "CEU4244600001",
+       "level": 6,
+       "short": "Health and personal care stores",
+       "full": "Health and personal care stores"
+      },
+      {
+       "value": "Gasoline stations",
+       "fredId": "CEU4244700001",
+       "level": 6,
+       "short": "Gasoline stations",
+       "full": "Gasoline stations"
+      },
+      {
+       "value": "Clothing and clothing accessories stores",
+       "fredId": "CEU4244800001",
+       "level": 6,
+       "short": "Clothing and clothing accessories stores",
+       "full": "Clothing and clothing accessories stores"
+      },
+      {
+       "value": "Sporting goods, hobby, book, and music stores",
+       "fredId": "CEU4245100001",
+       "level": 6,
+       "short": "Sporting goods, hobby, book, and music stores",
+       "full": "Sporting goods, hobby, book, and music stores"
+      },
+      {
+       "value": "General merchandise stores",
+       "fredId": "CEU4245200001",
+       "level": 6,
+       "short": "General merchandise stores",
+       "full": "General merchandise stores"
+      },
+      {
+       "value": "Department stores",
+       "fredId": "CEU4245210001",
+       "level": 6,
+       "short": "Department stores",
+       "full": "Department stores"
+      },
+      {
+       "value": "Miscellaneous store retailers",
+       "fredId": "CEU4245300001",
+       "level": 6,
+       "short": "Miscellaneous store retailers",
+       "full": "Miscellaneous store retailers"
+      },
+      {
+       "value": "Nonstore retailers",
+       "fredId": "CEU4245400001",
+       "level": 6,
+       "short": "Nonstore retailers",
+       "full": "Nonstore retailers"
+      },
+      {
+       "value": "Transportation and warehousing",
+       "fredId": "CEU4300000001",
+       "level": 5,
+       "short": "Transportation and warehousing",
+       "full": "Transportation and warehousing"
+      },
+      {
+       "value": "Air transportation",
+       "fredId": "CEU4348100001",
+       "level": 6,
+       "short": "Air transportation",
+       "full": "Air transportation"
+      },
+      {
+       "value": "Rail transportation",
+       "fredId": "CEU4348200001",
+       "level": 6,
+       "short": "Rail transportation",
+       "full": "Rail transportation"
+      },
+      {
+       "value": "Water transportation",
+       "fredId": "CEU4348300001",
+       "level": 6,
+       "short": "Water transportation",
+       "full": "Water transportation"
+      },
+      {
+       "value": "Truck transportation",
+       "fredId": "CEU4348400001",
+       "level": 6,
+       "short": "Truck transportation",
+       "full": "Truck transportation"
+      },
+      {
+       "value": "Transit and ground passenger transportation",
+       "fredId": "CEU4348500001",
+       "level": 6,
+       "short": "Transit and ground passenger transportation",
+       "full": "Transit and ground passenger transportation"
+      },
+      {
+       "value": "Pipeline transportation",
+       "fredId": "CEU4348600001",
+       "level": 6,
+       "short": "Pipeline transportation",
+       "full": "Pipeline transportation"
+      },
+      {
+       "value": "Scenic and sightseeing transportation",
+       "fredId": "CEU4348700001",
+       "level": 6,
+       "short": "Scenic and sightseeing transportation",
+       "full": "Scenic and sightseeing transportation"
+      },
+      {
+       "value": "Support activities for transportation",
+       "fredId": "CEU4348800001",
+       "level": 6,
+       "short": "Support activities for transportation",
+       "full": "Support activities for transportation"
+      },
+      {
+       "value": "Couriers and messengers",
+       "fredId": "CEU4349200001",
+       "level": 6,
+       "short": "Couriers and messengers",
+       "full": "Couriers and messengers"
+      },
+      {
+       "value": "Warehousing and storage",
+       "fredId": "CEU4349300001",
+       "level": 6,
+       "short": "Warehousing and storage",
+       "full": "Warehousing and storage"
+      },
+      {
+       "value": "Utilities",
+       "fredId": "CEU4422000001",
+       "level": 5,
+       "short": "Utilities",
+       "full": "Utilities"
+      },
+      {
+       "value": "Information",
+       "fredId": "CEU5000000001",
+       "level": 4,
+       "short": "Information",
+       "full": "Information"
+      },
+      {
+       "value": "Publishing industries, except Internet",
+       "fredId": "CEU5051100001",
+       "level": 5,
+       "short": "Publishing industries, except Internet",
+       "full": "Publishing industries, except Internet"
+      },
+      {
+       "value": "Motion picture and sound recording industries",
+       "fredId": "CEU5051200001",
+       "level": 5,
+       "short": "Motion picture and sound recording industries",
+       "full": "Motion picture and sound recording industries"
+      },
+      {
+       "value": "Broadcasting, except Internet",
+       "fredId": "CEU5051500001",
+       "level": 5,
+       "short": "Broadcasting, except Internet",
+       "full": "Broadcasting, except Internet"
+      },
+      {
+       "value": "Telecommunications",
+       "fredId": "CEU5051700001",
+       "level": 5,
+       "short": "Telecommunications",
+       "full": "Telecommunications"
+      },
+      {
+       "value": "Data processing, hosting and related services",
+       "fredId": "CEU5051800001",
+       "level": 5,
+       "short": "Data processing, hosting and related services",
+       "full": "Data processing, hosting and related services"
+      },
+      {
+       "value": "Other information services",
+       "fredId": "CEU5051900001",
+       "level": 5,
+       "short": "Other information services",
+       "full": "Other information services"
+      },
+      {
+       "value": "Financial activities",
+       "fredId": "CEU5500000001",
+       "level": 4,
+       "short": "Financial activities",
+       "full": "Financial activities"
+      },
+      {
+       "value": "Finance and insurance",
+       "fredId": "CEU5552000001",
+       "level": 5,
+       "short": "Finance and insurance",
+       "full": "Finance and insurance"
+      },
+      {
+       "value": "Monetary authorities - central bank",
+       "fredId": "CEU5552100001",
+       "level": 6,
+       "short": "Monetary authorities - central bank",
+       "full": "Monetary authorities - central bank"
+      },
+      {
+       "value": "Credit intermediation and related activities",
+       "fredId": "CEU5552200001",
+       "level": 6,
+       "short": "Credit intermediation and related activities",
+       "full": "Credit intermediation and related activities"
+      },
+      {
+       "value": "Depository credit intermediation",
+       "fredId": "CEU5552210001",
+       "level": 7,
+       "short": "Depository credit intermediation",
+       "full": "Depository credit intermediation"
+      },
+      {
+       "value": "Commercial banking",
+       "fredId": "CEU5552211001",
+       "level": 8,
+       "short": "Commercial banking",
+       "full": "Commercial banking"
+      },
+      {
+       "value": "Securities, commodity contracts, investments, and funds and trusts",
+       "fredId": "CEU5552300001",
+       "level": 6,
+       "short": "Securities, commodity contracts, investments, and funds and trusts",
+       "full": "Securities, commodity contracts, investments, and funds and trusts"
+      },
+      {
+       "value": "Insurance carriers and related activities",
+       "fredId": "CEU5552400001",
+       "level": 6,
+       "short": "Insurance carriers and related activities",
+       "full": "Insurance carriers and related activities"
+      },
+      {
+       "value": "Real estate and rental and leasing",
+       "fredId": "CEU5553000001",
+       "level": 5,
+       "short": "Real estate and rental and leasing",
+       "full": "Real estate and rental and leasing"
+      },
+      {
+       "value": "Real estate",
+       "fredId": "CEU5553100001",
+       "level": 6,
+       "short": "Real estate",
+       "full": "Real estate"
+      },
+      {
+       "value": "Rental and leasing services",
+       "fredId": "CEU5553200001",
+       "level": 6,
+       "short": "Rental and leasing services",
+       "full": "Rental and leasing services"
+      },
+      {
+       "value": "Lessors of nonfinancial intangible assets",
+       "fredId": "CEU5553300001",
+       "level": 6,
+       "short": "Lessors of nonfinancial intangible assets",
+       "full": "Lessors of nonfinancial intangible assets"
+      },
+      {
+       "value": "Professional and business services",
+       "fredId": "CEU6000000001",
+       "level": 4,
+       "short": "Professional and business services",
+       "full": "Professional and business services"
+      },
+      {
+       "value": "Professional, scientific, and technical services",
+       "fredId": "CEU6054000001",
+       "level": 5,
+       "short": "Professional, scientific, and technical services",
+       "full": "Professional, scientific, and technical services"
+      },
+      {
+       "value": "Legal services",
+       "fredId": "CEU6054110001",
+       "level": 6,
+       "short": "Legal services",
+       "full": "Legal services"
+      },
+      {
+       "value": "Accounting and bookkeeping services",
+       "fredId": "CEU6054120001",
+       "level": 6,
+       "short": "Accounting and bookkeeping services",
+       "full": "Accounting and bookkeeping services"
+      },
+      {
+       "value": "Architectural and engineering services",
+       "fredId": "CEU6054130001",
+       "level": 6,
+       "short": "Architectural and engineering services",
+       "full": "Architectural and engineering services"
+      },
+      {
+       "value": "Computer systems design and related services",
+       "fredId": "CEU6054150001",
+       "level": 6,
+       "short": "Computer systems design and related services",
+       "full": "Computer systems design and related services"
+      },
+      {
+       "value": "Management and technical consulting services",
+       "fredId": "CEU6054160001",
+       "level": 6,
+       "short": "Management and technical consulting services",
+       "full": "Management and technical consulting services"
+      },
+      {
+       "value": "Management of companies and enterprises",
+       "fredId": "CEU6055000001",
+       "level": 5,
+       "short": "Management of companies and enterprises",
+       "full": "Management of companies and enterprises"
+      },
+      {
+       "value": "Administrative and waste services",
+       "fredId": "CEU6056000001",
+       "level": 5,
+       "short": "Administrative and waste services",
+       "full": "Administrative and waste services"
+      },
+      {
+       "value": "Administrative and support services",
+       "fredId": "CEU6056100001",
+       "level": 6,
+       "short": "Administrative and support services",
+       "full": "Administrative and support services"
+      },
+      {
+       "value": "Employment services",
+       "fredId": "CEU6056130001",
+       "level": 7,
+       "short": "Employment services",
+       "full": "Employment services"
+      },
+      {
+       "value": "Temporary help services",
+       "fredId": "TEMPHELPN",
+       "level": 8,
+       "short": "Temporary help services",
+       "full": "Temporary help services"
+      },
+      {
+       "value": "Business support services",
+       "fredId": "CEU6056140001",
+       "level": 7,
+       "short": "Business support services",
+       "full": "Business support services"
+      },
+      {
+       "value": "Services to buildings and dwellings",
+       "fredId": "CEU6056170001",
+       "level": 7,
+       "short": "Services to buildings and dwellings",
+       "full": "Services to buildings and dwellings"
+      },
+      {
+       "value": "Waste management and remediation services",
+       "fredId": "CEU6056200001",
+       "level": 6,
+       "short": "Waste management and remediation services",
+       "full": "Waste management and remediation services"
+      },
+      {
+       "value": "Education and health services",
+       "fredId": "CEU6500000001",
+       "level": 4,
+       "short": "Education and health services",
+       "full": "Education and health services"
+      },
+      {
+       "value": "Educational services",
+       "fredId": "CEU6561000001",
+       "level": 5,
+       "short": "Educational services",
+       "full": "Educational services"
+      },
+      {
+       "value": "Health care and social assistance",
+       "fredId": "CEU6562000001",
+       "level": 5,
+       "short": "Health care and social assistance",
+       "full": "Health care and social assistance"
+      },
+      {
+       "value": "Health care",
+       "fredId": "CEU6562000101",
+       "level": 6,
+       "short": "Health care",
+       "full": "Health care"
+      },
+      {
+       "value": "Ambulatory health care services",
+       "fredId": "CEU6562100001",
+       "level": 7,
+       "short": "Ambulatory health care services",
+       "full": "Ambulatory health care services"
+      },
+      {
+       "value": "Offices of physicians",
+       "fredId": "CEU6562110001",
+       "level": 8,
+       "short": "Offices of physicians",
+       "full": "Offices of physicians"
+      },
+      {
+       "value": "Outpatient care centers",
+       "fredId": "CEU6562140001",
+       "level": 8,
+       "short": "Outpatient care centers",
+       "full": "Outpatient care centers"
+      },
+      {
+       "value": "Home health care services",
+       "fredId": "CEU6562160001",
+       "level": 8,
+       "short": "Home health care services",
+       "full": "Home health care services"
+      },
+      {
+       "value": "Hospitals",
+       "fredId": "CEU6562200001",
+       "level": 7,
+       "short": "Hospitals",
+       "full": "Hospitals"
+      },
+      {
+       "value": "Nursing and residential care facilities",
+       "fredId": "CEU6562300001",
+       "level": 7,
+       "short": "Nursing and residential care facilities",
+       "full": "Nursing and residential care facilities"
+      },
+      {
+       "value": "Nursing care facilities",
+       "fredId": "CEU6562310001",
+       "level": 8,
+       "short": "Nursing care facilities",
+       "full": "Nursing care facilities"
+      },
+      {
+       "value": "Social assistance",
+       "fredId": "CEU6562400001",
+       "level": 7,
+       "short": "Social assistance",
+       "full": "Social assistance"
+      },
+      {
+       "value": "Child day care services",
+       "fredId": "CEU6562440001",
+       "level": 8,
+       "short": "Child day care services",
+       "full": "Child day care services"
+      },
+      {
+       "value": "Leisure and hospitality",
+       "fredId": "CEU7000000001",
+       "level": 4,
+       "short": "Leisure and hospitality",
+       "full": "Leisure and hospitality"
+      },
+      {
+       "value": "Arts, entertainment, and recreation",
+       "fredId": "CEU7071000001",
+       "level": 5,
+       "short": "Arts, entertainment, and recreation",
+       "full": "Arts, entertainment, and recreation"
+      },
+      {
+       "value": "Performing arts and spectator sports",
+       "fredId": "CEU7071100001",
+       "level": 6,
+       "short": "Performing arts and spectator sports",
+       "full": "Performing arts and spectator sports"
+      },
+      {
+       "value": "Museums, historical sites, and similar institutions",
+       "fredId": "CEU7071200001",
+       "level": 6,
+       "short": "Museums, historical sites, and similar institutions",
+       "full": "Museums, historical sites, and similar institutions"
+      },
+      {
+       "value": "Amusements, gambling, and recreation",
+       "fredId": "CEU7071300001",
+       "level": 6,
+       "short": "Amusements, gambling, and recreation",
+       "full": "Amusements, gambling, and recreation"
+      },
+      {
+       "value": "Accommodation and food services",
+       "fredId": "CEU7072000001",
+       "level": 5,
+       "short": "Accommodation and food services",
+       "full": "Accommodation and food services"
+      },
+      {
+       "value": "Accommodation",
+       "fredId": "CEU7072100001",
+       "level": 6,
+       "short": "Accommodation",
+       "full": "Accommodation"
+      },
+      {
+       "value": "Food services and drinking places",
+       "fredId": "CEU7072200001",
+       "level": 6,
+       "short": "Food services and drinking places",
+       "full": "Food services and drinking places"
+      },
+      {
+       "value": "Other services",
+       "fredId": "CEU8000000001",
+       "level": 4,
+       "short": "Other services",
+       "full": "Other services"
+      },
+      {
+       "value": "Repair and maintenance",
+       "fredId": "CEU8081100001",
+       "level": 5,
+       "short": "Repair and maintenance",
+       "full": "Repair and maintenance"
+      },
+      {
+       "value": "Personal and laundry services",
+       "fredId": "CEU8081200001",
+       "level": 5,
+       "short": "Personal and laundry services",
+       "full": "Personal and laundry services"
+      },
+      {
+       "value": "Membership associations and organizations",
+       "fredId": "CEU8081300001",
+       "level": 5,
+       "short": "Membership associations and organizations",
+       "full": "Membership associations and organizations"
+      },
+      {
+       "value": "Government",
+       "fredId": "CEU9000000001",
+       "level": 2,
+       "short": "Government",
+       "full": "Government"
+      },
+      {
+       "value": "Federal",
+       "fredId": "CEU9091000001",
+       "level": 3,
+       "short": "Federal",
+       "full": "Federal"
+      },
+      {
+       "value": "Federal, except U.S. Postal Service",
+       "fredId": "CEU9091100001",
+       "level": 4,
+       "short": "Federal, except U.S. Postal Service",
+       "full": "Federal, except U.S. Postal Service"
+      },
+      {
+       "value": "U.S. Postal Service",
+       "fredId": "CEU9091912001",
+       "level": 4,
+       "short": "U.S. Postal Service",
+       "full": "U.S. Postal Service"
+      },
+      {
+       "value": "State government",
+       "fredId": "CEU9092000001",
+       "level": 3,
+       "short": "State government",
+       "full": "State government"
+      },
+      {
+       "value": "State government education",
+       "fredId": "CEU9092161101",
+       "level": 4,
+       "short": "State government education",
+       "full": "State government education"
+      },
+      {
+       "value": "State government, excluding education",
+       "fredId": "CEU9092200001",
+       "level": 4,
+       "short": "State government, excluding education",
+       "full": "State government, excluding education"
+      },
+      {
+       "value": "Local government",
+       "fredId": "CEU9093000001",
+       "level": 3,
+       "short": "Local government",
+       "full": "Local government"
+      },
+      {
+       "value": "Local government education",
+       "fredId": "CEU9093161101",
+       "level": 4,
+       "short": "Local government education",
+       "full": "Local government education"
+      },
+      {
+       "value": "Local government, excluding education",
+       "fredId": "CEU9093200001",
+       "level": 4,
+       "short": "Local government, excluding education",
+       "full": "Local government, excluding education"
+      }
+     ]
+    },
+    {
+     "id": "us_emp_stat_sa",
+     "name": "Employment status of population (SA)",
+     "chipShort": "Emp status SA (US)",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 1,
+     "dim1Name": "Series",
+     "rows": [
+      {
+       "value": "Civilian noninstitutional population",
+       "fredId": "CNP16OV",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force",
+       "fredId": "CLF16OV",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate",
+       "fredId": "CIVPART",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed",
+       "fredId": "CE16OV",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio",
+       "fredId": "EMRATIO",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed",
+       "fredId": "UNEMPLOY",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate",
+       "fredId": "UNRATE",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force",
+       "fredId": "LNS15000000",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      },
+      {
+       "value": "Persons who currently want a job",
+       "fredId": "NILFWJN",
+       "level": 4,
+       "short": "Persons who currently want a job",
+       "full": "Persons who currently want a job"
+      },
+      {
+       "value": "Civilian noninstitutional population (LNU00000001)",
+       "fredId": "LNU00000001",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force (LNS11000001)",
+       "fredId": "LNS11000001",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate (LNS11300001)",
+       "fredId": "LNS11300001",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed (LNS12000001)",
+       "fredId": "LNS12000001",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio (LNS12300001)",
+       "fredId": "LNS12300001",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed (LNS13000001)",
+       "fredId": "LNS13000001",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate (LNS14000001)",
+       "fredId": "LNS14000001",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force (LNS15000001)",
+       "fredId": "LNS15000001",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      },
+      {
+       "value": "Civilian noninstitutional population (LNU00000025)",
+       "fredId": "LNU00000025",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force (LNS11000025)",
+       "fredId": "LNS11000025",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate (LNS11300025)",
+       "fredId": "LNS11300025",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed (LNS12000025)",
+       "fredId": "LNS12000025",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio (LNS12300025)",
+       "fredId": "LNS12300025",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed (LNS13000025)",
+       "fredId": "LNS13000025",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate (LNS14000025)",
+       "fredId": "LNS14000025",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force (LNS15000025)",
+       "fredId": "LNS15000025",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      },
+      {
+       "value": "Civilian noninstitutional population (LNU00000002)",
+       "fredId": "LNU00000002",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force (LNS11000002)",
+       "fredId": "LNS11000002",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate (LNS11300002)",
+       "fredId": "LNS11300002",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed (LNS12000002)",
+       "fredId": "LNS12000002",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio (LNS12300002)",
+       "fredId": "LNS12300002",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed (LNS13000002)",
+       "fredId": "LNS13000002",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate (LNS14000002)",
+       "fredId": "LNS14000002",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force (LNS15000002)",
+       "fredId": "LNS15000002",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      },
+      {
+       "value": "Civilian noninstitutional population (LNU00000026)",
+       "fredId": "LNU00000026",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force (LNS11000026)",
+       "fredId": "LNS11000026",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate (LNS11300026)",
+       "fredId": "LNS11300026",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed (LNS12000026)",
+       "fredId": "LNS12000026",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio (LNS12300026)",
+       "fredId": "LNS12300026",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed (LNS13000026)",
+       "fredId": "LNS13000026",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate (LNS14000026)",
+       "fredId": "LNS14000026",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force (LNS15000026)",
+       "fredId": "LNS15000026",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      },
+      {
+       "value": "Civilian noninstitutional population (LNU00000012)",
+       "fredId": "LNU00000012",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force (LNS11000012)",
+       "fredId": "LNS11000012",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate (LNS11300012)",
+       "fredId": "LNS11300012",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed (LNS12000012)",
+       "fredId": "LNS12000012",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio (LNS12300012)",
+       "fredId": "LNS12300012",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed (LNS13000012)",
+       "fredId": "LNS13000012",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate (LNS14000012)",
+       "fredId": "LNS14000012",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force (LNS15000012)",
+       "fredId": "LNS15000012",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      }
+     ]
+    },
+    {
+     "id": "us_emp_stat_nsa",
+     "name": "Employment status of population (NSA)",
+     "chipShort": "Emp status NSA (US)",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 1,
+     "dim1Name": "Series",
+     "rows": [
+      {
+       "value": "Civilian noninstitutional population",
+       "fredId": "CNP16OV",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force",
+       "fredId": "LNU01000000",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate",
+       "fredId": "LNU01300000",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed",
+       "fredId": "LNU02000000",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio",
+       "fredId": "LNU02300000",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed",
+       "fredId": "LNU03000000",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate",
+       "fredId": "UNRATENSA",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force",
+       "fredId": "LNU05000000",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      },
+      {
+       "value": "Persons who currently want a job",
+       "fredId": "NILFWJNN",
+       "level": 4,
+       "short": "Persons who currently want a job",
+       "full": "Persons who currently want a job"
+      },
+      {
+       "value": "Civilian noninstitutional population (LNU00000001)",
+       "fredId": "LNU00000001",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force (LNU01000001)",
+       "fredId": "LNU01000001",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate (LNU01300001)",
+       "fredId": "LNU01300001",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed (LNU02000001)",
+       "fredId": "LNU02000001",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio (LNU02300001)",
+       "fredId": "LNU02300001",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed (LNU03000001)",
+       "fredId": "LNU03000001",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate (LNU04000001)",
+       "fredId": "LNU04000001",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force (LNU05000001)",
+       "fredId": "LNU05000001",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      },
+      {
+       "value": "Civilian noninstitutional population (LNU00000025)",
+       "fredId": "LNU00000025",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force (LNU01000025)",
+       "fredId": "LNU01000025",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate (LNU01300025)",
+       "fredId": "LNU01300025",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed (LNU02000025)",
+       "fredId": "LNU02000025",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio (LNU02300025)",
+       "fredId": "LNU02300025",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed (LNU03000025)",
+       "fredId": "LNU03000025",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate (LNU04000025)",
+       "fredId": "LNU04000025",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force (LNU05000025)",
+       "fredId": "LNU05000025",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      },
+      {
+       "value": "Civilian noninstitutional population (LNU00000002)",
+       "fredId": "LNU00000002",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force (LNU01000002)",
+       "fredId": "LNU01000002",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate (LNU01300002)",
+       "fredId": "LNU01300002",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed (LNU02000002)",
+       "fredId": "LNU02000002",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio (LNU02300002)",
+       "fredId": "LNU02300002",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed (LNU03000002)",
+       "fredId": "LNU03000002",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate (LNU04000002)",
+       "fredId": "LNU04000002",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force (LNU05000002)",
+       "fredId": "LNU05000002",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      },
+      {
+       "value": "Civilian noninstitutional population (LNU00000026)",
+       "fredId": "LNU00000026",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force (LNU01000026)",
+       "fredId": "LNU01000026",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate (LNU01300026)",
+       "fredId": "LNU01300026",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed (LNU02000026)",
+       "fredId": "LNU02000026",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio (LNU02300026)",
+       "fredId": "LNU02300026",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed (LNU03000026)",
+       "fredId": "LNU03000026",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate (LNU04000026)",
+       "fredId": "LNU04000026",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force (LNU05000026)",
+       "fredId": "LNU05000026",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      },
+      {
+       "value": "Civilian noninstitutional population (LNU00000012)",
+       "fredId": "LNU00000012",
+       "level": 2,
+       "short": "Civilian noninstitutional population",
+       "full": "Civilian noninstitutional population"
+      },
+      {
+       "value": "Civilian labor force (LNU01000012)",
+       "fredId": "LNU01000012",
+       "level": 3,
+       "short": "Civilian labor force",
+       "full": "Civilian labor force"
+      },
+      {
+       "value": "Participation rate (LNU01300012)",
+       "fredId": "LNU01300012",
+       "level": 4,
+       "short": "Participation rate",
+       "full": "Participation rate"
+      },
+      {
+       "value": "Employed (LNU02000012)",
+       "fredId": "LNU02000012",
+       "level": 4,
+       "short": "Employed",
+       "full": "Employed"
+      },
+      {
+       "value": "Employment-Population Ratio (LNU02300012)",
+       "fredId": "LNU02300012",
+       "level": 5,
+       "short": "Employment-Population Ratio",
+       "full": "Employment-Population Ratio"
+      },
+      {
+       "value": "Unemployed (LNU03000012)",
+       "fredId": "LNU03000012",
+       "level": 4,
+       "short": "Unemployed",
+       "full": "Unemployed"
+      },
+      {
+       "value": "Unemployment Rate (LNU04000012)",
+       "fredId": "LNU04000012",
+       "level": 5,
+       "short": "Unemployment Rate",
+       "full": "Unemployment Rate"
+      },
+      {
+       "value": "Not in Labor Force (LNU05000012)",
+       "fredId": "LNU05000012",
+       "level": 3,
+       "short": "Not in Labor Force",
+       "full": "Not in Labor Force"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "us_prices",
+   "label": "🇺🇸 Prices",
+   "sourceFreq": "monthly",
+   "series": [
+    {
+     "id": "us_cpi_sa",
+     "name": "CPI components (SA)",
+     "chipShort": "CPI SA (US)",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 1,
+     "dim1Name": "Series",
+     "rows": [
+      {
+       "value": "All items",
+       "fredId": "CPIAUCSL",
+       "level": 1,
+       "short": "All items",
+       "full": "All items"
+      },
+      {
+       "value": "Food and beverages",
+       "fredId": "CPIFABSL",
+       "level": 2,
+       "short": "Food and beverages",
+       "full": "Food and beverages"
+      },
+      {
+       "value": "Food",
+       "fredId": "CPIUFDSL",
+       "level": 3,
+       "short": "Food",
+       "full": "Food"
+      },
+      {
+       "value": "Food at home",
+       "fredId": "CUSR0000SAF11",
+       "level": 4,
+       "short": "Food at home",
+       "full": "Food at home"
+      },
+      {
+       "value": "Cereals and bakery products",
+       "fredId": "CUSR0000SAF111",
+       "level": 5,
+       "short": "Cereals and bakery products",
+       "full": "Cereals and bakery products"
+      },
+      {
+       "value": "Meats, poultry, fish, and eggs",
+       "fredId": "CUSR0000SAF112",
+       "level": 5,
+       "short": "Meats, poultry, fish, and eggs",
+       "full": "Meats, poultry, fish, and eggs"
+      },
+      {
+       "value": "Dairy and related products",
+       "fredId": "CUSR0000SEFJ",
+       "level": 5,
+       "short": "Dairy and related products",
+       "full": "Dairy and related products"
+      },
+      {
+       "value": "Fruits and vegetables",
+       "fredId": "CUSR0000SAF113",
+       "level": 5,
+       "short": "Fruits and vegetables",
+       "full": "Fruits and vegetables"
+      },
+      {
+       "value": "Nonalcoholic beverages and beverage materials",
+       "fredId": "CUSR0000SAF114",
+       "level": 5,
+       "short": "Nonalcoholic beverages and beverage materials",
+       "full": "Nonalcoholic beverages and beverage materials"
+      },
+      {
+       "value": "Coffee",
+       "fredId": "CUSR0000SEFP01",
+       "level": 6,
+       "short": "Coffee",
+       "full": "Coffee"
+      },
+      {
+       "value": "Other food at home",
+       "fredId": "CUSR0000SAF115",
+       "level": 5,
+       "short": "Other food at home",
+       "full": "Other food at home"
+      },
+      {
+       "value": "Sugar and sweets",
+       "fredId": "CUSR0000SEFR",
+       "level": 6,
+       "short": "Sugar and sweets",
+       "full": "Sugar and sweets"
+      },
+      {
+       "value": "Fats and oils",
+       "fredId": "CUSR0000SEFS",
+       "level": 6,
+       "short": "Fats and oils",
+       "full": "Fats and oils"
+      },
+      {
+       "value": "Other foods",
+       "fredId": "CUSR0000SEFT",
+       "level": 6,
+       "short": "Other foods",
+       "full": "Other foods"
+      },
+      {
+       "value": "Food away from home",
+       "fredId": "CUSR0000SEFV",
+       "level": 4,
+       "short": "Food away from home",
+       "full": "Food away from home"
+      },
+      {
+       "value": "Other food away from home",
+       "fredId": "CUSR0000SEFV05",
+       "level": 5,
+       "short": "Other food away from home",
+       "full": "Other food away from home"
+      },
+      {
+       "value": "Alcoholic beverages",
+       "fredId": "CUSR0000SAF116",
+       "level": 4,
+       "short": "Alcoholic beverages",
+       "full": "Alcoholic beverages"
+      },
+      {
+       "value": "Alcoholic beverages at home",
+       "fredId": "CUSR0000SEFW",
+       "level": 5,
+       "short": "Alcoholic beverages at home",
+       "full": "Alcoholic beverages at home"
+      },
+      {
+       "value": "Alcoholic beverages away from home",
+       "fredId": "CUSR0000SEFX",
+       "level": 5,
+       "short": "Alcoholic beverages away from home",
+       "full": "Alcoholic beverages away from home"
+      },
+      {
+       "value": "Housing",
+       "fredId": "CPIHOSSL",
+       "level": 2,
+       "short": "Housing",
+       "full": "Housing"
+      },
+      {
+       "value": "Shelter",
+       "fredId": "CUSR0000SAH1",
+       "level": 3,
+       "short": "Shelter",
+       "full": "Shelter"
+      },
+      {
+       "value": "Rent of primary residence",
+       "fredId": "CUSR0000SEHA",
+       "level": 4,
+       "short": "Rent of primary residence",
+       "full": "Rent of primary residence"
+      },
+      {
+       "value": "Lodging away from home",
+       "fredId": "CUSR0000SEHB",
+       "level": 4,
+       "short": "Lodging away from home",
+       "full": "Lodging away from home"
+      },
+      {
+       "value": "Owners' equivalent rent of residences",
+       "fredId": "CUSR0000SEHC",
+       "level": 4,
+       "short": "Owners' equivalent rent of residences",
+       "full": "Owners' equivalent rent of residences"
+      },
+      {
+       "value": "Owners' equivalent rent of primary residence",
+       "fredId": "CUSR0000SEHC01",
+       "level": 5,
+       "short": "Owners' equivalent rent of primary residence",
+       "full": "Owners' equivalent rent of primary residence"
+      },
+      {
+       "value": "Fuels and utilities",
+       "fredId": "CUSR0000SAH2",
+       "level": 3,
+       "short": "Fuels and utilities",
+       "full": "Fuels and utilities"
+      },
+      {
+       "value": "Household energy",
+       "fredId": "CUSR0000SAH21",
+       "level": 4,
+       "short": "Household energy",
+       "full": "Household energy"
+      },
+      {
+       "value": "Fuel oil and other fuels",
+       "fredId": "CUSR0000SEHE",
+       "level": 5,
+       "short": "Fuel oil and other fuels",
+       "full": "Fuel oil and other fuels"
+      },
+      {
+       "value": "Energy services",
+       "fredId": "CUSR0000SEHF",
+       "level": 5,
+       "short": "Energy services",
+       "full": "Energy services"
+      },
+      {
+       "value": "Electricity",
+       "fredId": "CUSR0000SEHF01",
+       "level": 6,
+       "short": "Electricity",
+       "full": "Electricity"
+      },
+      {
+       "value": "Utility (piped) gas service",
+       "fredId": "CUSR0000SEHF02",
+       "level": 6,
+       "short": "Utility (piped) gas service",
+       "full": "Utility (piped) gas service"
+      },
+      {
+       "value": "Water and sewer and trash collection services",
+       "fredId": "CUSR0000SEHG",
+       "level": 4,
+       "short": "Water and sewer and trash collection services",
+       "full": "Water and sewer and trash collection services"
+      },
+      {
+       "value": "Household furnishings and operations",
+       "fredId": "CUSR0000SAH3",
+       "level": 3,
+       "short": "Household furnishings and operations",
+       "full": "Household furnishings and operations"
+      },
+      {
+       "value": "Apparel",
+       "fredId": "CPIAPPSL",
+       "level": 2,
+       "short": "Apparel",
+       "full": "Apparel"
+      },
+      {
+       "value": "Men's and boys' apparel",
+       "fredId": "CUSR0000SAA1",
+       "level": 3,
+       "short": "Men's and boys' apparel",
+       "full": "Men's and boys' apparel"
+      },
+      {
+       "value": "Women's and girls' apparel",
+       "fredId": "CUSR0000SAA2",
+       "level": 3,
+       "short": "Women's and girls' apparel",
+       "full": "Women's and girls' apparel"
+      },
+      {
+       "value": "Footwear",
+       "fredId": "CUSR0000SEAE",
+       "level": 3,
+       "short": "Footwear",
+       "full": "Footwear"
+      },
+      {
+       "value": "Infants' and toddlers' apparel",
+       "fredId": "CUSR0000SEAF",
+       "level": 3,
+       "short": "Infants' and toddlers' apparel",
+       "full": "Infants' and toddlers' apparel"
+      },
+      {
+       "value": "Transportation",
+       "fredId": "CPITRNSL",
+       "level": 2,
+       "short": "Transportation",
+       "full": "Transportation"
+      },
+      {
+       "value": "Private transportation",
+       "fredId": "CUSR0000SAT1",
+       "level": 3,
+       "short": "Private transportation",
+       "full": "Private transportation"
+      },
+      {
+       "value": "New and used motor vehicles",
+       "fredId": "CUSR0000SETA",
+       "level": 4,
+       "short": "New and used motor vehicles",
+       "full": "New and used motor vehicles"
+      },
+      {
+       "value": "New vehicles",
+       "fredId": "CUSR0000SETA01",
+       "level": 5,
+       "short": "New vehicles",
+       "full": "New vehicles"
+      },
+      {
+       "value": "Used cars and trucks",
+       "fredId": "CUSR0000SETA02",
+       "level": 5,
+       "short": "Used cars and trucks",
+       "full": "Used cars and trucks"
+      },
+      {
+       "value": "Motor fuel",
+       "fredId": "CUSR0000SETB",
+       "level": 4,
+       "short": "Motor fuel",
+       "full": "Motor fuel"
+      },
+      {
+       "value": "Gasoline (all types)",
+       "fredId": "CUSR0000SETB01",
+       "level": 5,
+       "short": "Gasoline (all types)",
+       "full": "Gasoline (all types)"
+      },
+      {
+       "value": "Motor vehicle parts and equipment",
+       "fredId": "CUSR0000SETC",
+       "level": 4,
+       "short": "Motor vehicle parts and equipment",
+       "full": "Motor vehicle parts and equipment"
+      },
+      {
+       "value": "Motor vehicle maintenance and repair",
+       "fredId": "CUSR0000SETD",
+       "level": 4,
+       "short": "Motor vehicle maintenance and repair",
+       "full": "Motor vehicle maintenance and repair"
+      },
+      {
+       "value": "Public transportation",
+       "fredId": "CUSR0000SETG",
+       "level": 3,
+       "short": "Public transportation",
+       "full": "Public transportation"
+      },
+      {
+       "value": "Airline fare",
+       "fredId": "CUSR0000SETG01",
+       "level": 4,
+       "short": "Airline fare",
+       "full": "Airline fare"
+      },
+      {
+       "value": "Medical care",
+       "fredId": "CPIMEDSL",
+       "level": 2,
+       "short": "Medical care",
+       "full": "Medical care"
+      },
+      {
+       "value": "Medical care commodities",
+       "fredId": "CUSR0000SAM1",
+       "level": 3,
+       "short": "Medical care commodities",
+       "full": "Medical care commodities"
+      },
+      {
+       "value": "Medical care services",
+       "fredId": "CUSR0000SAM2",
+       "level": 3,
+       "short": "Medical care services",
+       "full": "Medical care services"
+      },
+      {
+       "value": "Professional services",
+       "fredId": "CUSR0000SEMC",
+       "level": 4,
+       "short": "Professional services",
+       "full": "Professional services"
+      },
+      {
+       "value": "Services by other medical professionals",
+       "fredId": "CUSR0000SEMC04",
+       "level": 5,
+       "short": "Services by other medical professionals",
+       "full": "Services by other medical professionals"
+      },
+      {
+       "value": "Hospital and related services",
+       "fredId": "CUSR0000SEMD",
+       "level": 4,
+       "short": "Hospital and related services",
+       "full": "Hospital and related services"
+      },
+      {
+       "value": "Recreation",
+       "fredId": "CPIRECSL",
+       "level": 2,
+       "short": "Recreation",
+       "full": "Recreation"
+      },
+      {
+       "value": "Video and audio",
+       "fredId": "CUSR0000SERA",
+       "level": 3,
+       "short": "Video and audio",
+       "full": "Video and audio"
+      },
+      {
+       "value": "Cable and satellite television and radio service",
+       "fredId": "CUSR0000SERA02",
+       "level": 4,
+       "short": "Cable and satellite television and radio service",
+       "full": "Cable and satellite television and radio service"
+      },
+      {
+       "value": "Pet food",
+       "fredId": "CUSR0000SS61031",
+       "level": 5,
+       "short": "Pet food",
+       "full": "Pet food"
+      },
+      {
+       "value": "Toys",
+       "fredId": "CUSR0000SERE01",
+       "level": 4,
+       "short": "Toys",
+       "full": "Toys"
+      },
+      {
+       "value": "Music instruments and accessories",
+       "fredId": "CUSR0000SERE03",
+       "level": 4,
+       "short": "Music instruments and accessories",
+       "full": "Music instruments and accessories"
+      },
+      {
+       "value": "Club dues and fees for participant sports and group exercises",
+       "fredId": "CUSR0000SERF01",
+       "level": 4,
+       "short": "Club dues and fees for participant sports and group exercises",
+       "full": "Club dues and fees for participant sports and group exercises"
+      },
+      {
+       "value": "Admission to movies, theaters, and concerts",
+       "fredId": "CUSR0000SS62031",
+       "level": 5,
+       "short": "Admission to movies, theaters, and concerts",
+       "full": "Admission to movies, theaters, and concerts"
+      },
+      {
+       "value": "Fees for lessons or instructions",
+       "fredId": "CUSR0000SERF03",
+       "level": 4,
+       "short": "Fees for lessons or instructions",
+       "full": "Fees for lessons or instructions"
+      },
+      {
+       "value": "Education and communication",
+       "fredId": "CPIEDUSL",
+       "level": 2,
+       "short": "Education and communication",
+       "full": "Education and communication"
+      },
+      {
+       "value": "Education",
+       "fredId": "CUSR0000SAE1",
+       "level": 3,
+       "short": "Education",
+       "full": "Education"
+      },
+      {
+       "value": "Educational books and supplies",
+       "fredId": "CUSR0000SEEA",
+       "level": 4,
+       "short": "Educational books and supplies",
+       "full": "Educational books and supplies"
+      },
+      {
+       "value": "Tuition, other school fees, and childcare",
+       "fredId": "CUSR0000SEEB",
+       "level": 4,
+       "short": "Tuition, other school fees, and childcare",
+       "full": "Tuition, other school fees, and childcare"
+      },
+      {
+       "value": "Communication",
+       "fredId": "CUSR0000SAE2",
+       "level": 3,
+       "short": "Communication",
+       "full": "Communication"
+      },
+      {
+       "value": "Information and information processing",
+       "fredId": "CUSR0000SAE21",
+       "level": 4,
+       "short": "Information and information processing",
+       "full": "Information and information processing"
+      },
+      {
+       "value": "Information technology, hardware and services",
+       "fredId": "CUSR0000SEEE",
+       "level": 4,
+       "short": "Information technology, hardware and services",
+       "full": "Information technology, hardware and services"
+      },
+      {
+       "value": "Personal computers and peripheral equipment",
+       "fredId": "CUSR0000SEEE01",
+       "level": 5,
+       "short": "Personal computers and peripheral equipment",
+       "full": "Personal computers and peripheral equipment"
+      },
+      {
+       "value": "Other goods and services",
+       "fredId": "CPIOGSSL",
+       "level": 2,
+       "short": "Other goods and services",
+       "full": "Other goods and services"
+      },
+      {
+       "value": "Tobacco and smoking products",
+       "fredId": "CUSR0000SEGA",
+       "level": 3,
+       "short": "Tobacco and smoking products",
+       "full": "Tobacco and smoking products"
+      },
+      {
+       "value": "Personal care",
+       "fredId": "CUSR0000SAG1",
+       "level": 3,
+       "short": "Personal care",
+       "full": "Personal care"
+      },
+      {
+       "value": "Miscellaneous personal services",
+       "fredId": "CUSR0000SEGD",
+       "level": 4,
+       "short": "Miscellaneous personal services",
+       "full": "Miscellaneous personal services"
+      },
+      {
+       "value": "Laundry and dry cleaning services",
+       "fredId": "CUSR0000SEGD03",
+       "level": 5,
+       "short": "Laundry and dry cleaning services",
+       "full": "Laundry and dry cleaning services"
+      }
+     ]
+    },
+    {
+     "id": "us_cpi_nsa",
+     "name": "CPI components (NSA)",
+     "chipShort": "CPI NSA (US)",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 1,
+     "dim1Name": "Series",
+     "rows": [
+      {
+       "value": "All items",
+       "fredId": "CPIAUCNS",
+       "level": 1,
+       "short": "All items",
+       "full": "All items"
+      },
+      {
+       "value": "Food and beverages",
+       "fredId": "CPIFABNS",
+       "level": 2,
+       "short": "Food and beverages",
+       "full": "Food and beverages"
+      },
+      {
+       "value": "Food",
+       "fredId": "CPIUFDNS",
+       "level": 3,
+       "short": "Food",
+       "full": "Food"
+      },
+      {
+       "value": "Food at home",
+       "fredId": "CUUR0000SAF11",
+       "level": 4,
+       "short": "Food at home",
+       "full": "Food at home"
+      },
+      {
+       "value": "Cereals and bakery products",
+       "fredId": "CUUR0000SAF111",
+       "level": 5,
+       "short": "Cereals and bakery products",
+       "full": "Cereals and bakery products"
+      },
+      {
+       "value": "Meats, poultry, fish, and eggs",
+       "fredId": "CUUR0000SAF112",
+       "level": 5,
+       "short": "Meats, poultry, fish, and eggs",
+       "full": "Meats, poultry, fish, and eggs"
+      },
+      {
+       "value": "Dairy and related products",
+       "fredId": "CUUR0000SEFJ",
+       "level": 5,
+       "short": "Dairy and related products",
+       "full": "Dairy and related products"
+      },
+      {
+       "value": "Fruits and vegetables",
+       "fredId": "CUUR0000SAF113",
+       "level": 5,
+       "short": "Fruits and vegetables",
+       "full": "Fruits and vegetables"
+      },
+      {
+       "value": "Nonalcoholic beverages and beverage materials",
+       "fredId": "CUUR0000SAF114",
+       "level": 5,
+       "short": "Nonalcoholic beverages and beverage materials",
+       "full": "Nonalcoholic beverages and beverage materials"
+      },
+      {
+       "value": "Coffee",
+       "fredId": "CUUR0000SEFP01",
+       "level": 6,
+       "short": "Coffee",
+       "full": "Coffee"
+      },
+      {
+       "value": "Other food at home",
+       "fredId": "CUUR0000SAF115",
+       "level": 5,
+       "short": "Other food at home",
+       "full": "Other food at home"
+      },
+      {
+       "value": "Sugar and sweets",
+       "fredId": "CUUR0000SEFR",
+       "level": 6,
+       "short": "Sugar and sweets",
+       "full": "Sugar and sweets"
+      },
+      {
+       "value": "Candy and chewing gum",
+       "fredId": "CUUR0000SEFR02",
+       "level": 7,
+       "short": "Candy and chewing gum",
+       "full": "Candy and chewing gum"
+      },
+      {
+       "value": "Fats and oils",
+       "fredId": "CUUR0000SEFS",
+       "level": 6,
+       "short": "Fats and oils",
+       "full": "Fats and oils"
+      },
+      {
+       "value": "Other foods",
+       "fredId": "CUUR0000SEFT",
+       "level": 6,
+       "short": "Other foods",
+       "full": "Other foods"
+      },
+      {
+       "value": "Food away from home",
+       "fredId": "CUUR0000SEFV",
+       "level": 4,
+       "short": "Food away from home",
+       "full": "Food away from home"
+      },
+      {
+       "value": "Other food away from home",
+       "fredId": "CUUR0000SEFV05",
+       "level": 5,
+       "short": "Other food away from home",
+       "full": "Other food away from home"
+      },
+      {
+       "value": "Alcoholic beverages",
+       "fredId": "CUUR0000SAF116",
+       "level": 4,
+       "short": "Alcoholic beverages",
+       "full": "Alcoholic beverages"
+      },
+      {
+       "value": "Alcoholic beverages at home",
+       "fredId": "CUUR0000SEFW",
+       "level": 5,
+       "short": "Alcoholic beverages at home",
+       "full": "Alcoholic beverages at home"
+      },
+      {
+       "value": "Alcoholic beverages away from home",
+       "fredId": "CUUR0000SEFX",
+       "level": 5,
+       "short": "Alcoholic beverages away from home",
+       "full": "Alcoholic beverages away from home"
+      },
+      {
+       "value": "Housing",
+       "fredId": "CPIHOSNS",
+       "level": 2,
+       "short": "Housing",
+       "full": "Housing"
+      },
+      {
+       "value": "Shelter",
+       "fredId": "CUUR0000SAH1",
+       "level": 3,
+       "short": "Shelter",
+       "full": "Shelter"
+      },
+      {
+       "value": "Rent of primary residence",
+       "fredId": "CUUR0000SEHA",
+       "level": 4,
+       "short": "Rent of primary residence",
+       "full": "Rent of primary residence"
+      },
+      {
+       "value": "Lodging away from home",
+       "fredId": "CUUR0000SEHB",
+       "level": 4,
+       "short": "Lodging away from home",
+       "full": "Lodging away from home"
+      },
+      {
+       "value": "Owners' equivalent rent of residences",
+       "fredId": "CUUR0000SEHC",
+       "level": 4,
+       "short": "Owners' equivalent rent of residences",
+       "full": "Owners' equivalent rent of residences"
+      },
+      {
+       "value": "Owners' equivalent rent of primary residence",
+       "fredId": "CUUR0000SEHC01",
+       "level": 5,
+       "short": "Owners' equivalent rent of primary residence",
+       "full": "Owners' equivalent rent of primary residence"
+      },
+      {
+       "value": "Tenants' and household insurance",
+       "fredId": "CUUR0000SEHD",
+       "level": 4,
+       "short": "Tenants' and household insurance",
+       "full": "Tenants' and household insurance"
+      },
+      {
+       "value": "Fuels and utilities",
+       "fredId": "CUUR0000SAH2",
+       "level": 3,
+       "short": "Fuels and utilities",
+       "full": "Fuels and utilities"
+      },
+      {
+       "value": "Household energy",
+       "fredId": "CUUR0000SAH21",
+       "level": 4,
+       "short": "Household energy",
+       "full": "Household energy"
+      },
+      {
+       "value": "Fuel oil and other fuels",
+       "fredId": "CUUR0000SEHE",
+       "level": 5,
+       "short": "Fuel oil and other fuels",
+       "full": "Fuel oil and other fuels"
+      },
+      {
+       "value": "Energy services",
+       "fredId": "CUUR0000SEHF",
+       "level": 5,
+       "short": "Energy services",
+       "full": "Energy services"
+      },
+      {
+       "value": "Water and sewer and trash collection services",
+       "fredId": "CUUR0000SEHG",
+       "level": 4,
+       "short": "Water and sewer and trash collection services",
+       "full": "Water and sewer and trash collection services"
+      },
+      {
+       "value": "Household furnishings and operations",
+       "fredId": "CUUR0000SAH3",
+       "level": 3,
+       "short": "Household furnishings and operations",
+       "full": "Household furnishings and operations"
+      },
+      {
+       "value": "Household operations",
+       "fredId": "CUUR0000SEHP",
+       "level": 4,
+       "short": "Household operations",
+       "full": "Household operations"
+      },
+      {
+       "value": "Repair of household items",
+       "fredId": "CUUR0000SEHP04",
+       "level": 5,
+       "short": "Repair of household items",
+       "full": "Repair of household items"
+      },
+      {
+       "value": "Apparel",
+       "fredId": "CPIAPPNS",
+       "level": 2,
+       "short": "Apparel",
+       "full": "Apparel"
+      },
+      {
+       "value": "Men's and boys' apparel",
+       "fredId": "CUUR0000SAA1",
+       "level": 3,
+       "short": "Men's and boys' apparel",
+       "full": "Men's and boys' apparel"
+      },
+      {
+       "value": "Women's and girls' apparel",
+       "fredId": "CUUR0000SAA2",
+       "level": 3,
+       "short": "Women's and girls' apparel",
+       "full": "Women's and girls' apparel"
+      },
+      {
+       "value": "Footwear",
+       "fredId": "CUUR0000SEAE",
+       "level": 3,
+       "short": "Footwear",
+       "full": "Footwear"
+      },
+      {
+       "value": "Infants' and toddlers' apparel",
+       "fredId": "CUUR0000SEAF",
+       "level": 3,
+       "short": "Infants' and toddlers' apparel",
+       "full": "Infants' and toddlers' apparel"
+      },
+      {
+       "value": "Transportation",
+       "fredId": "CPITRNNS",
+       "level": 2,
+       "short": "Transportation",
+       "full": "Transportation"
+      },
+      {
+       "value": "Private transportation",
+       "fredId": "CUUR0000SAT1",
+       "level": 3,
+       "short": "Private transportation",
+       "full": "Private transportation"
+      },
+      {
+       "value": "New and used motor vehicles",
+       "fredId": "CUUR0000SETA",
+       "level": 4,
+       "short": "New and used motor vehicles",
+       "full": "New and used motor vehicles"
+      },
+      {
+       "value": "New vehicles",
+       "fredId": "CUUR0000SETA01",
+       "level": 5,
+       "short": "New vehicles",
+       "full": "New vehicles"
+      },
+      {
+       "value": "Used cars and trucks",
+       "fredId": "CUUR0000SETA02",
+       "level": 5,
+       "short": "Used cars and trucks",
+       "full": "Used cars and trucks"
+      },
+      {
+       "value": "Motor fuel",
+       "fredId": "CUUR0000SETB",
+       "level": 4,
+       "short": "Motor fuel",
+       "full": "Motor fuel"
+      },
+      {
+       "value": "Motor vehicle parts and equipment",
+       "fredId": "CUUR0000SETC",
+       "level": 4,
+       "short": "Motor vehicle parts and equipment",
+       "full": "Motor vehicle parts and equipment"
+      },
+      {
+       "value": "Motor vehicle maintenance and repair",
+       "fredId": "CUUR0000SETD",
+       "level": 4,
+       "short": "Motor vehicle maintenance and repair",
+       "full": "Motor vehicle maintenance and repair"
+      },
+      {
+       "value": "Public transportation",
+       "fredId": "CUUR0000SETG",
+       "level": 3,
+       "short": "Public transportation",
+       "full": "Public transportation"
+      },
+      {
+       "value": "Airline fare",
+       "fredId": "CUUR0000SETG01",
+       "level": 4,
+       "short": "Airline fare",
+       "full": "Airline fare"
+      },
+      {
+       "value": "Medical care",
+       "fredId": "CPIMEDNS",
+       "level": 2,
+       "short": "Medical care",
+       "full": "Medical care"
+      },
+      {
+       "value": "Medical care commodities",
+       "fredId": "CUUR0000SAM1",
+       "level": 3,
+       "short": "Medical care commodities",
+       "full": "Medical care commodities"
+      },
+      {
+       "value": "Medical care services",
+       "fredId": "CUUR0000SAM2",
+       "level": 3,
+       "short": "Medical care services",
+       "full": "Medical care services"
+      },
+      {
+       "value": "Professional services",
+       "fredId": "CUUR0000SEMC",
+       "level": 4,
+       "short": "Professional services",
+       "full": "Professional services"
+      },
+      {
+       "value": "Services by other medical professionals",
+       "fredId": "CUUR0000SEMC04",
+       "level": 5,
+       "short": "Services by other medical professionals",
+       "full": "Services by other medical professionals"
+      },
+      {
+       "value": "Hospital and related services",
+       "fredId": "CUUR0000SEMD",
+       "level": 4,
+       "short": "Hospital and related services",
+       "full": "Hospital and related services"
+      },
+      {
+       "value": "Recreation",
+       "fredId": "CPIRECNS",
+       "level": 2,
+       "short": "Recreation",
+       "full": "Recreation"
+      },
+      {
+       "value": "Video and audio",
+       "fredId": "CUUR0000SERA",
+       "level": 3,
+       "short": "Video and audio",
+       "full": "Video and audio"
+      },
+      {
+       "value": "Cable and satellite television and radio service",
+       "fredId": "CUUR0000SERA02",
+       "level": 4,
+       "short": "Cable and satellite television and radio service",
+       "full": "Cable and satellite television and radio service"
+      },
+      {
+       "value": "Pet food",
+       "fredId": "CUUR0000SS61031",
+       "level": 5,
+       "short": "Pet food",
+       "full": "Pet food"
+      },
+      {
+       "value": "Toys",
+       "fredId": "CUUR0000SERE01",
+       "level": 4,
+       "short": "Toys",
+       "full": "Toys"
+      },
+      {
+       "value": "Music instruments and accessories",
+       "fredId": "CUUR0000SERE03",
+       "level": 4,
+       "short": "Music instruments and accessories",
+       "full": "Music instruments and accessories"
+      },
+      {
+       "value": "Club dues and fees for participant sports and group exercises",
+       "fredId": "CUUR0000SERF01",
+       "level": 4,
+       "short": "Club dues and fees for participant sports and group exercises",
+       "full": "Club dues and fees for participant sports and group exercises"
+      },
+      {
+       "value": "Admission to movies, theaters, and concerts",
+       "fredId": "CUUR0000SS62031",
+       "level": 5,
+       "short": "Admission to movies, theaters, and concerts",
+       "full": "Admission to movies, theaters, and concerts"
+      },
+      {
+       "value": "Fees for lessons or instructions",
+       "fredId": "CUUR0000SERF03",
+       "level": 4,
+       "short": "Fees for lessons or instructions",
+       "full": "Fees for lessons or instructions"
+      },
+      {
+       "value": "Recreational books",
+       "fredId": "CUUR0000SERG02",
+       "level": 4,
+       "short": "Recreational books",
+       "full": "Recreational books"
+      },
+      {
+       "value": "Education and communication",
+       "fredId": "CPIEDUNS",
+       "level": 2,
+       "short": "Education and communication",
+       "full": "Education and communication"
+      },
+      {
+       "value": "Education",
+       "fredId": "CUUR0000SAE1",
+       "level": 3,
+       "short": "Education",
+       "full": "Education"
+      },
+      {
+       "value": "Educational books and supplies",
+       "fredId": "CUUR0000SEEA",
+       "level": 4,
+       "short": "Educational books and supplies",
+       "full": "Educational books and supplies"
+      },
+      {
+       "value": "Tuition, other school fees, and childcare",
+       "fredId": "CUUR0000SEEB",
+       "level": 4,
+       "short": "Tuition, other school fees, and childcare",
+       "full": "Tuition, other school fees, and childcare"
+      },
+      {
+       "value": "Communication",
+       "fredId": "CUUR0000SAE2",
+       "level": 3,
+       "short": "Communication",
+       "full": "Communication"
+      },
+      {
+       "value": "Information and information processing",
+       "fredId": "CUUR0000SAE21",
+       "level": 4,
+       "short": "Information and information processing",
+       "full": "Information and information processing"
+      },
+      {
+       "value": "Telephone services",
+       "fredId": "CUUR0000SEED",
+       "level": 5,
+       "short": "Telephone services",
+       "full": "Telephone services"
+      },
+      {
+       "value": "Information technology, hardware and services",
+       "fredId": "CUUR0000SEEE",
+       "level": 4,
+       "short": "Information technology, hardware and services",
+       "full": "Information technology, hardware and services"
+      },
+      {
+       "value": "Personal computers and peripheral equipment",
+       "fredId": "CUUR0000SEEE01",
+       "level": 5,
+       "short": "Personal computers and peripheral equipment",
+       "full": "Personal computers and peripheral equipment"
+      },
+      {
+       "value": "Other goods and services",
+       "fredId": "CPIOGSNS",
+       "level": 2,
+       "short": "Other goods and services",
+       "full": "Other goods and services"
+      },
+      {
+       "value": "Tobacco and smoking products",
+       "fredId": "CUUR0000SEGA",
+       "level": 3,
+       "short": "Tobacco and smoking products",
+       "full": "Tobacco and smoking products"
+      },
+      {
+       "value": "Personal care",
+       "fredId": "CUUR0000SAG1",
+       "level": 3,
+       "short": "Personal care",
+       "full": "Personal care"
+      },
+      {
+       "value": "Personal care products",
+       "fredId": "CUUR0000SEGB",
+       "level": 4,
+       "short": "Personal care products",
+       "full": "Personal care products"
+      },
+      {
+       "value": "Cosmetics, perfume, bath, nail preparations and implements",
+       "fredId": "CUUR0000SEGB02",
+       "level": 5,
+       "short": "Cosmetics, perfume, bath, nail preparations and implements",
+       "full": "Cosmetics, perfume, bath, nail preparations and implements"
+      },
+      {
+       "value": "Personal care services",
+       "fredId": "CUUR0000SEGC",
+       "level": 4,
+       "short": "Personal care services",
+       "full": "Personal care services"
+      },
+      {
+       "value": "Miscellaneous personal services",
+       "fredId": "CUUR0000SEGD",
+       "level": 4,
+       "short": "Miscellaneous personal services",
+       "full": "Miscellaneous personal services"
+      },
+      {
+       "value": "Laundry and dry cleaning services",
+       "fredId": "CUUR0000SEGD03",
+       "level": 5,
+       "short": "Laundry and dry cleaning services",
+       "full": "Laundry and dry cleaning services"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "id": "us_yields",
+   "label": "🇺🇸 U.S. yields",
+   "sourceFreq": "monthly",
+   "series": [
+    {
+     "id": "us_y_1mo",
+     "name": "1-month Treasury yield",
+     "chipShort": "US 1mo yield",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 0,
+     "fredId": "DGS1MO"
+    },
+    {
+     "id": "us_y_3mo",
+     "name": "3-month Treasury yield",
+     "chipShort": "US 3mo yield",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 0,
+     "fredId": "DGS3MO"
+    },
+    {
+     "id": "us_y_6mo",
+     "name": "6-month Treasury yield",
+     "chipShort": "US 6mo yield",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 0,
+     "fredId": "DGS6MO"
+    },
+    {
+     "id": "us_y_1y",
+     "name": "1-year Treasury yield",
+     "chipShort": "US 1y yield",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 0,
+     "fredId": "DGS1"
+    },
+    {
+     "id": "us_y_2y",
+     "name": "2-year Treasury yield",
+     "chipShort": "US 2y yield",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 0,
+     "fredId": "DGS2"
+    },
+    {
+     "id": "us_y_5y",
+     "name": "5-year Treasury yield",
+     "chipShort": "US 5y yield",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 0,
+     "fredId": "DGS5"
+    },
+    {
+     "id": "us_y_10y",
+     "name": "10-year Treasury yield",
+     "chipShort": "US 10y yield",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 0,
+     "fredId": "DGS10"
+    },
+    {
+     "id": "us_y_30y",
+     "name": "30-year Treasury yield",
+     "chipShort": "US 30y yield",
+     "tableId": "FRED",
+     "freq": "monthly",
+     "dims": 0,
+     "fredId": "DGS30"
+    }
+   ]
+  }
+ ]
+}

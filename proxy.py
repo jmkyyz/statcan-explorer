@@ -55,6 +55,12 @@ def vectors():
     here = os.path.dirname(os.path.abspath(__file__))
     return send_from_directory(here, "Vectors.xlsx")
 
+@app.route("/api/fred-catalog")
+def fred_catalog():
+    # Static U.S. (FRED) series catalog; regenerate with build_fred_catalog.py
+    here = os.path.dirname(os.path.abspath(__file__))
+    return send_from_directory(here, "fred_catalog.json", mimetype="application/json")
+
 @app.route("/lab")
 def lab():
     here = os.path.dirname(os.path.abspath(__file__))
@@ -700,54 +706,88 @@ def get_fred():
     if not ids:
         return jsonify({"error": "No series specified"}), 400
 
-    def _fred_label(date_str, freq):
-        d = datetime.strptime(date_str, "%Y-%m-%d")
+    def _label(d, freq):
+        if freq == "annual":
+            return f"{d.year}"
         if freq == "quarterly":
-            q = (d.month - 1) // 3 + 1
-            return f"{d.year} Q{q}"
-        return f"{d.year}-{d.month:02d}"
+            return f"{d.year} Q{(d.month - 1) // 3 + 1}"
+        return f"{d.year}-{d.month:02d}"          # monthly (also daily→monthly)
 
-    results = []
-    for sid in ids:
+    def _detect_freq(dates):
+        """Native frequency from the median gap between observations."""
+        if len(dates) < 2:
+            return "monthly"
+        gaps = sorted((dates[i] - dates[i - 1]).days for i in range(1, len(dates)))
+        g = gaps[len(gaps) // 2]
+        if g <= 20:    return "daily"        # daily or weekly → aggregate to monthly
+        if g <= 45:    return "monthly"
+        if g <= 115:   return "quarterly"
+        return "annual"
+
+    # Fetch all series concurrently (same ThreadPoolExecutor pattern as
+    # /api/series) — sequential fetches stack full round-trip latency per id.
+    def _fetch_observations(sid):
         params = {"series_id": sid, "api_key": api_key, "file_type": "json"}
         if from_date:
             params["observation_start"] = from_date
         if to_date:
             params["observation_end"] = to_date
-        try:
-            r = requests.get(
-                "https://api.stlouisfed.org/fred/series/observations",
-                params=params, timeout=30,
-            )
-            r.raise_for_status()
-            data = r.json()
-        except requests.exceptions.Timeout:
-            return jsonify({"error": f"FRED timed out fetching {sid}"}), 504
-        except requests.exceptions.RequestException as exc:
-            return jsonify({"error": f"FRED API error: {exc}"}), 502
+        r = requests.get(
+            "https://api.stlouisfed.org/fred/series/observations",
+            params=params, timeout=30,
+        )
+        r.raise_for_status()
+        return r.json()
 
-        observations = [
-            obs for obs in data.get("observations", [])
-            if obs.get("value") not in (".", None, "")
+    with ThreadPoolExecutor(max_workers=min(5, len(ids))) as pool:
+        futures = [(sid, pool.submit(_fetch_observations, sid)) for sid in ids]
+        fetched = []
+        for sid, fut in futures:
+            try:
+                fetched.append((sid, fut.result()))
+            except requests.exceptions.Timeout:
+                return jsonify({"error": f"FRED timed out fetching {sid}"}), 504
+            except requests.exceptions.RequestException as exc:
+                return jsonify({"error": f"FRED API error: {exc}"}), 502
+
+    results = []
+    for sid, data in fetched:
+        obs = [
+            (datetime.strptime(o["date"], "%Y-%m-%d"), float(o["value"]))
+            for o in data.get("observations", [])
+            if o.get("value") not in (".", None, "")
         ]
 
-        # Detect frequency from date gap between first two points
-        freq = "monthly"
-        if len(observations) >= 2:
-            d1 = datetime.strptime(observations[0]["date"], "%Y-%m-%d")
-            d2 = datetime.strptime(observations[1]["date"], "%Y-%m-%d")
-            if (d2.year - d1.year) * 12 + (d2.month - d1.month) >= 3:
-                freq = "quarterly"
+        native = _detect_freq([d for d, _ in obs])
 
+        if native == "daily":
+            # Daily/weekly (e.g. Treasury yields) → monthly AVERAGE. Summing a
+            # rate would be meaningless; the app can't render daily yet anyway.
+            buckets = {}   # (year, month) → [values]
+            for d, v in obs:
+                buckets.setdefault((d.year, d.month), []).append(v)
+            points, display_freq = [], "monthly"
+            for (yr, mo), vals in sorted(buckets.items()):
+                d = datetime(yr, mo, 1)
+                points.append({
+                    "date": d.strftime("%Y-%m-%d"),
+                    "label": _label(d, "monthly"),
+                    "value": sum(vals) / len(vals),
+                })
+        else:
+            display_freq = native
+            points = [
+                {"date": d.strftime("%Y-%m-%d"), "label": _label(d, native), "value": v}
+                for d, v in obs
+            ]
+
+        freq_code = {"annual": 12, "quarterly": 9, "monthly": 6}.get(display_freq, 6)
         results.append({
             "vectorId":      sid,
-            "frequency":     "Quarterly" if freq == "quarterly" else "Monthly",
-            "frequencyCode": 9 if freq == "quarterly" else 12,
+            "frequency":     display_freq.capitalize(),
+            "frequencyCode": freq_code,
             "uom":           "",
-            "data": [
-                {"date": obs["date"], "label": _fred_label(obs["date"], freq), "value": float(obs["value"])}
-                for obs in observations
-            ],
+            "data":          points,
         })
 
     return jsonify({"series": results})
