@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Feed — Gazette Monitor{% endblock %}
+{% block content %}
+
+<form method="get" class="filters">
+  <div class="row">
+    <div>
+      <label>From</label>
+      <input type="date" name="date_from" value="{{ date_from }}">
+    </div>
+    <div>
+      <label>To</label>
+      <input type="date" name="date_to" value="{{ date_to }}">
+    </div>
+    <div class="checks">
+      <label style="display:block">Part</label>
+      {% for p in ['I', 'II', 'III'] %}
+      <label><input type="checkbox" name="part" value="{{ p }}"
+        {{ 'checked' if p in selected_parts }}> Part {{ p }}</label>
+      {% endfor %}
+    </div>
+    <div class="checks">
+      <label style="display:block">Rules</label>
+      {% for r in rules %}
+      <label><input type="checkbox" name="rule" value="{{ r['id'] }}"
+        {{ 'checked' if r['id'] in selected_rules }}> {{ r['label'] }}</label>
+      {% endfor %}
+    </div>
+    <div class="checks">
+      <label style="display:block">&nbsp;</label>
+      <label><input type="checkbox" name="hide_seen" value="1"
+        {{ 'checked' if hide_seen }}> Hide seen</label>
+    </div>
+    <div>
+      <button type="submit">Apply filters</button>
+      <a class="btn secondary" href="{{ url_for('feed') }}">Reset</a>
+    </div>
+  </div>
+</form>
+
+{% if not items %}
+  <p class="empty">No matched items. Try widening the filters, or
+  <a href="{{ url_for('run_ingest_view') }}">run the ingest</a>.</p>
+{% endif %}
+
+{% for item in items %}
+<div class="card {{ 'seen' if item.seen }}">
+  <h3><a href="{{ item.item_url }}" target="_blank" rel="noopener">{{ item.title }}</a></h3>
+  <div class="meta">
+    <span class="badge p-{{ item.part }}">Part {{ item.part }}</span>
+    {{ item.issue_date }}
+    {% if item.department %} · {{ item.department }}{% endif %}
+    {% if item.section %} · {{ item.section }}{% endif %}
+    {% if item.act %} · <em>{{ item.act }}</em>{% endif %}
+    {% if item.deadline %}
+      <span class="deadline {{ 'urgent' if item.days_left is not none and item.days_left < 7 }}">
+        Comments close {{ item.deadline }}{% if item.days_left is not none and 0 <= item.days_left < 30 %}
+        — {{ item.days_left }} day{{ '' if item.days_left == 1 else 's' }} left{% elif item.days_left is not none and item.days_left < 0 %}
+        — closed{% endif %}
+      </span>
+    {% endif %}
+  </div>
+  <div>
+    {% for r in item.rules %}
+    <span class="rule-tag">{{ r.label }}{% if r.matched_on %} <em>· {{ r.matched_on }}</em>{% endif %}</span>
+    {% endfor %}
+  </div>
+  {% if item.rias_summary %}
+  <p class="rias">{{ item.rias_summary[:400] }}{% if item.rias_summary|length > 400 %}…{% endif %}</p>
+  {% endif %}
+  <form class="inline" method="post" action="{{ url_for('toggle_seen', item_id=item.item_id) }}">
+    <button type="submit" class="secondary">{{ 'Mark unseen' if item.seen else 'Mark seen' }}</button>
+  </form>
+</div>
+{% endfor %}
+
+{% endblock %}

@@ -1,0 +1,5 @@
+# Runtime state — each machine keeps its own
+database.db
+*.log
+outbox/
+sent/

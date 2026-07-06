@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Run ingest — Gazette Monitor{% endblock %}
+{% block content %}
+
+<h2>Manual ingest</h2>
+<p>Fetches the three Gazette RSS feeds, ingests any issues from the last 4 weeks
+that aren't already stored, pulls RIAS text and comment deadlines for Part I
+proposed regulations, and re-runs watchlist matching. Takes a minute or two —
+there's a 1-second courtesy delay between requests to gazette.gc.ca.</p>
+
+<form method="post">
+  <button type="submit">Run ingest now</button>
+</form>
+
+{% if log_lines is not none %}
+<h3 style="margin-top:28px">Run log</h3>
+<div class="log">{% for line in log_lines %}<div class="{{ 'warn' if 'WARNING' in line }}">{{ line }}</div>{% endfor %}</div>
+{% endif %}
+
+{% endblock %}

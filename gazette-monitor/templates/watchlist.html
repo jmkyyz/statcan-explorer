@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Watchlist — Gazette Monitor{% endblock %}
+{% block content %}
+
+<h2>Watchlist rules</h2>
+<table>
+  <tr><th>Label</th><th>Keywords</th><th>Departments</th><th>Mode</th><th>Status</th><th></th></tr>
+  {% for r in rules %}
+  <tr class="{{ 'inactive-rule' if not r['active'] }}">
+    <td><strong>{{ r['label'] }}</strong></td>
+    <td>{{ (r['keywords'] | fromjson) | join(', ') }}</td>
+    <td>{{ (r['departments'] | fromjson) | join(', ') or '—' }}</td>
+    <td>{{ r['match_mode'] }}</td>
+    <td>{{ 'active' if r['active'] else 'inactive' }}</td>
+    <td style="white-space:nowrap">
+      <a class="btn secondary" href="{{ url_for('watchlist', edit=r['id']) }}">Edit</a>
+      <form class="inline" method="post" action="{{ url_for('watchlist_toggle', rule_id=r['id']) }}">
+        <button type="submit" class="secondary">{{ 'Disable' if r['active'] else 'Enable' }}</button>
+      </form>
+      <form class="inline" method="post" action="{{ url_for('watchlist_delete', rule_id=r['id']) }}"
+            onsubmit="return confirm('Delete rule “{{ r['label'] }}” and its matches?');">
+        <button type="submit" class="secondary">Delete</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h2 style="margin-top:32px">{{ 'Edit rule' if edit_rule else 'Add a rule' }}</h2>
+<form method="post" action="{{ url_for('watchlist_save') }}" class="card">
+  {% if edit_rule %}<input type="hidden" name="rule_id" value="{{ edit_rule['id'] }}">{% endif %}
+  <div class="formgrid">
+    <label>Label</label>
+    <input type="text" name="label" required
+           value="{{ edit_rule['label'] if edit_rule else '' }}">
+    <label>Keywords</label>
+    <input type="text" name="keywords" required
+           placeholder="comma-separated, e.g. tariff, customs, import"
+           value="{{ (edit_rule['keywords'] | fromjson) | join(', ') if edit_rule else '' }}">
+    <label>Departments</label>
+    <input type="text" name="departments"
+           placeholder="optional filter, e.g. Finance, Environment"
+           value="{{ (edit_rule['departments'] | fromjson) | join(', ') if edit_rule else '' }}">
+    <label>Match mode</label>
+    <span>
+      <label><input type="radio" name="match_mode" value="any"
+        {{ 'checked' if not edit_rule or edit_rule['match_mode'] == 'any' }}> any keyword</label>
+      &nbsp;&nbsp;
+      <label><input type="radio" name="match_mode" value="all"
+        {{ 'checked' if edit_rule and edit_rule['match_mode'] == 'all' }}> all keywords</label>
+    </span>
+    <span></span>
+    <span>
+      <button type="submit">{{ 'Save changes' if edit_rule else 'Add rule' }}</button>
+      {% if edit_rule %}<a class="btn secondary" href="{{ url_for('watchlist') }}">Cancel</a>{% endif %}
+    </span>
+  </div>
+</form>
+<p class="meta" style="color:var(--muted);font-size:13px">
+  Rule changes apply on the next ingest run — matching re-evaluates every stored item,
+  so new or edited rules pick up historical items too.
+</p>
+
+{% endblock %}

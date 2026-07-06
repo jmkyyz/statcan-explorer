@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}Gazette Monitor{% endblock %}</title>
+<style>
+  :root {
+    --ink: #1a1a1a; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #b91c1c; --bg: #f8f9fa; --card: #ffffff;
+    --p1: #1d4ed8; --p2: #047857; --p3: #7c3aed;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+         color: var(--ink); background: var(--bg); font-size: 15px; line-height: 1.5; }
+  header { background: #fff; border-bottom: 2px solid var(--accent); padding: 0 24px; }
+  .header-inner { max-width: 1100px; margin: 0 auto; display: flex;
+                  align-items: baseline; gap: 28px; flex-wrap: wrap; }
+  header h1 { font-size: 19px; margin: 14px 0; }
+  header h1 a { color: var(--ink); text-decoration: none; }
+  nav a { color: var(--muted); text-decoration: none; font-size: 14px; margin-right: 18px; }
+  nav a.current, nav a:hover { color: var(--accent); }
+  main { max-width: 1100px; margin: 24px auto; padding: 0 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+          padding: 16px 18px; margin-bottom: 14px; }
+  .card.seen { opacity: 0.55; }
+  .card h3 { margin: 0 0 6px; font-size: 16px; }
+  .card h3 a { color: var(--ink); text-decoration: none; }
+  .card h3 a:hover { color: var(--accent); }
+  .meta { color: var(--muted); font-size: 13px; margin-bottom: 8px; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px;
+           font-size: 12px; font-weight: 600; color: #fff; margin-right: 6px; }
+  .badge.p-I { background: var(--p1); } .badge.p-II { background: var(--p2); }
+  .badge.p-III { background: var(--p3); }
+  .deadline { display: inline-block; padding: 1px 8px; border-radius: 10px;
+              font-size: 12px; font-weight: 600; margin-left: 6px;
+              background: #fef3c7; color: #92400e; }
+  .deadline.urgent { background: #fee2e2; color: #b91c1c; }
+  .rule-tag { display: inline-block; background: #eef2ff; color: #3730a3;
+              border-radius: 4px; padding: 2px 8px; font-size: 12px;
+              margin: 2px 6px 2px 0; }
+  .rule-tag em { color: var(--muted); font-style: normal; }
+  .rias { color: #374151; font-size: 13px; margin: 8px 0 4px;
+          border-left: 3px solid var(--line); padding-left: 10px; }
+  .filters { background: var(--card); border: 1px solid var(--line);
+             border-radius: 8px; padding: 14px 18px; margin-bottom: 20px;
+             font-size: 13px; }
+  .filters .row { display: flex; gap: 24px; flex-wrap: wrap; align-items: flex-end; }
+  .filters label { display: block; color: var(--muted); margin-bottom: 3px; }
+  .filters .checks label { display: inline-block; margin-right: 12px; color: var(--ink); }
+  input[type=date], input[type=text] { padding: 5px 8px; border: 1px solid var(--line);
+        border-radius: 5px; font-size: 13px; }
+  button, .btn { background: var(--accent); color: #fff; border: 0; border-radius: 5px;
+        padding: 6px 14px; font-size: 13px; cursor: pointer; text-decoration: none; }
+  button.secondary, .btn.secondary { background: #fff; color: var(--ink);
+        border: 1px solid var(--line); }
+  form.inline { display: inline; }
+  table { width: 100%; border-collapse: collapse; background: var(--card);
+          border: 1px solid var(--line); border-radius: 8px; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line);
+           vertical-align: top; }
+  th { color: var(--muted); font-size: 12px; text-transform: uppercase;
+       letter-spacing: 0.04em; }
+  .inactive-rule { opacity: 0.5; }
+  .formgrid { display: grid; grid-template-columns: 140px 1fr; gap: 10px 14px;
+              max-width: 640px; align-items: center; }
+  .formgrid input[type=text] { width: 100%; }
+  .log { background: #111827; color: #d1d5db; border-radius: 8px; padding: 16px;
+         font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+         white-space: pre-wrap; }
+  .log .warn { color: #fbbf24; }
+  .empty { color: var(--muted); text-align: center; padding: 40px 0; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <h1><a href="{{ url_for('feed') }}">Canada Gazette Regulatory Monitor</a></h1>
+    <nav>
+      <a href="{{ url_for('feed') }}" class="{{ 'current' if request.endpoint == 'feed' }}">Feed</a>
+      <a href="{{ url_for('watchlist') }}" class="{{ 'current' if request.endpoint == 'watchlist' }}">Watchlist</a>
+      <a href="{{ url_for('run_ingest_view') }}" class="{{ 'current' if request.endpoint == 'run_ingest_view' }}">Run ingest</a>
+    </nav>
+  </div>
+</header>
+<main>
+{% block content %}{% endblock %}
+</main>
+</body>
+</html>
