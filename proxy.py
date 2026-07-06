@@ -1271,6 +1271,59 @@ def _live_write_blocked():
 
 
 # ---------------------------------------------------------------------------
+# Safeguard: refuse local catalog writes when this checkout is behind
+# origin/main. The wizard rewrites the WHOLE Vectors.xlsx from the on-disk copy,
+# so saving from a stale checkout silently reverts newer series pushed from
+# another machine (and clobbers them on the next push). We fetch, compare, and
+# block before any backup/write happens. Skipped on the live server (RENDER) and
+# when SKIP_STALE_CHECK is set (e.g. deliberately working offline).
+# ---------------------------------------------------------------------------
+class StaleCheckout(Exception):
+    def __init__(self, behind):
+        super().__init__(f"{behind} commit(s) behind origin/main")
+        self.behind = behind
+
+
+def _git(args, timeout=15):
+    """Run git in the repo dir. Returns stripped stdout, or None on any failure."""
+    import subprocess
+    repo = os.path.dirname(os.path.abspath(__file__))
+    try:
+        proc = subprocess.run(["git", *args], cwd=repo,
+                              capture_output=True, text=True, timeout=timeout)
+    except Exception:
+        return None
+    return proc.stdout.strip() if proc.returncode == 0 else None
+
+
+def _local_behind_count(do_fetch=True):
+    """Commits origin/main is ahead of HEAD. None when undeterminable (not a git
+    repo, no origin, git missing). A best-effort fetch refreshes origin/main
+    first; if it fails (offline) we compare against the last-known ref."""
+    if _git(["rev-parse", "--is-inside-work-tree"]) != "true":
+        return None
+    if do_fetch:
+        _git(["fetch", "--quiet", "origin", "main"], timeout=20)
+    cnt = _git(["rev-list", "--count", "HEAD..origin/main"])
+    return int(cnt) if (cnt and cnt.isdigit()) else None
+
+
+def _stale_check_enabled():
+    return not (os.environ.get("RENDER") or os.environ.get("SKIP_STALE_CHECK"))
+
+
+@app.errorhandler(StaleCheckout)
+def _handle_stale_checkout(err):
+    return jsonify({"error":
+        f"Your local checkout is {err.behind} commit(s) behind origin/main, so it "
+        "is missing series/changes pushed from another machine. The wizard rewrites "
+        "the entire catalog from your on-disk copy — saving now would revert that "
+        "newer work. Fix: run 'git pull' in the statcan-explorer folder, restart "
+        "this server, then try again. (Set SKIP_STALE_CHECK=1 to override if you're "
+        "certain your copy is current, e.g. working offline.)"}), 409
+
+
+# ---------------------------------------------------------------------------
 # Route: POST /api/catalog/append
 # Headers: X-Admin-Key (required when ADMIN_KEY env var is set)
 # Body: {"rows": [{category, freq, series_id, ... vector, full_label, ...}],
@@ -1401,6 +1454,12 @@ def catalog_delete():
 def _save_catalog(header, rows, commit_msg):
     global _catalog_rows_cache, _parsed_catalog
     import openpyxl
+    # Refuse to overwrite the catalog from a stale checkout (see StaleCheckout).
+    # Runs at the actual write moment, so previews (dryRun) never pay the fetch.
+    if _stale_check_enabled():
+        behind = _local_behind_count()
+        if behind:
+            raise StaleCheckout(behind)
     os.makedirs(BACKUP_DIR, exist_ok=True)
     backup_name = f"Vectors-{datetime.now().strftime('%Y%m%d-%H%M%S')}.xlsx"
     shutil.copy2(VECTORS_PATH, os.path.join(BACKUP_DIR, backup_name))
@@ -1558,6 +1617,20 @@ if __name__ == "__main__":
     print("=" * 60)
     print(f"  StatCan WDS Proxy  →  http://localhost:{port}")
     print(f"  bind: {host}  ({reach})")
+    # Warn loudly if this checkout is behind origin/main — adding a series now
+    # would revert newer work pushed from another machine. Non-blocking at
+    # startup (reads/offline use are fine); catalog WRITES are hard-blocked in
+    # _save_catalog until you 'git pull'.
+    if _stale_check_enabled():
+        behind = _local_behind_count()
+        if behind:
+            print("!" * 60)
+            print(f"  WARNING: {behind} commit(s) behind origin/main.")
+            print("  Run 'git pull' before adding series — the wizard will")
+            print("  refuse to save until you do (it would revert newer data).")
+            print("!" * 60)
+        elif behind == 0:
+            print("  git: up to date with origin/main ✓")
     print("=" * 60)
     # Pre-warm the catalog cache in the background so the first request after a
     # deploy doesn't pay the spreadsheet-parse cost. Port still binds instantly.
