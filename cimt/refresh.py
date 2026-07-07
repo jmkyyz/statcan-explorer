@@ -48,15 +48,20 @@ def run(args: list[str]) -> int:
 
 
 def store_max_period() -> int | None:
-    """Latest YYYYMM present in the store, or None if empty/unreadable."""
+    """Latest YYYYMM present in EVERY flow, or None if empty/unreadable.
+
+    Taking the minimum across flows keeps the --retry loop alive when StatCan
+    posts the bulk files at different times on release day (e.g. July 2026:
+    imports and domestic exports had the new month at 08:35 but total exports
+    was still the prior month's file)."""
     if not DETAIL.exists():
         return None
     try:
         import duckdb
         return duckdb.connect().execute(
-            f"SELECT max(year*100+month) FROM "
+            f"SELECT min(m) FROM (SELECT max(year*100+month) AS m FROM "
             f"read_parquet('{DETAIL.as_posix()}/**/*.parquet', "
-            f"hive_partitioning=true)").fetchone()[0]
+            f"hive_partitioning=true) GROUP BY flow)").fetchone()[0]
     except Exception as e:
         log(f"(could not read store max period: {e})")
         return None

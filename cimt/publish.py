@@ -170,7 +170,14 @@ def upload(prefix: str) -> None:
         if not f.is_file():
             continue
         key = f"{prefix}/{f.relative_to(PUBLISH).as_posix()}"
-        s3.upload_file(str(f), bucket, key)
+        # Browsers apply heuristic caching when no Cache-Control is set, which
+        # served day-old manifests after a release. The manifest must always be
+        # revalidated; parquet files are fetched with a ?v= cache-buster so a
+        # short TTL is safe.
+        cache = ("no-cache" if f.name == "manifest.json"
+                 else "public, max-age=3600")
+        s3.upload_file(str(f), bucket, key,
+                       ExtraArgs={"CacheControl": cache})
         n += 1
     print(f"uploaded {n} files to r2://{bucket}/{prefix}/")
 

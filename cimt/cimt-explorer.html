@@ -408,12 +408,16 @@ class WasmSource {
     this.db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
     await this.db.instantiate(bundle.mainModule, bundle.pthreadWorker);
     this.conn = await this.db.connect();
-    this.manifest = await (await fetch(this.base + "/manifest.json")).json();
+    // no-cache = always revalidate: the browser's heuristic cache served a
+    // stale manifest for up to a day after each monthly release.
+    this.manifest = await (await fetch(this.base + "/manifest.json", { cache: "no-cache" })).json();
+    this.v = this.manifest.period_max || Date.now();
   }
   maxLeaf() { return 6; }
   // One consolidated file per tier+flow (year is a column); filter year in SQL.
-  _src(tier, flow) { return `read_parquet('${this.base}/${tier}/${flow}.parquet')`; }
-  _dimUrl(name) { return `read_parquet('${this.base}/dim/${name}.parquet')`; }
+  // ?v= ties every data URL to the release, so no cache can mix releases.
+  _src(tier, flow) { return `read_parquet('${this.base}/${tier}/${flow}.parquet?v=${this.v}')`; }
+  _dimUrl(name) { return `read_parquet('${this.base}/dim/${name}.parquet?v=${this.v}')`; }
   async _q(sql) {
     const res = await this.conn.query(sql);
     const cols = res.schema.fields.map(f => f.name);
