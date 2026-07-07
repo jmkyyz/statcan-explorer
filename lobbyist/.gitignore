@@ -1,4 +1,7 @@
 lobby.db
+lobby.db-shm
+lobby.db-wal
+ask_usage.db
 update_lobby_db.log
 __pycache__/
 *.pyc

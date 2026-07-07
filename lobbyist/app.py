@@ -537,6 +537,261 @@ def trigger_update():
         return jsonify({"error": str(e)}), 502
 
 
+# ── AI chatbot (/api/ask) ────────────────────────────────────────────────────
+
+ASK_MODEL           = "claude-opus-4-8"
+ASK_DAILY_LIMIT     = 50      # questions per UTC day, across all visitors
+ASK_MAX_TOOL_CALLS  = 8       # max SQL queries Claude may run per question
+ASK_MAX_ROWS        = 200     # rows returned to Claude per query
+ASK_MAX_CELL_CHARS  = 400     # truncate long text cells in query results
+ASK_QUERY_TIMEOUT_S = 15      # abort any single SQL query after this long
+ASK_USAGE_DB        = Path(__file__).parent / "ask_usage.db"
+
+_anthropic_client = None
+_anthropic_lock = threading.Lock()
+
+
+def _get_anthropic():
+    global _anthropic_client
+    with _anthropic_lock:
+        if _anthropic_client is None:
+            import anthropic
+            _anthropic_client = anthropic.Anthropic()
+        return _anthropic_client
+
+
+def _ask_increment() -> int:
+    """Increment today's question count and return it. Uses a separate SQLite
+    file so the counter is atomic across gunicorn worker processes and
+    survives lobby.db being replaced by the daily rebuild."""
+    con = sqlite3.connect(ASK_USAGE_DB)
+    try:
+        con.execute("CREATE TABLE IF NOT EXISTS usage (day TEXT PRIMARY KEY, count INTEGER NOT NULL)")
+        day = datetime.datetime.utcnow().date().isoformat()
+        row = con.execute(
+            "INSERT INTO usage (day, count) VALUES (?, 1) "
+            "ON CONFLICT(day) DO UPDATE SET count = count + 1 RETURNING count",
+            (day,),
+        ).fetchone()
+        con.commit()
+        return row[0]
+    finally:
+        con.close()
+
+
+def _run_readonly_query(sql: str) -> dict:
+    """Execute one SELECT against lobby.db on a read-only connection.
+    Returns {"text": <compact result for the model>, "is_error": bool}."""
+    try:
+        con = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    except sqlite3.Error as e:
+        return {"text": f"Could not open database: {e}", "is_error": True}
+    try:
+        con.row_factory = sqlite3.Row
+        con.execute("PRAGMA query_only = ON")
+        deadline = time.monotonic() + ASK_QUERY_TIMEOUT_S
+        con.set_progress_handler(
+            lambda: 1 if time.monotonic() > deadline else 0, 100_000
+        )
+        cur = con.execute(sql)
+        raw = cur.fetchmany(ASK_MAX_ROWS + 1)
+        truncated = len(raw) > ASK_MAX_ROWS
+        raw = raw[:ASK_MAX_ROWS]
+        cols = [d[0] for d in cur.description] if cur.description else []
+
+        def cell(v):
+            if isinstance(v, str) and len(v) > ASK_MAX_CELL_CHARS:
+                return v[:ASK_MAX_CELL_CHARS] + "…"
+            return v
+
+        result = {
+            "columns": cols,
+            "rows": [[cell(v) for v in r] for r in raw],
+            "row_count": len(raw),
+        }
+        if truncated:
+            result["note"] = f"Output truncated to {ASK_MAX_ROWS} rows — use aggregation or LIMIT."
+        return {"text": json.dumps(result, ensure_ascii=False, default=str), "is_error": False}
+    except sqlite3.OperationalError as e:
+        if "interrupted" in str(e).lower():
+            return {"text": f"Query aborted after {ASK_QUERY_TIMEOUT_S}s — rewrite it to scan less data "
+                            "(filter on indexed columns, aggregate, or add LIMIT).", "is_error": True}
+        return {"text": f"SQL error: {e}", "is_error": True}
+    except sqlite3.Error as e:
+        return {"text": f"SQL error: {e}", "is_error": True}
+    finally:
+        con.close()
+
+
+_ask_system_cache: dict = {}
+
+
+def _ask_system_prompt() -> str:
+    """Build the system prompt (schema + data notes). Cached; the date range
+    only changes when the DB is rebuilt, and workers restart on redeploy."""
+    if "prompt" in _ask_system_cache:
+        return _ask_system_cache["prompt"]
+    with get_db() as con:
+        lo, hi = con.execute("SELECT MIN(comm_date), MAX(comm_date) FROM communications").fetchone()
+        total = con.execute("SELECT COUNT(*) FROM communications").fetchone()[0]
+        subjects = con.execute(
+            "SELECT subject_code, description FROM subject_types ORDER BY subject_code"
+        ).fetchall()
+    subject_list = "\n".join(f"  {r[0]} = {r[1]}" for r in subjects)
+    prompt = f"""You are the research assistant for the Canadian Lobbyist Registry Explorer, a public website. You answer questions about federal lobbying communication reports filed with the Office of the Commissioner of Lobbying of Canada, by querying a SQLite database with the query_db tool.
+
+DATABASE ({total:,} communications, {lo} to {hi}):
+
+CREATE TABLE communications (
+    comlog_id    INTEGER PRIMARY KEY,  -- one row per filed communication report
+    client_num   TEXT,     -- stable client identifier (groups name variants)
+    client_name  TEXT,     -- organization that lobbied (e.g. 'TELUS Corporation')
+    reg_num      TEXT,     -- registrant (lobbyist) registration number
+    reg_last     TEXT,     -- registrant surname
+    reg_first    TEXT,     -- registrant first name
+    comm_date    TEXT,     -- 'YYYY-MM-DD' (indexed; filter and sort on this)
+    comm_year    INTEGER,
+    comm_month   TEXT,     -- 'YYYY-MM'
+    reg_type     INTEGER,  -- 1 = Consultant, 2 = In-house Corporation, 3 = In-house Organization
+    is_amendment INTEGER   -- 1 if the report is an amendment to an earlier filing
+);
+CREATE TABLE dpoh (        -- Designated Public Office Holders present; one row PER OFFICIAL per communication
+    comlog_id    INTEGER,  -- joins to communications
+    dpoh_last    TEXT,
+    dpoh_first   TEXT,
+    dpoh_title   TEXT,     -- e.g. 'Member of Parliament', 'Chief of Staff'
+    branch       TEXT,
+    institution  TEXT      -- e.g. 'House of Commons', 'Finance Canada (FIN)'
+);
+CREATE TABLE subjects (    -- subject matter codes; one row per code per communication
+    comlog_id    INTEGER,
+    subject_code TEXT      -- joins to subject_types
+);
+CREATE TABLE subject_types (subject_code TEXT PRIMARY KEY, description TEXT);
+CREATE TABLE subject_details (comlog_id INTEGER, detail_text TEXT);  -- free-text detail; only present for a minority of records
+
+SUBJECT CODES:
+{subject_list}
+
+RULES AND GOTCHAS:
+- Joining dpoh or subjects multiplies rows: count communications with COUNT(DISTINCT c.comlog_id), never COUNT(*), after a join.
+- Name matching: use LIKE '%term%' COLLATE NOCASE — client and institution names vary in casing and form. If a first query returns nothing, try a broader pattern before concluding there are no records.
+- Institutions are stored with abbreviations, e.g. 'Finance Canada (FIN)', 'Transport Canada (TC)' — match with LIKE.
+- MPs and Senators appear as dpoh rows under 'House of Commons' / 'Senate of Canada'.
+- One communication = one meeting/call/email report. Several officials may attend (several dpoh rows).
+- Registrants (reg_last/reg_first) are the lobbyists; clients are who they lobby for. For reg_type 2 and 3 (in-house), the registrant works for the client organization itself.
+- subject_details exists only for a minority of records (a limitation of the source bulk file) — never treat its absence as meaningful.
+- client_name is an empty string on a few hundred records per year (all reg_types). Exclude them (client_name != '') when ranking or listing clients.
+- Data covers {lo} to {hi} and is refreshed daily from the public registry. If a question asks about anything after {hi}, say the data doesn't cover it yet.
+
+ANSWERING:
+- Today's date is {{today}}.
+- Run the queries you need (up to {ASK_MAX_TOOL_CALLS}), then answer concisely in plain prose. Short hyphen lists are fine; no markdown tables or headers.
+- Give exact figures from your queries and mention the period they cover. Round nothing silently.
+- If the question can't be answered from this database (e.g. lobbying spending, provincial lobbying, opinions), say so briefly rather than guessing.
+- Answer only questions about this lobbying data. Politely decline anything else."""
+    _ask_system_cache["prompt"] = prompt
+    return prompt
+
+
+ASK_TOOL = {
+    "name": "query_db",
+    "description": (
+        "Run one read-only SQL SELECT statement against the lobbying database. "
+        f"Returns at most {ASK_MAX_ROWS} rows as JSON. Prefer aggregation over "
+        "fetching raw rows. One statement per call."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "sql": {"type": "string", "description": "A single SQLite SELECT statement."}
+        },
+        "required": ["sql"],
+    },
+}
+
+
+@app.route("/api/ask", methods=["POST"])
+def ask():
+    body = request.get_json(silent=True) or {}
+    question = (body.get("question") or "").strip()
+    if not question:
+        return jsonify({"error": "Missing question"}), 400
+    if len(question) > 500:
+        return jsonify({"error": "Question too long (500 characters max)"}), 400
+
+    if not (os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")):
+        return jsonify({"error": "AI assistant not configured (ANTHROPIC_API_KEY not set)"}), 503
+
+    try:
+        client = _get_anthropic()
+    except Exception as e:
+        return jsonify({"error": f"AI assistant not configured: {e}"}), 503
+
+    try:
+        used = _ask_increment()
+    except sqlite3.Error as e:
+        return jsonify({"error": f"Usage tracking failed: {e}"}), 500
+    if used > ASK_DAILY_LIMIT:
+        return jsonify({"error": "The assistant has reached its daily question limit. "
+                                 "Please try again tomorrow — the filters above work without limits."}), 429
+
+    import anthropic
+
+    today = datetime.datetime.utcnow().date().isoformat()
+    system = [{
+        "type": "text",
+        "text": _ask_system_prompt().replace("{today}", today),
+        "cache_control": {"type": "ephemeral"},
+    }]
+    messages = [{"role": "user", "content": question}]
+    queries = []
+
+    try:
+        for _ in range(ASK_MAX_TOOL_CALLS + 1):
+            response = client.messages.create(
+                model=ASK_MODEL,
+                max_tokens=8000,
+                thinking={"type": "adaptive"},
+                system=system,
+                tools=[ASK_TOOL],
+                messages=messages,
+            )
+            if response.stop_reason != "tool_use":
+                break
+            messages.append({"role": "assistant", "content": response.content})
+            results = []
+            for block in response.content:
+                if block.type == "tool_use":
+                    sql = (block.input or {}).get("sql", "")
+                    out = _run_readonly_query(sql)
+                    queries.append(sql)
+                    results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": out["text"],
+                        "is_error": out["is_error"],
+                    })
+            messages.append({"role": "user", "content": results})
+    except anthropic.APIStatusError as e:
+        return jsonify({"error": f"AI service error ({e.status_code}). Please try again."}), 502
+    except anthropic.APIConnectionError:
+        return jsonify({"error": "Could not reach the AI service. Please try again."}), 502
+
+    if response.stop_reason == "refusal":
+        return jsonify({"error": "The assistant declined to answer that question."}), 200
+
+    answer = "".join(b.text for b in response.content if b.type == "text").strip()
+    if not answer:
+        answer = "Sorry — I couldn't produce an answer for that question. Try rephrasing it."
+
+    return jsonify({
+        "answer": answer,
+        "queries": queries,
+        "questions_remaining": max(0, ASK_DAILY_LIMIT - used),
+    })
+
+
 # ── Pre-warm cache on startup ─────────────────────────────────────────────────
 
 def _prewarm():
