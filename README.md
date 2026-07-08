@@ -1,5 +1,17 @@
 # StatCan Econ Explorer — Setup Guide
 
+> **Repo split (July 2026):** the other apps that used to live only in this
+> repo now have their own canonical repos —
+> [ev-incentive-tracker](https://github.com/jmkyyz/ev-incentive-tracker),
+> [canada-trade-explorer](https://github.com/jmkyyz/canada-trade-explorer),
+> [lobbyist-explorer](https://github.com/jmkyyz/lobbyist-explorer),
+> [gazette-monitor](https://github.com/jmkyyz/gazette-monitor),
+> [tax-dollar-tracker](https://github.com/jmkyyz/tax-dollar-tracker).
+> The copies still here (`ev-dashboard/`, `cimt/`, `lobbyist/`,
+> `gazette-monitor/`, `tax-dollar-tracker.html`) remain **only** so the live
+> Render service keeps serving `/ev`, `/trade` and `/tax` until each app is
+> deployed on its own server. Make changes in the new repos, not here.
+
 This is a two-part application:
 
 | Part | File | What it does |

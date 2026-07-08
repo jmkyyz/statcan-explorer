@@ -4,7 +4,10 @@ EV Incentive Database Change Detector
 Checks daily whether the open.canada.ca CKAN resource has been updated
 and sends an email notification when it has.
 
-Uses the same Gmail account and app-password RTF file as send_statcan_daily.py.
+Reads SMTP credentials from ~/statcan-explorer/.env (written by
+gazette-monitor/setup_env.py), falling back to the Desktop RTF file.
+Note: launchd jobs can't read the Desktop (macOS TCC), so the .env is
+the path that actually works unattended.
 
 Schedule (Mac launchd):
   cp com.statcan.ev-change-detector.plist ~/Library/LaunchAgents/
@@ -24,6 +27,7 @@ import requests
 RESOURCE_ID      = '4252857a-9e5f-47f9-98b1-1291e8f9f692'
 API_URL          = f'https://open.canada.ca/data/en/api/3/action/resource_show?id={RESOURCE_ID}'
 STATE_FILE       = Path(__file__).parent / '.ev_detector_state.json'
+ENV_FILE         = Path(__file__).parent / '.env'
 APP_PASSWORD_RTF = Path('/Users/jasonkirby/Desktop/StatCanApp/gmail_app_password.txt.rtf')
 
 FROM_EMAIL = 'jmk.yyz.data@gmail.com'
@@ -31,6 +35,14 @@ TO_EMAIL   = 'jasonkirby@gmail.com'
 
 
 def get_app_password():
+    # Prefer .env — background launchd jobs can't read the Desktop (TCC).
+    if ENV_FILE.exists():
+        for line in ENV_FILE.read_text().splitlines():
+            if line.strip().startswith('SMTP_PASS='):
+                password = line.split('=', 1)[1].strip()
+                if password and not password.startswith('your-'):
+                    return password
+    # Fallback: extract from the RTF (works when run manually from Terminal).
     content = APP_PASSWORD_RTF.read_text()
     for line in reversed(content.split('\n')):
         clean = re.sub(r'\\[a-z]+\d*\s?', '', line)
