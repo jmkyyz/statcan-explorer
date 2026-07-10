@@ -20,6 +20,7 @@ import json
 import re
 import sqlite3
 import sys
+import time
 from pathlib import Path
 
 from curl_cffi import requests
@@ -37,16 +38,29 @@ def log(msg):
 
 # ── Fetching ─────────────────────────────────────────────────────────────────
 
-def fetch_csv_for_range(from_date: str, to_date: str) -> str:
-    """Download the recent-comms CSV for a specific posted-date range."""
-    r = requests.get(
-        RECENT_URL,
-        params={"dateType": "4", "fromDate": from_date, "toDate": to_date, "csv": ""},
-        impersonate="chrome",
-        timeout=120,
-    )
-    r.raise_for_status()
-    return r.text
+def fetch_csv_for_range(from_date: str, to_date: str, retries: int = 3) -> str:
+    """Download the recent-comms CSV for a specific posted-date range.
+
+    Retries with backoff: the live registry intermittently returns transient
+    errors/timeouts, and the caller only logs-and-skips a failed chunk — so
+    without a retry a single blip silently drops that chunk's new records until
+    the next daily run."""
+    last_err = None
+    for attempt in range(1, retries + 1):
+        try:
+            r = requests.get(
+                RECENT_URL,
+                params={"dateType": "4", "fromDate": from_date, "toDate": to_date, "csv": ""},
+                impersonate="chrome",
+                timeout=120,
+            )
+            r.raise_for_status()
+            return r.text
+        except Exception as e:  # noqa: BLE001 — retry any transient failure
+            last_err = e
+            if attempt < retries:
+                time.sleep(2 * attempt)
+    raise last_err
 
 
 def fetch_all_chunks(from_date: str, to_date: str) -> list[dict]:

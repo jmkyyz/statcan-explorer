@@ -106,8 +106,17 @@ fi
 
 # ── 1b. Always patch with real-time records from the live registry ────────────
 echo "==> Patching with recent live records ..."
+# Capture with `set -e` disabled so a non-zero exit doesn't kill the run BEFORE
+# we echo the output — otherwise the actual error is swallowed and the log shows
+# only a bare "UPDATE FAILED" with no cause (see the July 10 2026 patch failure).
+set +e
 PATCH_OUTPUT=$(python3 -u lobbyist/patch_recent.py 2>&1)
+PATCH_RC=$?
+set -e
 echo "$PATCH_OUTPUT"
+if [ "$PATCH_RC" -ne 0 ]; then
+    fail "patch_recent.py exited $PATCH_RC — see its output above for the cause."
+fi
 PATCH_NEW=$(echo "$PATCH_OUTPUT" | sed -n 's/.*New: \([0-9][0-9]*\).*/\1/p' | tail -1)
 PATCH_NEW="${PATCH_NEW:-0}"
 
