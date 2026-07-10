@@ -24,6 +24,8 @@ from pathlib import Path
 
 from curl_cffi import requests
 
+from build_db import norm_name   # shared name-normalisation (keeps norm_name consistent)
+
 DB_PATH = Path(__file__).parent / "lobby.db"
 RECENT_URL = "https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/rcntCmLgs"
 MAX_DAYS_PER_REQUEST = 14  # chunk window to stay well under the site's 3000-row cap
@@ -223,6 +225,7 @@ def patch(lookback_days: int | None = None):
             comm_date, int(comm_date[:4]), comm_date[:7],
             0,  # reg_type unknown from live CSV
             0,  # is_amendment unknown from live CSV
+            norm_name(client_name),
         ))
 
         # DPOH rows
@@ -251,7 +254,7 @@ def patch(lookback_days: int | None = None):
 
     # Write
     con.executemany(
-        "INSERT OR IGNORE INTO communications VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        "INSERT OR IGNORE INTO communications VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
         comm_batch,
     )
     con.executemany(

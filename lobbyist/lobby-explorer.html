@@ -49,6 +49,39 @@
     border-radius: 12px;
   }
 
+  /* ── View toggle (Communications / Registrations) ─────────── */
+  .view-toggle {
+    display: flex;
+    gap: 4px;
+    background: rgba(255,255,255,.15);
+    border-radius: 8px;
+    padding: 3px;
+  }
+  .view-toggle button {
+    border: none;
+    background: none;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    opacity: .8;
+    white-space: nowrap;
+  }
+  .view-toggle button.active {
+    background: #fff;
+    color: var(--red);
+    opacity: 1;
+  }
+
+  /* View panes + mode-specific filter visibility */
+  .view-pane { display: none; }
+  body[data-view="comms"] #commsView { display: block; }
+  body[data-view="regs"]  #regsView  { display: block; }
+  body[data-view="comms"] .regs-only  { display: none; }
+  body[data-view="regs"]  .comms-only { display: none; }
+
   /* ── Layout ─────────────────────────────────────────────── */
   .layout {
     display: grid;
@@ -338,7 +371,7 @@
   .btn-update:disabled { opacity: .6; cursor: default; }
 
   /* ── Drill-down back bar ─────────────────────────────────────── */
-  #drillBar {
+  #drillBar, #regDrillBar {
     display: none;
     align-items: center;
     gap: 12px;
@@ -355,9 +388,9 @@
     z-index: 50;
     box-shadow: 0 2px 10px rgba(30,58,138,.18);
   }
-  #drillBar.show { display: flex; }
-  #drillBar .drill-label strong { font-weight: 700; }
-  #drillBack {
+  #drillBar.show, #regDrillBar.show { display: flex; }
+  #drillBar .drill-label strong, #regDrillBar .drill-label strong { font-weight: 700; }
+  #drillBack, #regDrillBack {
     padding: 5px 12px;
     background: var(--accent);
     color: #fff;
@@ -368,7 +401,7 @@
     cursor: pointer;
     white-space: nowrap;
   }
-  #drillBack:hover { background: #1e40af; }
+  #drillBack:hover, #regDrillBack:hover { background: #1e40af; }
 
   /* ── Card header with export ─────────────────────────────────── */
   .card-head {
@@ -444,7 +477,7 @@
   .ask-hint { font-size: 11px; color: var(--muted); margin-top: 8px; }
 </style>
 </head>
-<body>
+<body data-view="comms">
 
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div> Loading…
@@ -465,7 +498,11 @@
   </span>
   <div>
     <h1>Canadian Lobbyist Registry Explorer</h1>
-    <p>Office of the Commissioner of Lobbying — communication reports 2014–present</p>
+    <p id="headerSub">Office of the Commissioner of Lobbying — communication reports 2014–present</p>
+  </div>
+  <div class="view-toggle" role="tablist" style="margin-left:auto">
+    <button id="viewCommsBtn" class="active" role="tab">Communications</button>
+    <button id="viewRegsBtn" role="tab">Registrations</button>
   </div>
   <div class="db-status" id="dbStatus">Connecting…</div>
 </header>
@@ -510,6 +547,14 @@
       </div>
     </div>
 
+    <div class="filter-group regs-only">
+      <label>Show</label>
+      <div class="reg-type-group">
+        <label title="Only registrations with no predecessor (a newly-filed registration / new consultant mandate)."><input type="checkbox" id="newOnlyCb"> New registration filings only</label>
+        <label title="Only registrations that are an organization's first-ever appearance in the registry (name-matched)."><input type="checkbox" id="firstTimeOnlyCb"> First-time organizations only</label>
+      </div>
+    </div>
+
     <div class="filter-group">
       <label>Subject / Topic</label>
       <select id="subjectSelect">
@@ -517,9 +562,16 @@
       </select>
     </div>
 
-    <div class="filter-group">
+    <div class="filter-group comms-only">
       <label>Government institution lobbied</label>
       <select id="institutionSelect">
+        <option value="">All institutions</option>
+      </select>
+    </div>
+
+    <div class="filter-group regs-only">
+      <label>Government institution targeted</label>
+      <select id="regInstitutionSelect">
         <option value="">All institutions</option>
       </select>
     </div>
@@ -532,7 +584,12 @@
       </div>
     </div>
 
-    <div class="filter-group">
+    <div class="filter-group regs-only">
+      <label>Lobbying firm</label>
+      <input type="text" id="firmInput" placeholder="Search firm name…" autocomplete="off">
+    </div>
+
+    <div class="filter-group comms-only">
       <label>DPOH name (individual lobbied)</label>
       <input type="text" id="dpohInput" placeholder="Search last name…" autocomplete="off">
     </div>
@@ -543,6 +600,9 @@
 
   <!-- ── Main ───────────────────────────────────────────────── -->
   <main id="main">
+
+   <!-- ══════════ COMMUNICATIONS VIEW ══════════ -->
+   <div id="commsView" class="view-pane">
 
     <!-- Drill-down back bar -->
     <div id="drillBar">
@@ -684,6 +744,149 @@
       </div>
     </div>
 
+   </div><!-- /commsView -->
+
+   <!-- ══════════ REGISTRATIONS VIEW ══════════ -->
+   <div id="regsView" class="view-pane">
+
+    <!-- Drill-down back bar -->
+    <div id="regDrillBar">
+      <button id="regDrillBack">← Back</button>
+      <span class="drill-label" id="regDrillLabel"></span>
+    </div>
+
+    <!-- Stat cards -->
+    <div class="stat-cards">
+      <div class="stat-card">
+        <div class="label" title="Organizations whose first-ever appearance in the registry (across registrations and communications, 2014 onward) falls in this period. Name-matched, so the same organization registering under different consultant profiles is counted once.">First-time organizations ⓘ</div>
+        <div class="value" id="rStatFirstTime">—</div>
+        <div class="sub">first appearance in the registry</div>
+      </div>
+      <div class="stat-card">
+        <div class="label" title="Newly-filed registrations (no predecessor). Each new consultant an organization retains creates one, so an established organization generates many over time. NOT the same as a first-time organization.">New registration filings ⓘ</div>
+        <div class="value" id="rStatNew">—</div>
+        <div class="sub">new mandates filed</div>
+      </div>
+      <div class="stat-card">
+        <div class="label">Total filings</div>
+        <div class="value" id="rStatTotal">—</div>
+        <div class="sub" id="rStatRenewals"></div>
+      </div>
+      <div class="stat-card">
+        <div class="label" title="Distinct organizations by name (name-matched), regardless of how many consultant client profiles they use.">Organizations ⓘ</div>
+        <div class="value" id="rStatOrgs">—</div>
+        <div class="sub">distinct, name-matched</div>
+      </div>
+    </div>
+
+    <!-- Jump link -->
+    <p style="text-align:right;margin-bottom:16px;font-size:12px">
+      <a href="#regs-section" style="color:var(--muted);text-decoration:none">Jump to records ↓</a>
+    </p>
+
+    <!-- Ask AI (shares the /api/ask endpoint, which now covers registrations) -->
+    <div class="card">
+      <div class="card-head">
+        <h3>Ask a question</h3>
+        <span class="click-hint">AI-powered · answers come from this database</span>
+      </div>
+      <div class="ask-row">
+        <input id="rAskInput" type="text" maxlength="500"
+               placeholder="e.g. How many new registrations targeted Finance Canada in 2025?">
+        <button id="rAskBtn">Ask</button>
+      </div>
+      <div class="ask-answer" id="rAskAnswer"></div>
+      <div class="ask-meta" id="rAskMeta"></div>
+      <p class="ask-hint">Answers are generated by AI from the registry data and may contain errors — verify anything important against the records below.</p>
+    </div>
+
+    <!-- Time series -->
+    <div class="card">
+      <div class="card-head">
+        <h3>Registrations over time <span class="click-hint">· new vs. renewals/amendments</span></h3>
+        <button class="export-btn" data-rexport="time">⤓ Excel</button>
+      </div>
+      <div class="chart-wrap" style="height:220px">
+        <canvas id="rTimeChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Top firms + clients -->
+    <div class="two-col">
+      <div class="card">
+        <div class="card-head">
+          <h3>Top lobbying firms <span class="click-hint">· by registration filings · click to filter</span></h3>
+          <button class="export-btn" data-rexport="firms">⤓ Excel</button>
+        </div>
+        <div class="chart-wrap" style="height:260px">
+          <canvas id="rFirmChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head">
+          <h3>Top clients <span class="click-hint">· by registration filings · click to filter</span></h3>
+          <button class="export-btn" data-rexport="clients">⤓ Excel</button>
+        </div>
+        <div class="chart-wrap" style="height:260px">
+          <canvas id="rClientChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top target institutions -->
+    <div class="card">
+      <div class="card-head">
+        <h3>Most-targeted institutions <span class="click-hint">· click to filter</span></h3>
+        <button class="export-btn" data-rexport="institutions">⤓ Excel</button>
+      </div>
+      <div class="chart-wrap" style="height:260px">
+        <canvas id="rInstChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Top subjects -->
+    <div class="card">
+      <div class="card-head">
+        <h3>By subject matter <span class="click-hint">· click to filter</span></h3>
+        <button class="export-btn" data-rexport="subjects">⤓ Excel</button>
+      </div>
+      <div class="chart-wrap" style="height:260px">
+        <canvas id="rSubjectChart"></canvas>
+      </div>
+    </div>
+
+    <!-- Registrations table -->
+    <div class="card" id="regs-section">
+      <h3>Registration records <span id="rTableCountLabel" style="font-weight:400;color:var(--muted)"></span></h3>
+      <p class="scroll-hint">Scroll right to see all columns →</p>
+      <div class="table-wrap">
+        <table id="regsTable">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Posted</th>
+              <th>Status</th>
+              <th>Client</th>
+              <th>Communications</th>
+              <th>Firm / Lobbyist</th>
+              <th>Institution(s) targeted</th>
+              <th>Subject(s)</th>
+              <th>Type</th>
+            </tr>
+          </thead>
+          <tbody id="regsBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button class="page-btn" id="rPrevBtn" disabled>← Prev</button>
+        <span id="rPageLabel"></span>
+        <button class="page-btn" id="rNextBtn" disabled>Next →</button>
+        <span style="margin-left:auto" id="rPageTotal"></span>
+      </div>
+    </div>
+
+   </div><!-- /regsView -->
+
   </main>
 </div>
 
@@ -700,6 +903,16 @@ let charts        = {};
 let clientSelected = { name: "", num: "", exact: false };
 let lastStats     = null;   // most recent /api/stats payload (for chart export)
 let drillStack    = [];     // saved filter snapshots for the "← Back" button
+
+// Registrations view state (parallel to the communications state above)
+let currentView   = "comms";  // "comms" | "regs"
+let regLoaded     = false;     // lazy-load the registrations view on first switch
+let rCurrentPage  = 0;
+let rTotal        = 0;
+let lastRegStats  = null;
+let regDrillStack = [];
+let commsNorm     = "";   // when set, the Communications view filters by this normalised org name (cross-link from Registrations)
+const R_TYPE_LABELS = { 1: "Consultant", 2: "In-house Corp", 3: "In-house Org" };
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 const fmt = n => n?.toLocaleString("en-CA") ?? "—";
@@ -723,10 +936,13 @@ function getFilters() {
   const mFrom = document.getElementById("monthFrom").value.padStart(2, "0");
   const mTo   = document.getElementById("monthTo").value.padStart(2, "0");
 
-  // Client filter: exact match (from a chart drill-down) wins; otherwise a
-  // picked-from-autocomplete name, otherwise the free-text substring search.
-  let client_q = "", client_exact = "";
-  if (clientSelected.exact && clientSelected.name) {
+  // Client filter: a cross-link from Registrations (normalised name) wins;
+  // then an exact match from a chart drill-down; then a picked-from-autocomplete
+  // name; otherwise the free-text substring search.
+  let client_q = "", client_exact = "", client_norm = "";
+  if (commsNorm) {
+    client_norm = commsNorm;
+  } else if (clientSelected.exact && clientSelected.name) {
     client_exact = clientSelected.name;
   } else {
     client_q = clientSelected.name || document.getElementById("clientInput").value.trim();
@@ -740,6 +956,7 @@ function getFilters() {
     institution: document.getElementById("institutionSelect").value,
     client_q,
     client_exact,
+    client_norm,
     dpoh_q:      document.getElementById("dpohInput").value.trim(),
   };
 }
@@ -1121,6 +1338,7 @@ const clientList  = document.getElementById("clientList");
 
 clientInput.addEventListener("input", () => {
   clientSelected = { name: "", num: "", exact: false };
+  commsNorm = "";   // user is typing their own client search; drop the cross-link filter
   clearTimeout(acTimer);
   const q = clientInput.value.trim();
   if (q.length < 2) { clientList.classList.remove("open"); return; }
@@ -1157,7 +1375,10 @@ document.getElementById("nextBtn").addEventListener("click", () => {
 });
 
 // ── Apply / Clear ─────────────────────────────────────────────────────────
-document.getElementById("applyBtn").addEventListener("click", loadAll);
+// Dispatch to whichever view is active — the sidebar filters are shared.
+function applyCurrent() { currentView === "regs" ? loadRegAll() : loadAll(); }
+
+document.getElementById("applyBtn").addEventListener("click", applyCurrent);
 
 document.getElementById("clearBtn").addEventListener("click", () => {
   const now = new Date();
@@ -1168,17 +1389,24 @@ document.getElementById("clearBtn").addEventListener("click", () => {
   document.querySelectorAll(".reg-type-cb").forEach(cb => cb.checked = true);
   document.getElementById("subjectSelect").value    = "";
   document.getElementById("institutionSelect").value = "";
+  document.getElementById("regInstitutionSelect").value = "";
   clientInput.value = "";
   clientSelected    = { name: "", num: "", exact: false };
+  commsNorm         = "";
   document.getElementById("dpohInput").value = "";
+  document.getElementById("firmInput").value = "";
+  document.getElementById("newOnlyCb").checked = false;
+  document.getElementById("firstTimeOnlyCb").checked = false;
   drillStack = [];
+  regDrillStack = [];
   updateDrillBar();
-  loadAll();
+  updateRegDrillBar();
+  applyCurrent();
 });
 
-// Pressing Enter in any text field triggers apply
+// Pressing Enter in any text field triggers apply for the active view
 document.querySelectorAll("input[type=text]").forEach(el => {
-  el.addEventListener("keydown", e => { if (e.key === "Enter") loadAll(); });
+  el.addEventListener("keydown", e => { if (e.key === "Enter") applyCurrent(); });
 });
 
 // ── Subject tooltip (fixed-position, flips above when near bottom) ────────
@@ -1266,29 +1494,361 @@ async function checkForUpdate() {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   REGISTRATIONS VIEW — parallel to the communications logic above
+   ══════════════════════════════════════════════════════════════════════════ */
+
+// ── Filter state (shares date / reg-type / subject / client with comms) ─────
+function getRegFilters() {
+  const checkedTypes = [...document.querySelectorAll(".reg-type-cb:checked")].map(cb => cb.value);
+  const mFrom = document.getElementById("monthFrom").value.padStart(2, "0");
+  const mTo   = document.getElementById("monthTo").value.padStart(2, "0");
+
+  let client_q = "", client_exact = "";
+  if (clientSelected.exact && clientSelected.name) client_exact = clientSelected.name;
+  else client_q = clientSelected.name || document.getElementById("clientInput").value.trim();
+
+  return {
+    date_from:   `${document.getElementById("yearFrom").value}-${mFrom}`,
+    date_to:     `${document.getElementById("yearTo").value}-${mTo}`,
+    reg_type:    checkedTypes.length > 0 && checkedTypes.length < 3 ? checkedTypes.join(",") : "",
+    subject:     document.getElementById("subjectSelect").value,
+    institution: document.getElementById("regInstitutionSelect").value,
+    firm_q:      document.getElementById("firmInput").value.trim(),
+    new_only:    document.getElementById("newOnlyCb").checked ? "1" : "",
+    first_time_only: document.getElementById("firstTimeOnlyCb").checked ? "1" : "",
+    client_q,
+    client_exact,
+  };
+}
+
+function filtersToRegQS(extra = {}) {
+  const f = { ...getRegFilters(), ...extra };
+  return "?" + Object.entries(f)
+    .filter(([, v]) => v !== "" && v !== undefined)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join("&");
+}
+
+// Three-line time chart: all filings, new filings, first-time organizations
+function makeRegTimeChart(labels, totals, news, firstTime) {
+  destroyChart("rTimeChart");
+  const ctx = document.getElementById("rTimeChart").getContext("2d");
+  charts["rTimeChart"] = new Chart(ctx, {
+    type: "line",
+    data: {
+      labels,
+      datasets: [
+        { label: "All filings", data: totals, borderColor: "#2980b9",
+          backgroundColor: "rgba(41,128,185,.05)", borderWidth: 2,
+          pointRadius: labels.length > 60 ? 0 : 2, fill: true, tension: 0.3 },
+        { label: "New filings", data: news, borderColor: "#d35400",
+          backgroundColor: "rgba(211,84,0,.05)", borderWidth: 2,
+          pointRadius: labels.length > 60 ? 0 : 2, fill: true, tension: 0.3 },
+        { label: "First-time orgs", data: firstTime, borderColor: "#c0392b",
+          backgroundColor: "rgba(192,57,43,.08)", borderWidth: 2,
+          pointRadius: labels.length > 60 ? 0 : 2, fill: true, tension: 0.3 },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { font: { size: 10 }, maxTicksLimit: 24, maxRotation: 45 } },
+        y: { ticks: { font: { size: 11 } }, beginAtZero: true },
+      },
+    },
+  });
+}
+
+// ── Render stats ────────────────────────────────────────────────────────────
+function renderRegStats(d) {
+  lastRegStats = d;
+  document.getElementById("rStatFirstTime").textContent = fmt(d.first_time_orgs);
+  document.getElementById("rStatNew").textContent       = fmt(d.new_regs);
+  document.getElementById("rStatTotal").textContent     = fmt(d.total);
+  document.getElementById("rStatRenewals").textContent  = `${fmt(d.renewals)} renewals / amendments`;
+  document.getElementById("rStatOrgs").textContent      = fmt(d.unique_orgs);
+
+  const cm = d.by_month.slice(0, -1);   // drop the current (partial) month
+  makeRegTimeChart(cm.map(r => r.month), cm.map(r => r.count),
+                   cm.map(r => r.new), cm.map(r => r.first_time));
+
+  const tf = d.top_firms.slice(0, 15);
+  makeBarChart("rFirmChart", tf.map(r => r.firm_name), tf.map(r => r.count), true,
+    i => drillIntoReg("firm", tf[i].firm_name, `Firm: ${tf[i].firm_name}`));
+
+  const tc = d.top_clients.slice(0, 15);
+  makeBarChart("rClientChart", tc.map(r => r.client_name), tc.map(r => r.count), true,
+    i => drillIntoReg("client", tc[i].client_name, `Client: ${tc[i].client_name}`));
+
+  const ti = d.top_institutions.slice(0, 15);
+  makeBarChart("rInstChart", ti.map(r => r.institution), ti.map(r => r.count), true,
+    i => drillIntoReg("institution", ti[i].institution, `Institution: ${ti[i].institution}`));
+
+  const ts = d.top_subjects.slice(0, 20);
+  makeBarChart("rSubjectChart", ts.map(r => r.description), ts.map(r => r.count), true,
+    i => drillIntoReg("subject", ts[i].subject_code, `Subject: ${ts[i].description}`));
+}
+
+// ── Render table ──────────────────────────────────────────────────────────
+function renderRegTable(d) {
+  rTotal = d.total;
+  const ftOnly = document.getElementById("firstTimeOnlyCb").checked;
+  document.getElementById("rTableCountLabel").textContent =
+    `— ${fmt(d.total)} ${ftOnly ? "first-time organizations, newest first" : "records"}`;
+
+  const tbody = document.getElementById("regsBody");
+  if (d.rows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="9" class="no-data">No registrations match the current filters.</td></tr>`;
+  } else {
+    tbody.innerHTML = d.rows.map(r => {
+      const type = R_TYPE_LABELS[r.reg_type] || r.reg_type;
+      const instList = (r.institutions || "").split("|").map(s => s.trim()).filter(Boolean)
+        .map(s => `<span class="tag red">${s}</span>`).join(" ");
+      const subjList = (r.subjects || "").split("|").map(s => s.trim()).filter(Boolean)
+        .map(s => `<span class="tag green">${s}</span>`).join(" ");
+      const details = (r.subject_details || "").trim();
+      const badges = [];
+      if (r.first_time_org)
+        badges.push(`<span class="tag green" title="First appearance of this organization in the registry">1st-time org</span>`);
+      badges.push(r.is_original
+        ? `<span class="tag">New filing</span>`
+        : `<span class="tag" style="opacity:.55">Renewal</span>`);
+      const newBadge = badges.join(" ");
+      const firmLob = r.firm_name
+        ? `<strong>${r.firm_name}</strong><br><span class="client-num">${r.lobbyist}</span>`
+        : `${r.lobbyist}`;
+      const commsCell = r.comm_count > 0
+        ? `<a href="#" class="comm-link" data-norm="${(r.norm_name || '').replace(/"/g,'&quot;')}" data-name="${(r.client_name || '').replace(/"/g,'&quot;')}" title="View this organization's communication reports">${fmt(r.comm_count)} report${r.comm_count === 1 ? "" : "s"} ↗</a>`
+        : `<span style="color:var(--muted)">none yet</span>`;
+
+      return `<tr>
+        <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/vwRg?regId=${r.reg_id}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
+        <td style="white-space:nowrap">${r.posted_date}</td>
+        <td>${newBadge}</td>
+        <td><strong>${r.client_name}</strong>${r.client_num ? `<br><span class="client-num">reg #${r.client_num}</span>` : ""}</td>
+        <td style="white-space:nowrap">${commsCell}</td>
+        <td>${firmLob}</td>
+        <td>${instList || "—"}</td>
+        <td class="subj-cell" data-detail="${details ? details.replace(/"/g, '&quot;') : ''}">${subjList || "—"}</td>
+        <td style="white-space:nowrap;color:var(--muted)">${type}</td>
+      </tr>`;
+    }).join("");
+  }
+
+  const totalPages = Math.max(1, Math.ceil(rTotal / PAGE_SIZE));
+  document.getElementById("rPrevBtn").disabled = rCurrentPage === 0;
+  document.getElementById("rNextBtn").disabled = rCurrentPage >= totalPages - 1;
+  document.getElementById("rPageLabel").textContent = `Page ${rCurrentPage + 1} of ${totalPages}`;
+  document.getElementById("rPageTotal").textContent = `${fmt(rTotal)} total`;
+}
+
+// ── Load ──────────────────────────────────────────────────────────────────
+async function loadRegAll() {
+  loading(true);
+  try {
+    const qs = filtersToRegQS();
+    const [statsData, tableData] = await Promise.all([
+      apiFetch("/api/reg-stats" + qs),
+      apiFetch("/api/registrations" + filtersToRegQS({ limit: PAGE_SIZE, offset: 0 })),
+    ]);
+    rCurrentPage = 0;
+    renderRegStats(statsData);
+    renderRegTable(tableData);
+  } catch (e) {
+    console.error(e);
+    alert("Error loading registrations: " + e.message);
+  } finally {
+    loading(false);
+  }
+}
+
+async function loadRegTable() {
+  loading(true);
+  try {
+    const qs = filtersToRegQS({ limit: PAGE_SIZE, offset: rCurrentPage * PAGE_SIZE });
+    renderRegTable(await apiFetch("/api/registrations" + qs));
+  } finally {
+    loading(false);
+  }
+}
+
+// ── Drill-down (click a chart bar to filter, with a "← Back" trail) ─────────
+function snapshotRegFilters() {
+  return {
+    monthFrom: document.getElementById("monthFrom").value,
+    yearFrom:  document.getElementById("yearFrom").value,
+    monthTo:   document.getElementById("monthTo").value,
+    yearTo:    document.getElementById("yearTo").value,
+    regTypes:  [...document.querySelectorAll(".reg-type-cb")].map(cb => cb.checked),
+    subject:   document.getElementById("subjectSelect").value,
+    regInst:   document.getElementById("regInstitutionSelect").value,
+    firm:      document.getElementById("firmInput").value,
+    newOnly:   document.getElementById("newOnlyCb").checked,
+    firstTime: document.getElementById("firstTimeOnlyCb").checked,
+    clientInput: document.getElementById("clientInput").value,
+    clientSelected: { ...clientSelected },
+  };
+}
+
+function restoreRegFilters(s) {
+  document.getElementById("monthFrom").value = s.monthFrom;
+  document.getElementById("yearFrom").value  = s.yearFrom;
+  document.getElementById("monthTo").value   = s.monthTo;
+  document.getElementById("yearTo").value    = s.yearTo;
+  document.querySelectorAll(".reg-type-cb").forEach((cb, i) => cb.checked = s.regTypes[i]);
+  document.getElementById("subjectSelect").value        = s.subject;
+  document.getElementById("regInstitutionSelect").value = s.regInst;
+  document.getElementById("firmInput").value = s.firm;
+  document.getElementById("newOnlyCb").checked = s.newOnly;
+  document.getElementById("firstTimeOnlyCb").checked = s.firstTime;
+  document.getElementById("clientInput").value = s.clientInput;
+  clientSelected = { ...s.clientSelected };
+}
+
+function updateRegDrillBar() {
+  const bar = document.getElementById("regDrillBar");
+  if (regDrillStack.length === 0) { bar.classList.remove("show"); return; }
+  document.getElementById("regDrillLabel").innerHTML =
+    `Drilled into <strong>${regDrillStack[regDrillStack.length - 1].appliedLabel}</strong>`;
+  bar.classList.add("show");
+}
+
+function drillIntoReg(dimension, value, label) {
+  const snap = snapshotRegFilters();
+  snap.appliedLabel = label;
+  regDrillStack.push(snap);
+
+  if (dimension === "client") {
+    clientSelected = { name: value, num: "", exact: true };
+    document.getElementById("clientInput").value = value;
+  } else if (dimension === "firm") {
+    document.getElementById("firmInput").value = value;
+  } else if (dimension === "institution") {
+    document.getElementById("regInstitutionSelect").value = value;
+  } else if (dimension === "subject") {
+    document.getElementById("subjectSelect").value = value;
+  }
+
+  updateRegDrillBar();
+  loadRegAll();
+  document.getElementById("regs-section").scrollIntoView({ behavior: "smooth" });
+}
+
+document.getElementById("regDrillBack").addEventListener("click", () => {
+  const snap = regDrillStack.pop();
+  if (snap) restoreRegFilters(snap);
+  updateRegDrillBar();
+  loadRegAll();
+});
+
+// ── Pagination ────────────────────────────────────────────────────────────
+document.getElementById("rPrevBtn").addEventListener("click", () => {
+  if (rCurrentPage > 0) { rCurrentPage--; loadRegTable(); }
+});
+document.getElementById("rNextBtn").addEventListener("click", () => {
+  if (rCurrentPage < Math.ceil(rTotal / PAGE_SIZE) - 1) { rCurrentPage++; loadRegTable(); }
+});
+
+// ── Cross-link: jump to an organization's communications ────────────────────
+function openOrgComms(normName, displayName) {
+  commsNorm = normName;                    // filter comms by normalised org name
+  clientSelected = { name: "", num: "", exact: false };
+  document.getElementById("clientInput").value = displayName;   // visual cue in the sidebar
+  switchView("comms");
+  loadAll();
+  document.getElementById("comms-section").scrollIntoView({ behavior: "smooth" });
+}
+
+document.getElementById("regsBody").addEventListener("click", (e) => {
+  const link = e.target.closest(".comm-link");
+  if (!link) return;
+  e.preventDefault();
+  openOrgComms(link.dataset.norm, link.dataset.name);
+});
+
+// ── Excel export ──────────────────────────────────────────────────────────
+const R_EXPORTS = {
+  time:         () => [["Month", "All filings", "New filings", "First-time organizations"],
+                       ...lastRegStats.by_month.map(r => [r.month, r.count, r.new, r.first_time])],
+  firms:        () => [["Firm", "Registrations"],
+                       ...lastRegStats.top_firms.map(r => [r.firm_name, r.count])],
+  clients:      () => [["Client", "Registrations"],
+                       ...lastRegStats.top_clients.map(r => [r.client_name, r.count])],
+  institutions: () => [["Institution", "Registrations"],
+                       ...lastRegStats.top_institutions.map(r => [r.institution, r.count])],
+  subjects:     () => [["Code", "Subject", "Registrations"],
+                       ...lastRegStats.top_subjects.map(r => [r.subject_code, r.description, r.count])],
+};
+const R_EXPORT_NAMES = {
+  time: "Over time", firms: "Top firms", clients: "Top clients",
+  institutions: "Top institutions", subjects: "Top subjects",
+};
+
+document.querySelectorAll(".export-btn[data-rexport]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const kind = btn.dataset.rexport;
+    if (!lastRegStats || !R_EXPORTS[kind]) return;
+    exportSheet(R_EXPORTS[kind](), R_EXPORT_NAMES[kind], "registrations-" + kind,
+                "Registrations — " + R_EXPORT_NAMES[kind]);
+  });
+});
+
+// ── View toggle ───────────────────────────────────────────────────────────
+function updateHeaderSub() {
+  document.getElementById("headerSub").textContent = currentView === "regs"
+    ? "Office of the Commissioner of Lobbying — registration filings 2014–present"
+    : "Office of the Commissioner of Lobbying — communication reports 2014–present";
+}
+
+function switchView(view) {
+  if (view === currentView) return;
+  currentView = view;
+  document.body.setAttribute("data-view", view);
+  document.getElementById("viewCommsBtn").classList.toggle("active", view === "comms");
+  document.getElementById("viewRegsBtn").classList.toggle("active", view === "regs");
+  updateHeaderSub();
+
+  if (view === "regs" && !regLoaded) {
+    regLoaded = true;
+    loadRegAll();
+  } else {
+    // Charts created while hidden need a resize once their pane is visible
+    setTimeout(() => Object.values(charts).forEach(c => { try { c.resize(); } catch (e) {} }), 0);
+  }
+}
+
+document.getElementById("viewCommsBtn").addEventListener("click", () => switchView("comms"));
+document.getElementById("viewRegsBtn").addEventListener("click", () => switchView("regs"));
+
 // ── Health check + init ───────────────────────────────────────────────────
 async function init() {
   initDateDropdowns();  // sync — sets up date selects so filtersToQS() works
 
   loading(true);
   try {
-    const [health, subjects, institutions, statsData, tableData] = await Promise.all([
+    const [health, subjects, institutions, regInstitutions, statsData, tableData] = await Promise.all([
       apiFetch("/api/health"),
       apiFetch("/api/subjects"),
       apiFetch("/api/institutions"),
+      apiFetch("/api/reg-institutions"),
       apiFetch("/api/stats" + filtersToQS()),
       apiFetch("/api/communications" + filtersToQS({ limit: PAGE_SIZE, offset: 0 })),
     ]);
 
     const [minY, maxY] = health.date_range.map(d => d.slice(0, 4));
     document.getElementById("dbStatus").textContent =
-      `${fmt(health.total_comms)} records · ${minY}–${maxY}`;
+      `${fmt(health.total_comms)} comms · ${fmt(health.total_regs)} regs · ${minY}–${maxY}`;
 
     const subSel = document.getElementById("subjectSelect");
     subjects.forEach(s => subSel.add(new Option(s.description, s.subject_code)));
 
     const instSel = document.getElementById("institutionSelect");
     institutions.forEach(i => instSel.add(new Option(i.institution, i.institution)));
+
+    const regInstSel = document.getElementById("regInstitutionSelect");
+    regInstitutions.forEach(i => regInstSel.add(new Option(i.institution, i.institution)));
 
     currentPage = 0;
     renderStats(statsData);
@@ -1306,23 +1866,23 @@ async function init() {
 
 init();
 
-/* ── Ask AI ─────────────────────────────────────────────────────────────── */
+/* ── Ask AI (shared endpoint; wired to both the comms and regs boxes) ────── */
 
-const askInput  = document.getElementById("askInput");
-const askBtn    = document.getElementById("askBtn");
-const askAnswer = document.getElementById("askAnswer");
-const askMeta   = document.getElementById("askMeta");
+async function askAI(ctx) {
+  const inputEl  = document.getElementById(ctx.input);
+  const btnEl    = document.getElementById(ctx.btn);
+  const answerEl = document.getElementById(ctx.answer);
+  const metaEl   = document.getElementById(ctx.meta);
 
-async function askAI() {
-  const question = askInput.value.trim();
-  if (!question || askBtn.disabled) return;
+  const question = inputEl.value.trim();
+  if (!question || btnEl.disabled) return;
 
-  askBtn.disabled = true;
-  askBtn.textContent = "Thinking…";
-  askAnswer.className = "ask-answer";
-  askAnswer.style.display = "block";
-  askAnswer.textContent = "Querying the database — this can take up to a minute…";
-  askMeta.style.display = "none";
+  btnEl.disabled = true;
+  btnEl.textContent = "Thinking…";
+  answerEl.className = "ask-answer";
+  answerEl.style.display = "block";
+  answerEl.textContent = "Querying the database — this can take up to a minute…";
+  metaEl.style.display = "none";
 
   try {
     const r = await fetch(API + "/api/ask", {
@@ -1333,16 +1893,16 @@ async function askAI() {
     const d = await r.json();
 
     if (!r.ok || d.error) {
-      askAnswer.classList.add("error");
-      askAnswer.textContent = d.error || `Request failed (${r.status})`;
+      answerEl.classList.add("error");
+      answerEl.textContent = d.error || `Request failed (${r.status})`;
       return;
     }
 
-    askAnswer.textContent = d.answer;
+    answerEl.textContent = d.answer;
 
     if (d.queries && d.queries.length) {
-      askMeta.style.display = "block";
-      askMeta.innerHTML = "";
+      metaEl.style.display = "block";
+      metaEl.innerHTML = "";
       const details = document.createElement("details");
       const summary = document.createElement("summary");
       summary.textContent = `${d.queries.length} SQL ${d.queries.length === 1 ? "query" : "queries"} run · ${d.questions_remaining} questions left today`;
@@ -1352,20 +1912,25 @@ async function askAI() {
         pre.textContent = q;
         details.appendChild(pre);
       });
-      askMeta.appendChild(details);
+      metaEl.appendChild(details);
     }
   } catch (e) {
-    askAnswer.classList.add("error");
-    askAnswer.textContent = "Network error — please try again.";
+    answerEl.classList.add("error");
+    answerEl.textContent = "Network error — please try again.";
     console.error(e);
   } finally {
-    askBtn.disabled = false;
-    askBtn.textContent = "Ask";
+    btnEl.disabled = false;
+    btnEl.textContent = "Ask";
   }
 }
 
-askBtn.addEventListener("click", askAI);
-askInput.addEventListener("keydown", e => { if (e.key === "Enter") askAI(); });
+const COMMS_ASK = { input: "askInput",  btn: "askBtn",  answer: "askAnswer",  meta: "askMeta" };
+const REGS_ASK  = { input: "rAskInput", btn: "rAskBtn", answer: "rAskAnswer", meta: "rAskMeta" };
+
+document.getElementById("askBtn").addEventListener("click", () => askAI(COMMS_ASK));
+document.getElementById("askInput").addEventListener("keydown", e => { if (e.key === "Enter") askAI(COMMS_ASK); });
+document.getElementById("rAskBtn").addEventListener("click", () => askAI(REGS_ASK));
+document.getElementById("rAskInput").addEventListener("keydown", e => { if (e.key === "Enter") askAI(REGS_ASK); });
 </script>
 
 <footer style="text-align:center; padding:16px 24px; font-size:11px; color:#6b7280;

@@ -28,18 +28,23 @@ cd "$REPO_ROOT"
 git pull --ff-only >/dev/null 2>&1 && echo "    Synced to latest ($(git rev-parse --short HEAD))." \
     || echo "    (git pull skipped — running with current code)"
 
-# Fetch remote Last-Modified and Content-Length via Chrome TLS impersonation
+# Fetch remote Last-Modified and Content-Length for BOTH open-data ZIPs
+# (communications + registrations) via Chrome TLS impersonation.
 REMOTE=$(python3 - <<'EOF'
 from curl_cffi import requests
+URLS = {
+    "comms": "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip",
+    "regs":  "https://lobbycanada.gc.ca/media/zwcjycef/registrations_enregistrements_ocl_cal.zip",
+}
 try:
-    r = requests.get(
-        "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip",
-        impersonate="chrome", stream=True, timeout=15
-    )
-    lm = r.headers.get("Last-Modified", "")
-    cl = r.headers.get("Content-Length", "")
-    r.close()
-    print(f"{lm}|||{cl}")
+    out = []
+    for _, url in URLS.items():
+        r = requests.get(url, impersonate="chrome", stream=True, timeout=15)
+        out.append(r.headers.get("Last-Modified", ""))
+        out.append(r.headers.get("Content-Length", ""))
+        r.close()
+    # comms_lm|||comms_cl|||regs_lm|||regs_cl
+    print("|||".join(out))
 except Exception as e:
     print(f"ERROR: {e}")
 EOF
@@ -51,44 +56,49 @@ if [[ "$REMOTE" == ERROR:* ]]; then
     exit 0
 fi
 
-REMOTE_LM="${REMOTE%%|||*}"
-REMOTE_CL="${REMOTE##*|||}"
+# Split the "a|||b|||c|||d" payload (awk is reliable with the multi-char delimiter)
+REMOTE_LM=$(echo "$REMOTE"     | awk -F'\\|\\|\\|' '{print $1}')
+REMOTE_CL=$(echo "$REMOTE"     | awk -F'\\|\\|\\|' '{print $2}')
+REG_REMOTE_LM=$(echo "$REMOTE" | awk -F'\\|\\|\\|' '{print $3}')
+REG_REMOTE_CL=$(echo "$REMOTE" | awk -F'\\|\\|\\|' '{print $4}')
 
 # Read stored values from the existing DB (if it exists)
-if [ -f "$DB" ]; then
-    LOCAL_LM=$(python3 -c "
-import sqlite3, sys
+db_meta() {  # $1 = meta key
+    [ -f "$DB" ] || { echo ""; return; }
+    python3 -c "
+import sqlite3
 try:
     con = sqlite3.connect('$DB')
-    row = con.execute(\"SELECT value FROM meta WHERE key='source_last_modified'\").fetchone()
+    row = con.execute(\"SELECT value FROM meta WHERE key='$1'\").fetchone()
     print(row[0] if row else '')
 except: print('')
-")
-    LOCAL_CL=$(python3 -c "
-import sqlite3, sys
-try:
-    con = sqlite3.connect('$DB')
-    row = con.execute(\"SELECT value FROM meta WHERE key='source_file_size'\").fetchone()
-    print(row[0] if row else '')
-except: print('')
-")
-else
-    LOCAL_LM=""
-    LOCAL_CL=""
-fi
+"
+}
+LOCAL_LM=$(db_meta source_last_modified)
+LOCAL_CL=$(db_meta source_file_size)
+REG_LOCAL_LM=$(db_meta reg_source_last_modified)
+REG_LOCAL_CL=$(db_meta reg_source_file_size)
 
-# Compare — skip full rebuild if ZIP is unchanged, but always run patch
-ZIP_CHANGED=true
-if [ -n "$REMOTE_LM" ] && [ "$REMOTE_LM" = "$LOCAL_LM" ]; then
-    echo "    No change in open-data ZIP (Last-Modified: $REMOTE_LM). Skipping full rebuild."
-    ZIP_CHANGED=false
-elif [ -z "$REMOTE_LM" ] && [ -n "$REMOTE_CL" ] && [ "$REMOTE_CL" = "$LOCAL_CL" ]; then
-    echo "    No change in open-data ZIP (Content-Length: $REMOTE_CL). Skipping full rebuild."
-    ZIP_CHANGED=false
+# Returns "true" if a remote ZIP differs from what the DB was built from.
+zip_changed() {  # $1 remote_lm  $2 local_lm  $3 remote_cl  $4 local_cl
+    if [ -n "$1" ] && [ "$1" = "$2" ]; then echo false; return; fi
+    if [ -z "$1" ] && [ -n "$3" ] && [ "$3" = "$4" ]; then echo false; return; fi
+    echo true
+}
+COMMS_CHANGED=$(zip_changed "$REMOTE_LM" "$LOCAL_LM" "$REMOTE_CL" "$LOCAL_CL")
+REG_CHANGED=$(zip_changed "$REG_REMOTE_LM" "$REG_LOCAL_LM" "$REG_REMOTE_CL" "$REG_LOCAL_CL")
+
+# A change in EITHER open-data ZIP warrants a full rebuild (build_db.py ingests both)
+ZIP_CHANGED=false
+[ "$COMMS_CHANGED" = true ] && ZIP_CHANGED=true
+[ "$REG_CHANGED" = true ]   && ZIP_CHANGED=true
+
+if [ "$ZIP_CHANGED" = false ]; then
+    echo "    No change in either open-data ZIP (comms LM: $REMOTE_LM, regs LM: $REG_REMOTE_LM). Skipping full rebuild."
 fi
 
 if [ "$ZIP_CHANGED" = true ]; then
-    echo "    New open-data ZIP detected (remote: $REMOTE_LM, local: $LOCAL_LM). Rebuilding ..."
+    echo "    New open-data ZIP detected (comms changed: $COMMS_CHANGED, regs changed: $REG_CHANGED). Rebuilding ..."
     # ── 1. Full rebuild from open-data ZIP ──────────────────────────────────────
     echo "==> Building lobby.db ..."
     python3 -u lobbyist/build_db.py

@@ -20,9 +20,12 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
-DB_PATH = Path(__file__).parent / "lobby.db"
+# DB path is overridable so a scratch DB can be served during local verification
+# without touching the live lobby.db.
+DB_PATH = Path(os.environ.get("LOBBY_DB_PATH", Path(__file__).parent / "lobby.db"))
 PORT = int(os.environ.get("PORT", 5002))
 COMMS_ZIP_URL = "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip"
+REGS_ZIP_URL  = "https://lobbycanada.gc.ca/media/zwcjycef/registrations_enregistrements_ocl_cal.zip"
 RENDER_DEPLOY_HOOK = os.environ.get("RENDER_DEPLOY_HOOK", "")
 
 try:
@@ -72,6 +75,21 @@ def rows_to_list(rows):
     return [dict(r) for r in rows]
 
 
+_reg_table_flag: dict = {}
+
+
+def _has_reg_tables(con) -> bool:
+    """True if the registrations tables exist. Lets the app serve the
+    communications view unharmed against an older DB that predates the
+    registration schema (e.g. a deploy that grabbed a stale release DB)."""
+    if "exists" not in _reg_table_flag:
+        row = con.execute(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='registrations'"
+        ).fetchone()
+        _reg_table_flag["exists"] = row[0] > 0
+    return _reg_table_flag["exists"]
+
+
 # ── Simple in-memory cache ───────────────────────────────────────────────────
 
 _cache: dict = {}
@@ -116,6 +134,7 @@ def build_filter_parts(params: dict):
     date_to     = (params.get("date_to")   or "2099-12").strip()
     client_q    = (params.get("client_q")  or "").strip()
     client_exact = (params.get("client_exact") or "").strip()
+    client_norm = (params.get("client_norm") or "").strip()
     reg_type    = (params.get("reg_type")  or "").strip()
     institution = (params.get("institution") or "").strip()
     subject     = (params.get("subject")   or "").strip()
@@ -126,7 +145,13 @@ def build_filter_parts(params: dict):
     wheres = ["c.comm_date >= ?", "c.comm_date < ?"]
     binds  = [start, end]
 
-    if client_exact:
+    if client_norm:
+        # Normalised-name match — used by the "view this client's communications"
+        # cross-link from the Registrations tab. Catches all of an organization's
+        # communications regardless of which client_num/name variant they used.
+        wheres.append("c.norm_name = ?")
+        binds.append(client_norm)
+    elif client_exact:
         # Exact match — reproduces the Top-Clients ranking (which groups by the
         # full name string) and avoids LIKE over-matching short names.
         wheres.append("c.client_name = ?")
@@ -171,6 +196,76 @@ def build_filter_select(params: dict):
     return sql, binds
 
 
+# ── Registration filter helpers (parallel to communications above) ───────────
+
+def build_reg_filter_parts(params: dict):
+    """Returns (joins, wheres, binds) for the active registration filters.
+    Filters and sorts on posted_date (the publication date)."""
+    date_from    = (params.get("date_from") or "2014-01").strip()
+    date_to      = (params.get("date_to")   or "2099-12").strip()
+    client_q     = (params.get("client_q")  or "").strip()
+    client_exact = (params.get("client_exact") or "").strip()
+    firm_q       = (params.get("firm_q")    or "").strip()
+    reg_type     = (params.get("reg_type")  or "").strip()
+    institution  = (params.get("institution") or "").strip()
+    subject      = (params.get("subject")   or "").strip()
+    new_only     = (params.get("new_only")  or "").strip()
+    first_time   = (params.get("first_time_only") or "").strip()
+
+    start, end = _month_bounds(date_from, date_to)
+    joins  = []
+    wheres = ["r.posted_date >= ?", "r.posted_date < ?"]
+    binds  = [start, end]
+
+    if new_only in ("1", "true", "on", "yes"):
+        wheres.append("r.is_original = 1")
+
+    if first_time in ("1", "true", "on", "yes"):
+        # Rows that are an organization's first-ever appearance in the registry
+        joins.append("JOIN org_first_seen o ON o.norm_name = r.norm_name")
+        wheres.append("r.norm_name != ''")
+        wheres.append("o.first_date = r.posted_date")
+
+    if client_exact:
+        wheres.append("r.client_name = ?")
+        binds.append(client_exact)
+    elif client_q:
+        wheres.append("r.client_name LIKE ? COLLATE NOCASE")
+        binds.append(f"%{client_q}%")
+
+    if firm_q:
+        wheres.append("r.firm_name LIKE ? COLLATE NOCASE")
+        binds.append(f"%{firm_q}%")
+
+    if reg_type:
+        types = [int(t) for t in reg_type.split(",") if t.strip()]
+        wheres.append(f"r.reg_type IN ({','.join('?' * len(types))})")
+        binds += types
+
+    if institution:
+        joins.append("JOIN reg_institutions ri ON r.reg_id = ri.reg_id")
+        wheres.append("ri.inst_id = (SELECT inst_id FROM reg_inst_ref WHERE institution = ?)")
+        binds.append(institution)
+
+    if subject:
+        joins.append("JOIN reg_subjects rs ON r.reg_id = rs.reg_id")
+        wheres.append("rs.subject_code = ?")
+        binds.append(subject)
+
+    return joins, wheres, binds
+
+
+def build_reg_filter_select(params: dict):
+    """The SELECT DISTINCT reg_id query matching all active registration filters."""
+    joins, wheres, binds = build_reg_filter_parts(params)
+    sql = (
+        f"SELECT DISTINCT r.reg_id "
+        f"FROM registrations r {' '.join(joins)} "
+        f"WHERE {' AND '.join(wheres)}"
+    )
+    return sql, binds
+
+
 # ── Static frontend ──────────────────────────────────────────────────────────
 
 @app.route("/")
@@ -193,12 +288,22 @@ def health():
             patch_count = con.execute(
                 "SELECT value FROM meta WHERE key='patch_new_count'"
             ).fetchone()
+            if _has_reg_tables(con):
+                reg_row = con.execute(
+                    "SELECT COUNT(*), COALESCE(SUM(is_original),0), MIN(posted_date), MAX(posted_date) "
+                    "FROM registrations"
+                ).fetchone()
+            else:
+                reg_row = (0, 0, None, None)
         return jsonify({
             "status": "ok",
             "total_comms": total,
             "date_range": [min_d, max_d],
             "patched_at": patched[0] if patched else None,
             "patch_new_count": int(patch_count[0]) if patch_count else 0,
+            "total_regs": reg_row[0],
+            "new_regs": reg_row[1],
+            "reg_date_range": [reg_row[2], reg_row[3]],
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -378,6 +483,143 @@ def stats():
     return jsonify(result)
 
 
+# ── Registration stats (parallel to communications stats above) ──────────────
+
+def _compute_reg_stats(params: dict) -> dict:
+    """Run all registration analytics for the given filter params, using a temp
+    table so the filter join runs once and each aggregation scans the small result."""
+    inner_sql, binds = build_reg_filter_select(params)
+
+    with get_db() as con:
+        con.execute(f"CREATE TEMP TABLE _rfids AS {inner_sql}", binds)
+        con.execute("CREATE INDEX _rfids_idx ON _rfids(reg_id)")
+
+        row = con.execute("""
+            SELECT COUNT(*)                       AS total,
+                   COALESCE(SUM(r.is_original),0) AS new_regs,
+                   COUNT(DISTINCT r.client_num)   AS unique_clients,
+                   COUNT(DISTINCT r.reg_num_dclrnt) AS unique_lobbyists
+            FROM _rfids fi JOIN registrations r ON r.reg_id = fi.reg_id
+        """).fetchone()
+        totals = dict(row)
+        totals["renewals"] = totals["total"] - totals["new_regs"]
+        totals["unique_firms"] = con.execute("""
+            SELECT COUNT(DISTINCT r.firm_name)
+            FROM _rfids fi JOIN registrations r ON r.reg_id = fi.reg_id
+            WHERE r.firm_name != ''
+        """).fetchone()[0]
+        # First-time organizations: distinct orgs whose earliest-ever appearance
+        # (across registrations + communications) is a registration in this set.
+        totals["first_time_orgs"] = con.execute("""
+            SELECT COUNT(DISTINCT r.norm_name)
+            FROM _rfids fi JOIN registrations r ON r.reg_id = fi.reg_id
+            JOIN org_first_seen o ON o.norm_name = r.norm_name
+            WHERE r.norm_name != '' AND o.first_date = r.posted_date
+        """).fetchone()[0]
+        totals["unique_orgs"] = con.execute("""
+            SELECT COUNT(DISTINCT r.norm_name)
+            FROM _rfids fi JOIN registrations r ON r.reg_id = fi.reg_id
+            WHERE r.norm_name != ''
+        """).fetchone()[0]
+
+        by_month = con.execute("""
+            SELECT r.posted_month AS month, COUNT(*) AS count,
+                   COALESCE(SUM(r.is_original),0) AS new,
+                   COUNT(DISTINCT CASE WHEN o.first_date = r.posted_date THEN r.norm_name END) AS first_time
+            FROM _rfids fi JOIN registrations r ON r.reg_id = fi.reg_id
+            LEFT JOIN org_first_seen o ON o.norm_name = r.norm_name
+            GROUP BY r.posted_month ORDER BY r.posted_month
+        """).fetchall()
+
+        top_firms = con.execute("""
+            SELECT r.firm_name, COUNT(*) AS count
+            FROM _rfids fi JOIN registrations r ON r.reg_id = fi.reg_id
+            WHERE r.firm_name != ''
+            GROUP BY r.firm_name ORDER BY count DESC LIMIT 20
+        """).fetchall()
+
+        top_clients = con.execute("""
+            SELECT r.client_name, COUNT(*) AS count
+            FROM _rfids fi JOIN registrations r ON r.reg_id = fi.reg_id
+            WHERE r.client_name != ''
+            GROUP BY r.client_name ORDER BY count DESC LIMIT 20
+        """).fetchall()
+
+        top_subjects = con.execute("""
+            SELECT rs.subject_code, st.description, COUNT(DISTINCT fi.reg_id) AS count
+            FROM _rfids fi
+            JOIN reg_subjects rs ON rs.reg_id = fi.reg_id
+            JOIN subject_types st ON st.subject_code = rs.subject_code
+            WHERE rs.subject_code != ''
+            GROUP BY rs.subject_code ORDER BY count DESC
+        """).fetchall()
+
+        top_institutions = con.execute("""
+            SELECT rir.institution, COUNT(DISTINCT fi.reg_id) AS count
+            FROM _rfids fi
+            JOIN reg_institutions ri ON ri.reg_id = fi.reg_id
+            JOIN reg_inst_ref rir ON rir.inst_id = ri.inst_id
+            GROUP BY rir.institution ORDER BY count DESC LIMIT 20
+        """).fetchall()
+
+    return {
+        **totals,
+        "by_month":         rows_to_list(by_month),
+        "top_firms":        rows_to_list(top_firms),
+        "top_clients":      rows_to_list(top_clients),
+        "top_subjects":     rows_to_list(top_subjects),
+        "top_institutions": rows_to_list(top_institutions),
+    }
+
+
+def _is_default_reg_params(params: dict) -> bool:
+    """True when params represent an unfiltered 'all registrations' request."""
+    extra = {k for k in params if k not in ("date_from", "date_to")}
+    if extra:
+        return False
+    now = datetime.datetime.utcnow()
+    current_month = f"{now.year}-{now.month:02d}"
+    return (
+        params.get("date_from", "2014-01") <= "2014-01"
+        and params.get("date_to", "2099-12") >= current_month
+    )
+
+
+_EMPTY_REG_STATS = {
+    "total": 0, "new_regs": 0, "renewals": 0, "unique_clients": 0,
+    "unique_lobbyists": 0, "unique_firms": 0, "first_time_orgs": 0, "unique_orgs": 0, "by_month": [],
+    "top_firms": [], "top_clients": [], "top_subjects": [], "top_institutions": [],
+}
+
+
+@app.route("/api/reg-stats")
+def reg_stats():
+    params = {k: v for k, v in request.args.items() if v}
+    key = "reg::" + str(sorted(params.items()))
+
+    cached = _cache_get(key)
+    if cached is not None:
+        return jsonify(cached)
+
+    with get_db() as con:
+        if not _has_reg_tables(con):
+            return jsonify(_EMPTY_REG_STATS)
+
+    if _is_default_reg_params(params):
+        with get_db() as con:
+            row = con.execute(
+                "SELECT value FROM meta WHERE key = 'default_reg_stats'"
+            ).fetchone()
+        if row:
+            result = json.loads(row[0])
+            _cache_set(key, result)
+            return jsonify(result)
+
+    result = _compute_reg_stats(params)
+    _cache_set(key, result)
+    return jsonify(result)
+
+
 # ── Communications table (paginated) ─────────────────────────────────────────
 
 def _decorate_comms(con, ids):
@@ -462,6 +704,134 @@ def communications():
     return jsonify({"total": total, "rows": rows})
 
 
+# ── Registrations table (paginated) ──────────────────────────────────────────
+
+def _decorate_regs(con, ids):
+    """Fetch display fields for a page of reg_ids, preserving order. Subjects and
+    target institutions are queried separately to avoid join row-multiplication."""
+    if not ids:
+        return []
+    ph = ",".join("?" * len(ids))
+
+    regs = {}
+    norms = {}   # reg_id -> norm_name, for the communications-count lookup
+    for r in con.execute(f"""
+        SELECT r.reg_id, r.reg_num, r.posted_date, r.effective_date, r.end_date,
+               r.firm_name, r.reg_first || ' ' || r.reg_last AS lobbyist,
+               r.client_name, r.client_num, r.reg_type, r.is_original, r.norm_name,
+               CASE WHEN o.first_date = r.posted_date THEN 1 ELSE 0 END AS first_time_org
+        FROM registrations r
+        LEFT JOIN org_first_seen o ON o.norm_name = r.norm_name
+        WHERE r.reg_id IN ({ph})""", ids):
+        d = dict(r)
+        norms[r["reg_id"]] = d.pop("norm_name") or ""
+        regs[r["reg_id"]] = {**d, "subjects": [], "institutions": [],
+                             "subject_details": [], "comm_count": 0}
+
+    for r in con.execute(f"""
+        SELECT rs.reg_id, st.description
+        FROM reg_subjects rs JOIN subject_types st ON st.subject_code = rs.subject_code
+        WHERE rs.reg_id IN ({ph})""", ids):
+        regs[r["reg_id"]]["subjects"].append(r["description"])
+
+    for r in con.execute(f"""
+        SELECT ri.reg_id, rir.institution
+        FROM reg_institutions ri JOIN reg_inst_ref rir ON rir.inst_id = ri.inst_id
+        WHERE ri.reg_id IN ({ph})""", ids):
+        regs[r["reg_id"]]["institutions"].append(r["institution"])
+
+    for r in con.execute(f"""
+        SELECT sd.reg_id, dt.detail_text
+        FROM reg_subject_details sd JOIN reg_detail_text dt ON dt.detail_id = sd.detail_id
+        WHERE sd.reg_id IN ({ph})""", ids):
+        regs[r["reg_id"]]["subject_details"].append(r["detail_text"])
+
+    # Communications count per organization (by normalised name), one query for
+    # the whole page — powers the "has this client filed communications?" link.
+    page_norms = [n for n in {v for v in norms.values()} if n]
+    comm_counts = {}
+    if page_norms:
+        nph = ",".join("?" * len(page_norms))
+        for r in con.execute(
+            f"SELECT norm_name, COUNT(*) AS c FROM communications "
+            f"WHERE norm_name IN ({nph}) GROUP BY norm_name", page_norms):
+            comm_counts[r["norm_name"]] = r["c"]
+
+    out = []
+    for rid in ids:
+        r = regs[rid]
+        r["subjects"]        = "|".join(dict.fromkeys(r["subjects"]))
+        r["institutions"]    = "|".join(dict.fromkeys(r["institutions"]))
+        r["subject_details"] = " || ".join(dict.fromkeys(r["subject_details"]))
+        r["norm_name"]       = norms[rid]
+        r["comm_count"]      = comm_counts.get(norms[rid], 0)
+        out.append(r)
+    return out
+
+
+@app.route("/api/registrations")
+def registrations():
+    limit  = min(int(request.args.get("limit", 50)), 200)
+    offset = int(request.args.get("offset", 0))
+
+    first_time = (request.args.get("first_time_only") or "").strip() in ("1", "true", "on", "yes")
+
+    joins, wheres, binds = build_reg_filter_parts(request.args)
+    base = f"FROM registrations r {' '.join(joins)} WHERE {' AND '.join(wheres)}"
+
+    with get_db() as con:
+        if not _has_reg_tables(con):
+            return jsonify({"total": 0, "rows": []})
+
+        if first_time:
+            # One row per organization (its debut registration), newest first —
+            # a clean "first-time organizations" list. All of an org's debut-day
+            # rows share the same posted_date (= its first_date), so MIN(reg_id)
+            # picks a stable representative.
+            total = con.execute(
+                f"SELECT COUNT(DISTINCT r.norm_name) {base}", binds).fetchone()[0]
+            ids = [r[0] for r in con.execute(
+                f"SELECT MIN(r.reg_id) {base} "
+                f"GROUP BY r.norm_name ORDER BY MIN(r.posted_date) DESC, r.norm_name "
+                f"LIMIT ? OFFSET ?",
+                binds + [limit, offset],
+            ).fetchall()]
+        else:
+            count_expr = "COUNT(DISTINCT r.reg_id)" if joins else "COUNT(*)"
+            distinct   = "DISTINCT " if joins else ""
+            total = con.execute(f"SELECT {count_expr} {base}", binds).fetchone()[0]
+            ids = [r[0] for r in con.execute(
+                f"SELECT {distinct}r.reg_id, r.posted_date {base} "
+                f"ORDER BY r.posted_date DESC LIMIT ? OFFSET ?",
+                binds + [limit, offset],
+            ).fetchall()]
+
+        rows = _decorate_regs(con, ids)
+
+    return jsonify({"total": total, "rows": rows})
+
+
+@app.route("/api/reg-institutions")
+def reg_institutions():
+    """Distinct target government institutions across registrations (for the
+    registrations filter dropdown). Kept separate from /api/institutions, which
+    ranks DPOH institutions from communications."""
+    cached = _cache_get("__reg_institutions__")
+    if cached is not None:
+        return jsonify(cached)
+    with get_db() as con:
+        if not _has_reg_tables(con):
+            return jsonify([])
+        rows = con.execute(
+            """SELECT rir.institution, COUNT(DISTINCT ri.reg_id) AS reg_count
+               FROM reg_institutions ri JOIN reg_inst_ref rir ON rir.inst_id = ri.inst_id
+               GROUP BY rir.institution ORDER BY reg_count DESC"""
+        ).fetchall()
+    result = rows_to_list(rows)
+    _cache_set("__reg_institutions__", result)
+    return jsonify(result)
+
+
 # ── Update check ─────────────────────────────────────────────────────────────
 
 @app.route("/api/check-update")
@@ -471,37 +841,43 @@ def check_update():
         # (Chrome impersonation) gets through. If not installed, skip check.
         if not _HAVE_CFFI:
             return jsonify({"update_available": False, "note": "curl_cffi not available"})
-        r = cffi_requests.get(COMMS_ZIP_URL, impersonate="chrome", stream=True, timeout=15)
-        r.raise_for_status()
-        remote_lm = r.headers.get("Last-Modified", "")
-        remote_cl = r.headers.get("Content-Length", "")
-        r.close()
+
+        def _head(url):
+            rr = cffi_requests.get(url, impersonate="chrome", stream=True, timeout=15)
+            rr.raise_for_status()
+            lm = rr.headers.get("Last-Modified", "")
+            cl = rr.headers.get("Content-Length", "")
+            rr.close()
+            return lm, cl
+
+        remote_lm, remote_cl = _head(COMMS_ZIP_URL)
+        reg_remote_lm, reg_remote_cl = _head(REGS_ZIP_URL)
     except Exception as e:
         return jsonify({"error": f"Request failed: {e}"}), 502
 
+    def _meta(con, key):
+        row = con.execute("SELECT value FROM meta WHERE key = ?", (key,)).fetchone()
+        return row[0] if row else ""
+
     with get_db() as con:
-        row = con.execute(
-            "SELECT value FROM meta WHERE key = 'source_last_modified'"
-        ).fetchone()
-        local_lm = row[0] if row else ""
+        local_lm      = _meta(con, "source_last_modified")
+        local_size    = _meta(con, "source_file_size")
+        built_at      = _meta(con, "built_at")
+        reg_local_lm  = _meta(con, "reg_source_last_modified")
+        reg_local_size = _meta(con, "reg_source_file_size")
 
-        size_row = con.execute(
-            "SELECT value FROM meta WHERE key = 'source_file_size'"
-        ).fetchone()
-        local_size = size_row[0] if size_row else ""
+    def _changed(rlm, llm, rcl, lcl):
+        # Primary signal: Last-Modified header; fallback: Content-Length vs stored size
+        if rlm and llm:
+            return rlm != llm
+        if rcl and lcl:
+            return rcl != lcl
+        return False
 
-        built_row = con.execute(
-            "SELECT value FROM meta WHERE key = 'built_at'"
-        ).fetchone()
-        built_at = built_row[0] if built_row else ""
-
-    # Primary signal: Last-Modified header; fallback: Content-Length vs stored size
-    if remote_lm and local_lm:
-        update_available = remote_lm != local_lm
-    elif remote_cl and local_size:
-        update_available = remote_cl != local_size
-    else:
-        update_available = False
+    comms_changed = _changed(remote_lm, local_lm, remote_cl, local_size)
+    regs_changed  = _changed(reg_remote_lm, reg_local_lm, reg_remote_cl, reg_local_size)
+    # A change in either open-data file means a rebuild is warranted
+    update_available = comms_changed or regs_changed
 
     with get_db() as con:
         patched_row = con.execute(
@@ -515,10 +891,14 @@ def check_update():
 
     return jsonify({
         "update_available": update_available,
+        "comms_changed": comms_changed,
+        "regs_changed": regs_changed,
         "remote_last_modified": remote_lm,
         "local_last_modified": local_lm,
         "remote_content_length": remote_cl,
         "local_file_size": local_size,
+        "reg_remote_last_modified": reg_remote_lm,
+        "reg_local_last_modified": reg_local_lm,
         "built_at": built_at,
         "patched_at": patched_at,
         "patch_new_count": patch_new_count,
@@ -637,6 +1017,13 @@ def _ask_system_prompt() -> str:
         subjects = con.execute(
             "SELECT subject_code, description FROM subject_types ORDER BY subject_code"
         ).fetchall()
+        if _has_reg_tables(con):
+            reg_total, reg_new, reg_lo, reg_hi = con.execute(
+                "SELECT COUNT(*), COALESCE(SUM(is_original),0), MIN(posted_date), MAX(posted_date) "
+                "FROM registrations"
+            ).fetchone()
+        else:
+            reg_total, reg_new, reg_lo, reg_hi = 0, 0, "n/a", "n/a"
     subject_list = "\n".join(f"  {r[0]} = {r[1]}" for r in subjects)
     prompt = f"""You are the research assistant for the Canadian Lobbyist Registry Explorer, a public website. You answer questions about federal lobbying communication reports filed with the Office of the Commissioner of Lobbying of Canada, by querying a SQLite database with the query_db tool.
 
@@ -653,7 +1040,8 @@ CREATE TABLE communications (
     comm_year    INTEGER,
     comm_month   TEXT,     -- 'YYYY-MM'
     reg_type     INTEGER,  -- 1 = Consultant, 2 = In-house Corporation, 3 = In-house Organization
-    is_amendment INTEGER   -- 1 if the report is an amendment to an earlier filing
+    is_amendment INTEGER,  -- 1 if the report is an amendment to an earlier filing
+    norm_name    TEXT      -- normalised client_name; join to registrations.norm_name to link a client across both datasets
 );
 CREATE TABLE dpoh (        -- Designated Public Office Holders present; one row PER OFFICIAL per communication
     comlog_id    INTEGER,  -- joins to communications
@@ -670,10 +1058,43 @@ CREATE TABLE subjects (    -- subject matter codes; one row per code per communi
 CREATE TABLE subject_types (subject_code TEXT PRIMARY KEY, description TEXT);
 CREATE TABLE subject_details (comlog_id INTEGER, detail_text TEXT);  -- free-text detail; only present for a minority of records
 
-SUBJECT CODES:
+REGISTRATIONS ({reg_total:,} registration filings, {reg_new:,} of them brand-new, {reg_lo} to {reg_hi} by posted date). A registration is a lobbyist declaring they will lobby for a client, filed BEFORE any communication. This is distinct from communications above (which log meetings that actually happened).
+
+CREATE TABLE registrations (
+    reg_id         INTEGER PRIMARY KEY,  -- one row per registration version
+    reg_num        TEXT,     -- '{{registrant}}-{{client}}-{{version}}'
+    reg_type       INTEGER,  -- 1 = Consultant, 2 = In-house Corporation, 3 = In-house Organization
+    version_code   TEXT,
+    firm_name      TEXT,     -- consultant lobbying firm ('' for in-house registrations)
+    reg_num_dclrnt TEXT,     -- registrant (lobbyist) id
+    reg_last       TEXT, reg_first TEXT,   -- registrant (lobbyist) name
+    client_num     TEXT, client_name TEXT, -- client the lobbyist registered to represent
+    effective_date TEXT,     -- 'YYYY-MM-DD' when the registration took effect
+    end_date       TEXT,     -- '' if the registration is still active
+    posted_date    TEXT,     -- 'YYYY-MM-DD' when it was published (indexed; filter/sort on this)
+    posted_year    INTEGER, posted_month TEXT,  -- 'YYYY-MM'
+    is_original    INTEGER,  -- 1 = a newly-filed registration (no predecessor); 0 = a renewal/amendment of an earlier filing
+    norm_name      TEXT,     -- normalised client_name (joins to org_first_seen)
+    govt_fund_ind  TEXT, contg_fee_ind TEXT, coalition_ind TEXT  -- 'Y'/'N' flags
+);
+CREATE TABLE reg_subjects (reg_id INTEGER, subject_code TEXT);       -- subject matters per registration; joins to subject_types
+CREATE TABLE reg_inst_ref (inst_id INTEGER PRIMARY KEY, institution TEXT);  -- lookup of the ~222 government institutions
+CREATE TABLE reg_institutions (reg_id INTEGER, inst_id INTEGER);     -- institutions a registration intends to lobby; join reg_inst_ref for the name
+CREATE TABLE reg_detail_text (detail_id INTEGER PRIMARY KEY, detail_text TEXT);   -- deduplicated free-text subject-matter descriptions
+CREATE TABLE reg_subject_details (reg_id INTEGER, detail_id INTEGER);  -- free-text descriptions per registration; join reg_detail_text for the text
+CREATE TABLE org_first_seen (norm_name TEXT PRIMARY KEY, first_date TEXT, display_name TEXT);  -- earliest appearance of each org (by normalised name) across registrations + communications
+
+SUBJECT CODES (shared by both subjects and reg_subjects):
 {subject_list}
 
 RULES AND GOTCHAS:
+- Two separate datasets: `communications` = meetings that happened; `registrations` = intent-to-lobby filings. Pick the right one for the question. "New registrations", "who registered to lobby", "new lobbying files" → registrations. "Meetings", "who was lobbied", "contacts with officials" → communications.
+- `is_original = 1` means a NEWLY-FILED registration, NOT a first-time organization. client_num is minted per consultant engagement, so a long-established org (e.g. a big association) gets a new is_original=1 registration every time it retains a new consultant. Do not equate is_original with "first-time client/organization".
+- To find FIRST-TIME organizations (never in the registry before), use org_first_seen: an org debuts when a registration's posted_date equals its org_first_seen.first_date (join on norm_name). Count distinct organizations with COUNT(DISTINCT r.norm_name). This is name-deduplicated (a heuristic) and only covers 2014-onward data.
+- Filter and sort registrations on posted_date.
+- Joining reg_subjects or reg_institutions multiplies rows: count registrations with COUNT(DISTINCT r.reg_id) after a join.
+- reg_institutions holds the institutions a lobbyist INTENDS to lobby (declared at registration); dpoh.institution holds officials actually met. Both use the same abbreviated names ('Finance Canada (FIN)').
+- Registrations refresh from the weekly bulk file only (communications also get a daily live top-up), so registrations may lag the last few days.
 - Joining dpoh or subjects multiplies rows: count communications with COUNT(DISTINCT c.comlog_id), never COUNT(*), after a join.
 - Name matching: use LIKE '%term%' COLLATE NOCASE — client and institution names vary in casing and form. If a first query returns nothing, try a broader pattern before concluding there are no records.
 - Institutions are stored with abbreviations, e.g. 'Finance Canada (FIN)', 'Transport Canada (TC)' — match with LIKE.
@@ -811,9 +1232,19 @@ def _prewarm():
                    GROUP BY institution ORDER BY comm_count DESC"""
             ).fetchall())
 
+            have_regs = _has_reg_tables(con)
+            reg_inst = rows_to_list(con.execute(
+                """SELECT rir.institution, COUNT(DISTINCT ri.reg_id) AS reg_count
+                   FROM reg_institutions ri JOIN reg_inst_ref rir ON rir.inst_id = ri.inst_id
+                   GROUP BY rir.institution ORDER BY reg_count DESC"""
+            ).fetchall()) if have_regs else []
+
             stats_row = con.execute(
                 "SELECT value FROM meta WHERE key = 'default_stats'"
             ).fetchone()
+            reg_stats_row = con.execute(
+                "SELECT value FROM meta WHERE key = 'default_reg_stats'"
+            ).fetchone() if have_regs else None
 
             # Touch idx_c_date so the first page-of-records query after a
             # fresh deploy reads a warm index instead of cold disk
@@ -821,17 +1252,25 @@ def _prewarm():
                 "SELECT COUNT(*) FROM communications "
                 "WHERE comm_date >= '2014-01-01' AND comm_date < '2100-01-01'"
             ).fetchone()
+            # Same for the registrations posted-date index
+            if have_regs:
+                con.execute(
+                    "SELECT COUNT(*) FROM registrations "
+                    "WHERE posted_date >= '2014-01-01' AND posted_date < '2100-01-01'"
+                ).fetchone()
 
         _cache_set("__subjects__", subj)
         _cache_set("__institutions__", inst)
+        _cache_set("__reg_institutions__", reg_inst)
 
+        default_params = {
+            "date_from": "2014-01",
+            "date_to": f"{now.year}-{now.month:02d}",
+        }
         if stats_row:
-            default_stats = json.loads(stats_row[0])
-            default_params = {
-                "date_from": "2014-01",
-                "date_to": f"{now.year}-{now.month:02d}",
-            }
-            _cache_set(str(sorted(default_params.items())), default_stats)
+            _cache_set(str(sorted(default_params.items())), json.loads(stats_row[0]))
+        if reg_stats_row:
+            _cache_set("reg::" + str(sorted(default_params.items())), json.loads(reg_stats_row[0]))
 
         print("Cache ready.", flush=True)
     except Exception as e:
