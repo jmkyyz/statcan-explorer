@@ -1,7 +1,12 @@
 // All requests proxy through Vite at /ckan → https://open.canada.ca/data/en/api/3/action
 // datastore_search_sql is disabled on this CKAN instance — we use datastore_search + client-side aggregation.
 const BASE = '/ckan'
-const RESOURCE_ID = '4252857a-9e5f-47f9-98b1-1291e8f9f692'
+
+// The EVAP dataset publishes each month as a BRAND-NEW datastore resource (e.g.
+// "EVAP May 2026 Webstats -EN") rather than appending to a stable one, so any hardcoded
+// resource_id freezes the dashboard the moment the next month is released. Resolve the
+// newest English datastore resource from the package at runtime instead.
+const PACKAGE_ID = '23344072-7118-4715-84a9-daf630ec76c8'
 
 // Fields to fetch — excludes "Battery, Plug in Hybrid, or Fuel Cell EV" because its commas break
 // the fields= comma-separated list. EV type is handled via separate limit=0 requests.
@@ -27,6 +32,37 @@ async function parseResponse(res) {
 
 async function fetchJSON(url) {
   return parseResponse(await fetch(url))
+}
+
+// Resolve the current EVAP resource_id: the most-recently-modified active English
+// datastore resource in the package. Memoized for the session; a failure clears the
+// cache so the next call retries rather than wedging on a transient error.
+let resourceIdPromise = null
+
+async function resolveResourceId() {
+  const pkg = await fetchJSON(`${BASE}/package_show?id=${PACKAGE_ID}`)
+  const candidates = (pkg.resources ?? []).filter(
+    // English datastore CSVs are named "... Webstats -EN"; the French pair is "... - FR"
+    // and the data dictionary is a non-datastore XLSX, so both fall out here.
+    r => r.datastore_active && /-\s*EN\b/i.test(r.name ?? '')
+  )
+  if (!candidates.length) {
+    throw new Error('No active English EVAP datastore resource found in package')
+  }
+  candidates.sort((a, b) =>
+    (b.last_modified ?? b.created ?? '').localeCompare(a.last_modified ?? a.created ?? '')
+  )
+  return candidates[0].id
+}
+
+function getResourceId() {
+  if (!resourceIdPromise) {
+    resourceIdPromise = resolveResourceId().catch(err => {
+      resourceIdPromise = null
+      throw err
+    })
+  }
+  return resourceIdPromise
 }
 
 // CKAN's datastore_search hard-caps each response at 32,000 records regardless of the
@@ -64,7 +100,8 @@ function buildFilters(filters, evTypeOverride) {
 export async function fetchAllRecords(filters) {
   const evTypes = filters.evTypes ?? ['BEV', 'PHEV', 'FCEV']
   const allSelected = evTypes.length === 3
-  const base = `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=${RECORD_FIELDS}`
+  const resourceId = await getResourceId()
+  const base = `${BASE}/datastore_search?resource_id=${resourceId}&fields=${RECORD_FIELDS}`
 
   if (allSelected || evTypes.length === 0) {
     return fetchAllPages(base + buildFilters(filters, null))
@@ -81,8 +118,8 @@ export async function fetchAllRecords(filters) {
 
 // BEV / PHEV / FCEV counts via limit=0 requests (no record download)
 export async function fetchEVTypeCounts(filters) {
-  const nonEvFilters = buildFilters({ ...filters, evTypes: [] }, null)
-  const base = `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&limit=0`
+  const resourceId = await getResourceId()
+  const base = `${BASE}/datastore_search?resource_id=${resourceId}&limit=0`
   const types = ['BEV', 'PHEV', 'FCEV']
   const counts = await Promise.all(
     types.map(t =>
@@ -97,15 +134,17 @@ export async function fetchEVTypeCounts(filters) {
 }
 
 export async function fetchResourceMeta() {
-  return fetchJSON(`${BASE}/resource_show?id=${RESOURCE_ID}`)
+  const resourceId = await getResourceId()
+  return fetchJSON(`${BASE}/resource_show?id=${resourceId}`)
 }
 
 // Latest Month and Year = the most-recently-loaded record.
 // distinct=true silently drops values on this CKAN instance (the records array is
 // truncated and inconsistent with `total`), so read the newest record by _id instead.
 export async function fetchLatestMonthYear() {
+  const resourceId = await getResourceId()
   const result = await fetchJSON(
-    `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=Month%20and%20Year&sort=_id%20desc&limit=1`
+    `${BASE}/datastore_search?resource_id=${resourceId}&fields=Month%20and%20Year&sort=_id%20desc&limit=1`
   )
   return result.records[0]?.['Month and Year'] ?? null
 }
@@ -113,17 +152,19 @@ export async function fetchLatestMonthYear() {
 // distinct=true is unreliable here (see fetchLatestMonthYear) — it returns fewer records
 // than `total`, so dropdowns silently lose values. Page the full column and de-dupe client-side.
 export async function fetchDistinct(field) {
+  const resourceId = await getResourceId()
   const records = await fetchAllPages(
-    `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=${encodeURIComponent(field)}`
+    `${BASE}/datastore_search?resource_id=${resourceId}&fields=${encodeURIComponent(field)}`
   )
   return [...new Set(records.map(r => r[field]).filter(Boolean))].sort()
 }
 
 // Uses datastore_search filters param (JSON key) — handles commas in field names correctly
 export async function fetchDistinctModels(make) {
+  const resourceId = await getResourceId()
   const filters = encodeURIComponent(JSON.stringify({ 'Vehicle Make': make }))
   const records = await fetchAllPages(
-    `${BASE}/datastore_search?resource_id=${RESOURCE_ID}&fields=Vehicle%20Model&filters=${filters}`
+    `${BASE}/datastore_search?resource_id=${resourceId}&fields=Vehicle%20Model&filters=${filters}`
   )
   return [...new Set(records.map(r => r['Vehicle Model']).filter(Boolean))].sort()
 }
