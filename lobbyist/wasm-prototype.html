@@ -31,7 +31,11 @@
     font-size: 13px; background: var(--bg); color: var(--text); outline: none; }
   .cb-group label { display: flex; align-items: center; gap: 7px; font-size: 13px;
                     font-weight: 400; color: var(--text); cursor: pointer; margin-bottom: 5px; }
-  .date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 6px; }
+  /* Checkboxes must not inherit the sidebar's input width:100% — that
+     stretches the box full-width and shoves its label to the far edge */
+  .cb-group input[type=checkbox] { width: 14px; height: 14px; flex: none; }
+  /* Month pickers are too wide to sit side-by-side in the 280px sidebar */
+  .date-grid { display: grid; grid-template-columns: 1fr; gap: 4px; margin-bottom: 6px; }
   .btn-apply { width: 100%; padding: 9px; background: var(--red); color: #fff; border: none;
                border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
   main { padding: 20px 24px; min-width: 0; }
