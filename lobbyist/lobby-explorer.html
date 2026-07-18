@@ -1743,44 +1743,59 @@ document.getElementById("main").addEventListener("mouseleave", () => {
 });
 
 // ── Update check ──────────────────────────────────────────────────────────
+// Two distinct situations:
+//  - deployable_update: a newer DB is PUBLISHED but this server hasn't picked
+//    it up (e.g. the redeploy hook failed) — the button genuinely fixes this.
+//  - update_available only: the registry has new source data that no pipeline
+//    run has ingested yet — a redeploy can't create data, so no button; the
+//    nightly pipeline will pick it up.
 async function checkForUpdate() {
   try {
     const data = await apiFetch("/api/check-update");
-    if (!data.update_available) return;
-
     const banner = document.getElementById("updateBanner");
-    const btn    = document.getElementById("updateBtn");
-    banner.classList.add("show");
+    const bannerText = banner.querySelector("span");
+    const btn = document.getElementById("updateBtn");
 
-    btn.addEventListener("click", async () => {
-      btn.disabled = true;
-      btn.textContent = "Triggering rebuild…";
-      try {
-        await fetch("/api/trigger-update", { method: "POST" });
-      } catch {
-        btn.textContent = "Error — try again";
-        btn.disabled = false;
-        return;
-      }
-
-      // Update banner message and start polling for completion
-      const bannerText = banner.querySelector("span");
-      bannerText.innerHTML = "⏳ <strong>Database rebuild in progress</strong> — this takes about 2 minutes. The page will reload automatically when the updated data is ready.";
-      btn.style.display = "none";
-
-      const poll = setInterval(async () => {
+    if (data.deployable_update) {
+      banner.classList.add("show");
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        btn.textContent = "Deploying…";
         try {
-          const status = await apiFetch("/api/check-update");
-          if (!status.update_available) {
-            clearInterval(poll);
-            bannerText.innerHTML = "✓ <strong>Update complete!</strong> Reloading…";
-            setTimeout(() => window.location.reload(), 1500);
-          }
+          const r = await fetch("/api/trigger-update", { method: "POST" });
+          if (!r.ok) throw new Error();
         } catch {
-          // server mid-restart — keep polling
+          btn.textContent = "Error — try again";
+          btn.disabled = false;
+          return;
         }
-      }, 15000);
-    });
+        bannerText.innerHTML = "⏳ <strong>Deploying the updated database</strong> — takes about 2 minutes. The page will reload automatically.";
+        btn.style.display = "none";
+
+        let polls = 0;
+        const poll = setInterval(async () => {
+          if (++polls > 40) {   // ~10 min — give up rather than spin forever
+            clearInterval(poll);
+            bannerText.innerHTML = "This is taking longer than expected — try refreshing the page in a few minutes.";
+            return;
+          }
+          try {
+            const status = await apiFetch("/api/check-update");
+            if (!status.deployable_update) {
+              clearInterval(poll);
+              bannerText.innerHTML = "✓ <strong>Update complete!</strong> Reloading…";
+              setTimeout(() => window.location.reload(), 1500);
+            }
+          } catch {
+            // server mid-restart — keep polling
+          }
+        }, 15000);
+      });
+    } else if (data.update_available) {
+      bannerText.innerHTML = "ℹ️ <strong>New data is available at the registry</strong> — it will be included in the next automatic refresh (runs daily).";
+      btn.style.display = "none";
+      banner.classList.add("show");
+    }
   } catch {
     // silently ignore — update check is best-effort
   }

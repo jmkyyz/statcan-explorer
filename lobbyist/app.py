@@ -33,6 +33,8 @@ PORT = int(os.environ.get("PORT", 5002))
 COMMS_ZIP_URL = "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip"
 REGS_ZIP_URL  = "https://lobbycanada.gc.ca/media/zwcjycef/registrations_enregistrements_ocl_cal.zip"
 RENDER_DEPLOY_HOOK = os.environ.get("RENDER_DEPLOY_HOOK", "")
+# Version stamp the pipeline publishes beside lobby.db (see update_lobby_db.sh)
+META_ASSET_URL = "https://github.com/jmkyyz/statcan-explorer/releases/download/db-latest/lobby-meta.json"
 
 try:
     from curl_cffi import requests as cffi_requests
@@ -948,8 +950,28 @@ def check_update():
     patched_at = patched_row[0] if patched_row else ""
     patch_new_count = int(patch_count_row[0]) if patch_count_row else 0
 
+    # A redeploy can only ever install a DB that is already *published* — it
+    # cannot create new data. So the rebuild button is offered only when the
+    # published version stamp is newer than what this server is running
+    # (e.g. the pipeline published but the redeploy hook failed). New data at
+    # the registry without a newer published DB is informational only.
+    deployable_update = False
+    remote_built_at = ""
+    try:
+        mr = http_requests.get(META_ASSET_URL, timeout=10)
+        if mr.ok:
+            remote_meta = mr.json()
+            remote_built_at = remote_meta.get("built_at", "")
+            remote_stamp = max(remote_built_at, remote_meta.get("patched_at", ""))
+            local_stamp = max(built_at or "", patched_at or "")
+            deployable_update = bool(remote_stamp) and remote_stamp > local_stamp
+    except Exception:
+        pass   # no stamp published yet, or GitHub unreachable — button stays hidden
+
     payload = {
         "update_available": update_available,
+        "deployable_update": deployable_update,
+        "remote_built_at": remote_built_at,
         "comms_changed": comms_changed,
         "regs_changed": regs_changed,
         "remote_last_modified": remote_lm,
@@ -979,8 +1001,8 @@ def trigger_update():
     if not RENDER_DEPLOY_HOOK:
         return jsonify({"error": "RENDER_DEPLOY_HOOK not configured"}), 503
     chk = _cache_get("__check_update__")
-    if not (chk and chk.get("update_available")):
-        return jsonify({"error": "No update detected — nothing to deploy."}), 409
+    if not (chk and chk.get("deployable_update")):
+        return jsonify({"error": "No newer published database to deploy."}), 409
     now = time.time()
     if now - _trigger_state["last"] < TRIGGER_COOLDOWN_S:
         return jsonify({"error": "An update was already triggered recently — "
