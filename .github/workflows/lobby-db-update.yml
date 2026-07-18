@@ -1,0 +1,160 @@
+# Daily lobbyist-DB pipeline — the GitHub Actions replacement for the Mac
+# launchd job (com.jasonkirby.lobby-db-update running update_lobby_db.sh).
+#
+# Same flow: check the registry's open-data ZIP headers → full rebuild if
+# either changed → always patch recent live records → publish lobby.db +
+# lobby-meta.json + registrations.parquet to the db-latest release → hit the
+# Render deploy hook.
+#
+# Setup: add the RENDER_DEPLOY_HOOK repository secret
+#   (Settings → Secrets and variables → Actions).
+# Test:  run manually with dry_run=true — builds everything, publishes nothing.
+# The schedule only fires on the default branch; manual runs work on any branch.
+
+name: lobby-db-update
+
+on:
+  schedule:
+    - cron: "0 14 * * *"   # daily 14:00 UTC ≈ 10:00 EDT / 09:00 EST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build only — skip publish and Render redeploy"
+        type: boolean
+        default: false
+
+concurrency:
+  group: lobby-db-update
+  cancel-in-progress: false
+
+permissions:
+  contents: write   # upload assets to the db-latest release
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install --quiet curl_cffi duckdb
+
+      - name: Download current published DB
+        id: current
+        run: |
+          if gh release download db-latest --pattern lobby.db --output lobbyist/lobby.db --repo "$GITHUB_REPOSITORY"; then
+            echo "have_db=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No existing release DB — will do a full rebuild."
+            echo "have_db=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check registry for new source data
+        id: check
+        run: |
+          python3 - <<'EOF' | tee /tmp/check.out
+          import sqlite3, sys
+          from pathlib import Path
+          from curl_cffi import requests
+
+          URLS = {
+              "comms": ("https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip",
+                        "source_last_modified", "source_file_size"),
+              "regs":  ("https://lobbycanada.gc.ca/media/zwcjycef/registrations_enregistrements_ocl_cal.zip",
+                        "reg_source_last_modified", "reg_source_file_size"),
+          }
+          db = Path("lobbyist/lobby.db")
+          meta = {}
+          if db.exists():
+              con = sqlite3.connect(db)
+              try:
+                  meta = dict(con.execute("SELECT key, value FROM meta").fetchall())
+              except sqlite3.Error:
+                  pass
+              con.close()
+
+          rebuild = not db.exists()
+          for name, (url, lm_key, cl_key) in URLS.items():
+              try:
+                  r = requests.get(url, impersonate="chrome", stream=True, timeout=30)
+                  r.raise_for_status()
+                  lm, cl = r.headers.get("Last-Modified", ""), r.headers.get("Content-Length", "")
+                  r.close()
+              except Exception as e:
+                  # Registry unreachable — skip this run rather than fail loudly
+                  print(f"unreachable: {e}")
+                  print("rebuild=skip")
+                  sys.exit(0)
+              changed = (lm != meta.get(lm_key, "")) if lm else (cl != meta.get(cl_key, ""))
+              print(f"{name}: remote LM {lm!r} vs local {meta.get(lm_key, '')!r} -> changed={changed}")
+              rebuild = rebuild or changed
+          print(f"rebuild={'true' if rebuild else 'false'}")
+          EOF
+          grep -o 'rebuild=[a-z]*' /tmp/check.out | tail -1 >> "$GITHUB_OUTPUT"
+
+      - name: Full rebuild from open-data ZIPs
+        if: steps.check.outputs.rebuild == 'true'
+        working-directory: lobbyist
+        run: python3 -u build_db.py
+
+      - name: Patch recent live records
+        if: steps.check.outputs.rebuild != 'skip'
+        id: patch
+        working-directory: lobbyist
+        run: |
+          python3 -u patch_recent.py | tee /tmp/patch.out
+          NEW=$(sed -n 's/.*New: \([0-9][0-9]*\).*/\1/p' /tmp/patch.out | tail -1)
+          echo "new=${NEW:-0}" >> "$GITHUB_OUTPUT"
+
+      - name: Build registrations parquet
+        if: steps.check.outputs.rebuild != 'skip' && (steps.check.outputs.rebuild == 'true' || steps.patch.outputs.new != '0')
+        working-directory: lobbyist
+        run: python3 -u build_parquet.py
+
+      - name: Write version stamp
+        if: steps.check.outputs.rebuild != 'skip' && (steps.check.outputs.rebuild == 'true' || steps.patch.outputs.new != '0')
+        run: |
+          python3 -c "
+          import json, sqlite3
+          con = sqlite3.connect('lobbyist/lobby.db')
+          m = dict(con.execute(\"SELECT key, value FROM meta WHERE key IN ('built_at','patched_at')\").fetchall())
+          print(json.dumps({'built_at': m.get('built_at',''), 'patched_at': m.get('patched_at','')}))
+          " > lobby-meta.json
+          cat lobby-meta.json
+          ls -la lobbyist/lobby.db lobbyist/parquet/registrations.parquet
+
+      - name: Publish to db-latest release
+        if: >
+          steps.check.outputs.rebuild != 'skip'
+          && (steps.check.outputs.rebuild == 'true' || steps.patch.outputs.new != '0')
+          && inputs.dry_run != true
+        run: |
+          gh release upload db-latest lobbyist/lobby.db lobby-meta.json \
+            lobbyist/parquet/registrations.parquet --clobber --repo "$GITHUB_REPOSITORY"
+          gh release edit db-latest \
+            --notes "Built $(date -u '+%Y-%m-%d %H:%M UTC') by GitHub Actions from lobbycanada.gc.ca open data" \
+            --repo "$GITHUB_REPOSITORY"
+
+      - name: Trigger Render redeploy
+        if: >
+          steps.check.outputs.rebuild != 'skip'
+          && (steps.check.outputs.rebuild == 'true' || steps.patch.outputs.new != '0')
+          && inputs.dry_run != true
+        run: |
+          if [ -z "${{ secrets.RENDER_DEPLOY_HOOK }}" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK secret not set — new DB published but Render was NOT redeployed (live site is stale)."
+            exit 1
+          fi
+          curl -fsS -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}" >/dev/null
+          echo "Render is rebuilding — the site picks up the new DB in ~2 minutes."
+
+      - name: Dry-run summary
+        if: inputs.dry_run == true
+        run: echo "Dry run — nothing was published or deployed."
