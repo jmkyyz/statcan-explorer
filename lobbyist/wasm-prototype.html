@@ -18,10 +18,13 @@
            display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   header h1 { font-size: 18px; }
   header p { font-size: 12px; opacity: .85; }
+  /* Equal flex sides keep the view toggle truly centred in the header */
+  .hdr-left, .hdr-right { flex: 1 1 0; min-width: 0; }
+  .hdr-right { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
   .view-toggle { display: flex; gap: 4px; background: rgba(255,255,255,.15);
-                 border-radius: 8px; padding: 3px; margin-left: auto; }
-  .view-toggle button { border: none; background: none; color: #fff; font-size: 12px;
-                        font-weight: 600; padding: 5px 12px; border-radius: 6px;
+                 border-radius: 10px; padding: 4px; }
+  .view-toggle button { border: none; background: none; color: #fff; font-size: 15px;
+                        font-weight: 600; padding: 9px 22px; border-radius: 7px;
                         cursor: pointer; opacity: .8; white-space: nowrap; }
   .view-toggle button.active { background: #fff; color: var(--red); opacity: 1; }
   .proto-pill { font-size: 11px; background: rgba(255,255,255,.2);
@@ -125,13 +128,31 @@
   .ask-answer.error { color: var(--red); }
   .ask-hint { font-size: 11px; color: var(--muted); margin-top: 8px; }
 
+  #subj-tooltip {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    background: #1e293b;
+    color: #f1f5f9;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+    line-height: 1.5;
+    max-width: 320px;
+    white-space: normal;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    pointer-events: none;
+  }
+
   @media (max-width: 900px) {
     header { padding: 10px 14px; gap: 10px; }
     header h1 { font-size: 15px; }
     header p { display: none; }
     .proto-pill { display: none; }
-    .view-toggle { margin-left: 0; }
-    #filterToggle { display: inline-block; margin-left: auto; }
+    .hdr-left, .hdr-right { flex: 0 1 auto; }
+    .view-toggle button { font-size: 12px; padding: 6px 12px; }
+    #filterToggle { display: inline-block; }
+    .hdr-right { margin-left: auto; }
     .layout { grid-template-columns: 1fr; }
     aside { display: none; border-right: none; border-bottom: 1px solid var(--border); }
     aside.open { display: block; }
@@ -145,7 +166,7 @@
 <body data-view="comms">
 
 <header>
-  <div>
+  <div class="hdr-left">
     <h1>Lobbyist Explorer — Static Prototype</h1>
     <p>DuckDB-WASM querying Parquet files in your browser · no backend server</p>
   </div>
@@ -153,8 +174,10 @@
     <button id="viewCommsBtn" class="active">Communications</button>
     <button id="viewRegsBtn">Registrations</button>
   </div>
-  <button id="filterToggle">☰ Filters</button>
-  <span class="proto-pill" id="protoPill">booting…</span>
+  <div class="hdr-right">
+    <button id="filterToggle">☰ Filters</button>
+    <span class="proto-pill" id="protoPill">booting…</span>
+  </div>
 </header>
 
 <div id="bootStatus">Downloading data…</div>
@@ -398,6 +421,8 @@
 
   </main>
 </div>
+
+<div id="subj-tooltip"></div>
 
 <script type="module">
 import * as duckdb from "./static/vendor/duckdb-browser.mjs?v=1.33.1-dev57.0";
@@ -685,7 +710,9 @@ function updateDrillBar(view) {
 }
 
 function drillInto(view, setter, label) {
-  drillStacks[view].push(snapshotFilters(label));
+  const snap = snapshotFilters(label);
+  snap.scrollY = window.scrollY;   // so Back returns to where the user clicked
+  drillStacks[view].push(snap);
   setter();
   updateDrillBar(view);
   if (view === "regs") { loadRegsAll(); $("rRecords").scrollIntoView({ behavior: "smooth" }); }
@@ -696,13 +723,58 @@ $("cDrillBack").addEventListener("click", () => {
   const s = drillStacks.comms.pop();
   if (s) restoreFilters(s);
   updateDrillBar("comms");
+  // Jump before the reload — a smooth scroll gets cancelled by the re-render.
+  window.scrollTo({ top: s?.scrollY ?? 0 });
   loadCommsAll();
 });
 $("rDrillBack").addEventListener("click", () => {
   const s = drillStacks.regs.pop();
   if (s) restoreFilters(s);
   updateDrillBar("regs");
+  window.scrollTo({ top: s?.scrollY ?? 0 });
   loadRegsAll();
+});
+
+// ── Subject tooltip (fixed-position, flips above when near bottom) ────────
+const subjTooltip = document.getElementById("subj-tooltip");
+const mainEl = document.querySelector("main");
+
+mainEl.addEventListener("mouseover", e => {
+  const cell = e.target.closest(".subj-cell");
+  if (!cell || (!cell.dataset.detail && !cell.querySelector(".tag"))) {
+    subjTooltip.style.display = "none";
+    return;
+  }
+
+  if (cell.dataset.detail) {
+    subjTooltip.innerHTML = [...new Set(cell.dataset.detail.split(" || "))].map(d => `• ${esc(d)}`).join("<br>");
+  } else {
+    // Registry detail text is only in the weekly bulk file (recently added
+    // records lack it until the next rebuild) and only exists for reports
+    // filed after Oct 2024.
+    const date = cell.closest("tr")?.cells[1]?.textContent || "";
+    subjTooltip.innerHTML = date >= "2024-10"
+      ? `<em style="opacity:.8">Subject-matter details for this recently added record will appear after the next weekly data refresh.</em>`
+      : `<em style="opacity:.8">No subject-matter details — only reports filed after October 2024 include them.</em>`;
+  }
+  subjTooltip.style.display = "block";
+
+  const rect = cell.getBoundingClientRect();
+  const tipH = subjTooltip.offsetHeight;
+  const tipW = subjTooltip.offsetWidth;
+
+  let top  = rect.bottom + 4;
+  let left = rect.left;
+
+  if (top + tipH > window.innerHeight - 8) top = rect.top - tipH - 4;
+  if (left + tipW > window.innerWidth  - 8) left = window.innerWidth - tipW - 8;
+
+  subjTooltip.style.top  = top  + "px";
+  subjTooltip.style.left = left + "px";
+});
+
+mainEl.addEventListener("mouseleave", () => {
+  subjTooltip.style.display = "none";
 });
 
 // ══════════ COMMUNICATIONS ══════════
@@ -795,7 +867,7 @@ async function loadCommsTable() {
         <td>${esc(r.lobbyist)}</td>
         <td>${tagList(r.dpoh_names, "") || "—"}</td>
         <td>${tagList(r.institutions, "red") || "—"}</td>
-        <td ${details ? `title="${esc(details)}"` : ""}>${tagList(r.subjects, "green") || "—"}</td>
+        <td class="subj-cell" data-detail="${esc(details)}">${tagList(r.subjects, "green") || "—"}</td>
         <td style="white-space:nowrap;color:var(--muted)">${esc(TYPE_LABELS[r.reg_type] || r.reg_type)}</td>
       </tr>`;
       }).join("");
@@ -935,7 +1007,7 @@ async function loadRegsTable() {
           <td style="white-space:nowrap">${commsCell}</td>
           <td>${firmLob}</td>
           <td>${tagList(r.institutions, "red") || "—"}</td>
-          <td ${details ? `title="${esc(details)}"` : ""}>${tagList(r.subjects, "green") || "—"}</td>
+          <td class="subj-cell" data-detail="${esc(details)}">${tagList(r.subjects, "green") || "—"}</td>
           <td style="white-space:nowrap;color:var(--muted)">${esc(TYPE_LABELS[r.reg_type] || r.reg_type)}</td>
         </tr>`;
       }).join("");
