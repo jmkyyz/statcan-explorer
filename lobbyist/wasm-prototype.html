@@ -34,8 +34,12 @@
   /* Checkboxes must not inherit the sidebar's input width:100% — that
      stretches the box full-width and shoves its label to the far edge */
   .cb-group input[type=checkbox] { width: 14px; height: 14px; flex: none; }
-  /* Month pickers are too wide to sit side-by-side in the 280px sidebar */
-  .date-grid { display: grid; grid-template-columns: 1fr; gap: 4px; margin-bottom: 6px; }
+  /* Same From/To month+year dropdown rows as the live app */
+  .date-range { display: flex; flex-direction: column; gap: 6px; }
+  .date-row   { display: grid; grid-template-columns: auto 1fr; gap: 6px; align-items: center; }
+  .date-row span { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .date-row .my { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .date-note { font-weight: 400; text-transform: none; letter-spacing: 0; }
   .btn-apply { width: 100%; padding: 9px; background: var(--red); color: #fff; border: none;
                border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
   main { padding: 20px 24px; min-width: 0; }
@@ -90,8 +94,17 @@
   <aside>
     <h2>Filters</h2>
     <div class="filter-group">
-      <label>Date range (from / to)</label>
-      <div class="date-grid"><input type="month" id="dfInput" value="2014-01"><input type="month" id="dtInput"></div>
+      <label>Date range <span class="date-note">· database starts Jan 2014</span></label>
+      <div class="date-range">
+        <div class="date-row">
+          <span>From</span>
+          <div class="my"><select id="monthFrom"></select><select id="yearFrom"></select></div>
+        </div>
+        <div class="date-row">
+          <span>To</span>
+          <div class="my"><select id="monthTo"></select><select id="yearTo"></select></div>
+        </div>
+      </div>
     </div>
     <div class="filter-group cb-group">
       <label>Registration type</label>
@@ -209,10 +222,11 @@ async function q(sql) {
 
 function whereClause() {
   const w = [];
-  const df = document.getElementById("dfInput").value || "2014-01";
-  const dt = document.getElementById("dtInput").value || "2099-12";
-  const [y, m] = dt.split("-").map(Number);
-  const end = `${y + Math.floor(m / 12)}-${String(m % 12 + 1).padStart(2, "0")}-01`;
+  const pad = v => String(v).padStart(2, "0");
+  const df = `${document.getElementById("yearFrom").value}-${pad(document.getElementById("monthFrom").value)}`;
+  const y = Number(document.getElementById("yearTo").value);
+  const m = Number(document.getElementById("monthTo").value);
+  const end = `${y + Math.floor(m / 12)}-${pad(m % 12 + 1)}-01`;
   w.push(`posted_date >= '${qs(df)}-01'`, `posted_date < '${qs(end)}'`);
 
   const types = [...document.querySelectorAll(".rt-cb:checked")].map(cb => cb.value);
@@ -375,10 +389,22 @@ async function loadAll() {
 }
 
 // ── Filter dropdown options (derived from the data itself) ────────────────
-async function populateFilters() {
+function initDateDropdowns() {
   const now = new Date();
-  document.getElementById("dtInput").value =
-    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const mFrom = document.getElementById("monthFrom");
+  const mTo   = document.getElementById("monthTo");
+  MONTHS.forEach((name, i) => { mFrom.add(new Option(name, i + 1)); mTo.add(new Option(name, i + 1)); });
+  const yFrom = document.getElementById("yearFrom");
+  const yTo   = document.getElementById("yearTo");
+  for (let y = 2014; y <= now.getFullYear(); y++) { yFrom.add(new Option(y, y)); yTo.add(new Option(y, y)); }
+  // Default to recent data (the sidebar notes the DB goes back to 2014)
+  mFrom.value = 1;    yFrom.value = 2024;
+  mTo.value = now.getMonth() + 1;  yTo.value = now.getFullYear();
+}
+
+async function populateFilters() {
+  initDateDropdowns();
 
   const insts = await q(`
     SELECT s, COUNT(DISTINCT reg_id) c FROM (
