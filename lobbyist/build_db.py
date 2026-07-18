@@ -781,38 +781,41 @@ def build():
     con.commit()
 
     # ── 6. Indexes ────────────────────────────────────────────────────────────
+    # Only indexes a real query path uses. Dropped (unused by app.py /
+    # patch_recent.py / send_lobby_weekly.py): comm_year, comm_month,
+    # reg_num, reg_type, is_original, firm_name (leading-% LIKE can't use it),
+    # dpoh names (same), dpoh(institution) (covered by idx_d_inst_comlog),
+    # reg_subjects(reg_id) (covered by the UNIQUE(reg_id, subject_code)
+    # autoindex), org_first_seen(first_date).
     log("Creating indexes ...")
     con.executescript("""
-        CREATE INDEX idx_c_year    ON communications(comm_year);
-        CREATE INDEX idx_c_month   ON communications(comm_month);
         CREATE INDEX idx_c_client  ON communications(client_name COLLATE NOCASE);
         CREATE INDEX idx_c_cnum    ON communications(client_num);
-        CREATE INDEX idx_c_regtype ON communications(reg_type);
-        CREATE INDEX idx_c_regnum  ON communications(reg_num);
         CREATE INDEX idx_c_date    ON communications(comm_date DESC);
+        CREATE INDEX idx_c_norm    ON communications(norm_name);
         CREATE INDEX idx_d_comlog  ON dpoh(comlog_id);
-        CREATE INDEX idx_d_inst    ON dpoh(institution);
         CREATE INDEX idx_d_inst_comlog ON dpoh(institution, comlog_id);
-        CREATE INDEX idx_d_name    ON dpoh(dpoh_last, dpoh_first);
         CREATE INDEX idx_s_comlog  ON subjects(comlog_id);
-        CREATE INDEX idx_s_code    ON subjects(subject_code);
+        CREATE INDEX idx_s_code    ON subjects(subject_code, comlog_id);
         CREATE INDEX idx_sd_comlog ON subject_details(comlog_id);
         CREATE INDEX idx_r_posted  ON registrations(posted_date DESC);
-        CREATE INDEX idx_r_orig    ON registrations(is_original);
-        CREATE INDEX idx_r_regtype ON registrations(reg_type);
         CREATE INDEX idx_r_client  ON registrations(client_name COLLATE NOCASE);
-        CREATE INDEX idx_r_firm    ON registrations(firm_name COLLATE NOCASE);
-        CREATE INDEX idx_rs_regid  ON reg_subjects(reg_id);
-        CREATE INDEX idx_rs_code   ON reg_subjects(subject_code);
-        CREATE INDEX idx_ri_regid  ON reg_institutions(reg_id);
-        CREATE INDEX idx_ri_instid ON reg_institutions(inst_id);
         CREATE INDEX idx_r_norm    ON registrations(norm_name);
-        CREATE INDEX idx_ofs_first ON org_first_seen(first_date);
-        CREATE INDEX idx_c_norm    ON communications(norm_name);
+        CREATE INDEX idx_rs_code   ON reg_subjects(subject_code, reg_id);
+        CREATE INDEX idx_ri_regid  ON reg_institutions(reg_id);
+        CREATE INDEX idx_ri_instid ON reg_institutions(inst_id, reg_id);
         CREATE INDEX idx_rsd_regid ON reg_subject_details(reg_id);
     """)
     compute_default_stats(con)
     compute_default_reg_stats(con)
+
+    # Planner statistics, then reclaim the space freed by the smaller index set.
+    # VACUUM needs autocommit and roughly 2x the DB size free on disk.
+    log("ANALYZE + VACUUM ...")
+    con.execute("ANALYZE")
+    con.commit()
+    con.isolation_level = None
+    con.execute("VACUUM")
     con.close()
 
     size_mb = DB_PATH.stat().st_size / 1e6
