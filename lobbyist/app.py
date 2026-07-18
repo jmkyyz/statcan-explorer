@@ -1426,8 +1426,35 @@ def _prewarm():
         print(f"Pre-warm failed: {e}", flush=True)
 
 
+def _fetch_missing_parquet():
+    """The Render buildCommand is supposed to download these next to lobby.db
+    (render.yaml), but the service's dashboard build command may not include
+    them — fetch any missing file at startup so /beta works regardless.
+    Download to .tmp + atomic rename so a request never sees a partial file."""
+    parquet_dir = Path(__file__).parent / "parquet"
+    release = "https://github.com/jmkyyz/statcan-explorer/releases/download/db-latest"
+    parquet_dir.mkdir(exist_ok=True)
+    for name in ("registrations.parquet", "communications.parquet", "dpoh.parquet"):
+        dest = parquet_dir / name
+        if dest.exists():
+            continue
+        tmp = parquet_dir / (name + f".tmp{os.getpid()}")
+        try:
+            with http_requests.get(f"{release}/{name}", stream=True, timeout=300) as r:
+                r.raise_for_status()
+                with open(tmp, "wb") as f:
+                    for chunk in r.iter_content(1 << 20):
+                        f.write(chunk)
+            tmp.rename(dest)
+            print(f"Fetched {name}", flush=True)
+        except Exception as e:
+            tmp.unlink(missing_ok=True)
+            print(f"Parquet fetch failed for {name}: {e}", flush=True)
+
+
 _ensure_indexes()
 threading.Thread(target=_prewarm, daemon=True).start()
+threading.Thread(target=_fetch_missing_parquet, daemon=True).start()
 
 
 # ── Run ───────────────────────────────────────────────────────────────────────
