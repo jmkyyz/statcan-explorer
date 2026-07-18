@@ -36,9 +36,12 @@ import json
 import os
 import re
 import smtplib
+import socket
 import sqlite3
 import ssl
 import sys
+import time
+import traceback
 import urllib.error
 import urllib.request
 from email.mime.multipart import MIMEMultipart
@@ -268,20 +271,51 @@ def get_api_key():
 
 # ── Database ──────────────────────────────────────────────────────────────────
 
-def open_db():
-    if not DB_PATH.exists():
-        print(f"ERROR: lobby.db not found at {DB_PATH}")
-        sys.exit(1)
-    con = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+def _try_open(uri):
+    """Open read-only and force a real read so a lazy CANTOPEN surfaces here."""
+    con = sqlite3.connect(uri, uri=True)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA query_only = ON")
-    # Confirm the registrations tables exist (they can lag a deploy).
-    have = {r[0] for r in con.execute(
+    tables = {r[0] for r in con.execute(
         "SELECT name FROM sqlite_master WHERE type='table'")}
-    if not {"registrations", "org_first_seen", "reg_subjects"} <= have:
-        print("ERROR: registrations tables missing from lobby.db — cannot run.")
-        sys.exit(1)
-    return con
+    return con, tables
+
+
+def open_db(retries=4, delay=5):
+    """Open lobby.db read-only, resilient to transient states around the daily
+    rebuild. The Monday 09:00 run once died with 'unable to open database file'
+    — a momentary condition (mid-refresh / WAL shared-memory race) that a plain
+    single-attempt open turns into a whole missed week. So: wait for the file,
+    retry the open with backoff, and if a WAL-mode DB still won't open read-only
+    (no writer to create the -shm), fall back to an immutable snapshot read."""
+    for attempt in range(retries):
+        if DB_PATH.exists():
+            break
+        if attempt == retries - 1:
+            raise RuntimeError(f"lobby.db not found at {DB_PATH}")
+        print(f"  lobby.db not present yet — retrying in {delay}s "
+              f"({attempt + 1}/{retries})")
+        time.sleep(delay)
+
+    last_err = None
+    for attempt in range(retries):
+        for uri in (f"file:{DB_PATH}?mode=ro", f"file:{DB_PATH}?immutable=1"):
+            try:
+                con, tables = _try_open(uri)
+            except sqlite3.OperationalError as e:
+                last_err = e
+                continue
+            if not {"registrations", "org_first_seen", "reg_subjects"} <= tables:
+                raise RuntimeError("registrations tables missing from lobby.db")
+            if attempt or uri.endswith("immutable=1"):
+                print(f"  opened lobby.db on retry (attempt {attempt + 1}, {uri.split('?')[1]})")
+            return con
+        if attempt < retries - 1:
+            print(f"  DB open failed ({last_err}) — retrying in {delay}s "
+                  f"({attempt + 1}/{retries})")
+            time.sleep(delay)
+
+    raise RuntimeError(f"could not open {DB_PATH} after {retries} attempts: {last_err}")
 
 
 def _keyword_clause(keywords, columns):
@@ -870,5 +904,31 @@ def main():
     print("State updated.")
 
 
+def notify_failure(err):
+    """Best-effort: email a short 'the weekly alert crashed' notice so a failed
+    run is visible, not just buried in a log file. Never raises."""
+    try:
+        password = get_app_password()
+        tb = traceback.format_exc()
+        body = ("The weekly lobbyist alert failed to run and sent no briefing.\n\n"
+                f"Host: {socket.gethostname()}\n"
+                f"When: {datetime.datetime.now().isoformat(timespec='seconds')}\n"
+                f"DB:   {DB_PATH}\n\n"
+                f"Error: {err}\n\n{tb}")
+        send_email(f"⚠️ Lobbyist weekly alert FAILED — {datetime.date.today():%B %-d, %Y}",
+                   body, password)
+        print("Sent failure notification email.")
+    except Exception as e:   # noqa: BLE001 — notification must never mask the real error
+        print(f"(could not send failure notification: {e})")
+
+
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except SystemExit:
+        raise   # explicit sys.exit() paths already printed their reason
+    except BaseException as e:   # noqa: BLE001
+        print(f"FATAL: {e}")
+        if "--dry-run" not in sys.argv:
+            notify_failure(e)
+        sys.exit(1)
