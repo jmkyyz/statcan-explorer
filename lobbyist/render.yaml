@@ -6,7 +6,12 @@ services:
     buildCommand: >-
       pip install -r requirements.txt &&
       curl -L --fail --retry 5 --retry-all-errors --retry-delay 5 -o lobby.db
-      "https://github.com/jmkyyz/statcan-explorer/releases/download/db-latest/lobby.db"
+      "https://github.com/jmkyyz/statcan-explorer/releases/download/db-latest/lobby.db" &&
+      mkdir -p parquet &&
+      for f in registrations communications dpoh; do
+      curl -L --fail --retry 5 --retry-all-errors --retry-delay 5 -o "parquet/$f.parquet"
+      "https://github.com/jmkyyz/statcan-explorer/releases/download/db-latest/$f.parquet"
+      || exit 1; done
     startCommand: gunicorn --workers 2 --threads 4 --bind 0.0.0.0:$PORT --timeout 120 app:app
     envVars:
       - key: PORT

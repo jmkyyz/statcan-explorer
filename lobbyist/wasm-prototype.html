@@ -4,8 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Lobbyist Explorer — Static Prototype (DuckDB-WASM)</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="static/vendor/chart.umd.min.js?v=4.4.1"></script>
+<script src="static/vendor/xlsx.full.min.js?v=0.18.5"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -400,7 +400,7 @@
 </div>
 
 <script type="module">
-import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/+esm";
+import * as duckdb from "./static/vendor/duckdb-browser.mjs?v=1.33.1-dev57.0";
 
 const PAGE_SIZE = 50;
 const ASK_API = "";   // same-origin /api/ask; unreachable in pure-static hosting
@@ -429,10 +429,15 @@ const last = { comms: {}, regs: {} };   // latest query results, for Excel expor
 const boot = $("bootStatus");
 const t0 = performance.now();
 
-const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
-const workerUrl = URL.createObjectURL(
-  new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
-const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(workerUrl));
+// Self-hosted bundle (eh only — every current browser supports wasm exception
+// handling). URLs must be absolute: the worker resolves mainModule against its
+// own location, not the page's.
+const abs = p => new URL(p, document.baseURI).href;
+const bundle = await duckdb.selectBundle({
+  eh: { mainModule: abs("static/vendor/duckdb-eh.wasm?v=1.33.1-dev57.0"),
+        mainWorker: abs("static/vendor/duckdb-browser-eh.worker.js?v=1.33.1-dev57.0") },
+});
+const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(bundle.mainWorker));
 await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
 conn = await db.connect();
 
@@ -444,9 +449,11 @@ async function registerParquet(file) {
   await db.registerFileBuffer(file, buf);
 }
 
+let readySecs;   // frozen at first render so later lazy loads don't inflate it
 function pill() {
+  readySecs ??= ((performance.now() - t0) / 1000).toFixed(1);
   $("protoPill").textContent =
-    `${loadedMB.toFixed(1)} MB parquet · engine ready in ${((performance.now()-t0)/1000).toFixed(1)}s`;
+    `${loadedMB.toFixed(1)} MB parquet · engine ready in ${readySecs}s`;
 }
 
 // Per-view lazy loading; in-flight promises so concurrent callers share one download.

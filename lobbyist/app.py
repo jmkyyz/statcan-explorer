@@ -6,6 +6,7 @@ Flask server: serves the HTML frontend and query API backed by lobby.db.
 
 import datetime
 import json
+import mimetypes
 import os
 import sqlite3
 import threading
@@ -293,6 +294,48 @@ def index():
     resp = send_from_directory(Path(__file__).parent, "lobby-explorer.html")
     # Always revalidate (cheap 304 via the ETag Flask sets) so a redeploy's
     # frontend changes reach browsers immediately.
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+# ── /beta: static DuckDB-WASM frontend (candidate replacement for /) ─────────
+
+_VENDOR_TYPES = {".wasm": "application/wasm", ".mjs": "text/javascript",
+                 ".js": "text/javascript"}
+
+
+@app.route("/beta/")
+def beta_index():
+    resp = send_from_directory(Path(__file__).parent, "wasm-prototype.html")
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
+@app.route("/beta/static/<path:filename>")
+def beta_static(filename):
+    """Vendored, version-pinned libraries (the HTML references them with ?v=
+    cache-busters). Serve the pre-gzipped sibling when the client accepts it —
+    gzipping the 35MB duckdb wasm per-request would pin the CPU."""
+    static_dir = Path(__file__).parent / "static"
+    ctype = (_VENDOR_TYPES.get(Path(filename).suffix)
+             or mimetypes.guess_type(filename)[0]
+             or "application/octet-stream")
+    gz_ok = "gzip" in request.headers.get("Accept-Encoding", "").lower()
+    if gz_ok and (static_dir / (filename + ".gz")).is_file():
+        resp = send_from_directory(static_dir, filename + ".gz", mimetype=ctype)
+        resp.headers["Content-Encoding"] = "gzip"
+    else:
+        resp = send_from_directory(static_dir, filename, mimetype=ctype)
+    resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    resp.headers["Vary"] = "Accept-Encoding"
+    return resp
+
+
+@app.route("/beta/parquet/<path:filename>")
+def beta_parquet(filename):
+    """Data files — replaced by the daily pipeline, so always revalidate
+    (cheap 304 + browser cache while unchanged)."""
+    resp = send_from_directory(Path(__file__).parent / "parquet", filename)
     resp.headers["Cache-Control"] = "no-cache"
     return resp
 
