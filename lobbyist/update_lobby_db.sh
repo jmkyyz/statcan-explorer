@@ -139,6 +139,30 @@ if ! gh release view db-latest >/dev/null 2>&1; then
     --notes "Lobbyist DB published by update_lobby_db.sh"
 fi
 gh release upload db-latest lobbyist/lobby.db --clobber
+
+# Version stamp published beside the DB: the app compares it to its own meta
+# to tell "a newer DB is published but this server hasn't picked it up" (the
+# only case its Rebuild button can fix) from "the registry has new source
+# data" (needs a pipeline run first — informational only).
+python3 -c "
+import json, sqlite3
+con = sqlite3.connect('$DB')
+m = dict(con.execute(\"SELECT key, value FROM meta WHERE key IN ('built_at','patched_at')\").fetchall())
+print(json.dumps({'built_at': m.get('built_at',''), 'patched_at': m.get('patched_at','')}))
+" > /tmp/lobby-meta.json
+gh release upload db-latest /tmp/lobby-meta.json --clobber
+
+# Registrations parquet for the static (DuckDB-WASM) frontend — optional while
+# that architecture is being proven; skipped quietly if duckdb isn't installed.
+if python3 -c "import duckdb" 2>/dev/null; then
+    echo "==> Building registrations.parquet ..."
+    if python3 -u lobbyist/build_parquet.py; then
+        gh release upload db-latest lobbyist/parquet/registrations.parquet --clobber
+    else
+        echo "    (parquet build failed — continuing; the SQLite app is unaffected)"
+    fi
+fi
+
 gh release edit db-latest \
   --notes "Built $(date -u '+%Y-%m-%d %H:%M UTC') from lobbycanada.gc.ca open data" >/dev/null 2>&1 || true
 

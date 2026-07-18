@@ -195,14 +195,17 @@
   /* ── Main content ────────────────────────────────────────── */
   main {
     padding: 20px 24px;
-    /* No overflow-y here: it would become the sticky containing block and
+    /* min-width 0: without it this grid item's auto minimum is the records
+       table's full width, forcing horizontal overflow on narrow screens.
+       No overflow-y here: it would become the sticky containing block and
        stop #drillBar from pinning to the viewport (the window is the scroller). */
+    min-width: 0;
   }
 
   /* Stat cards */
   .stat-cards {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 12px;
     margin-bottom: 20px;
   }
@@ -232,7 +235,7 @@
   }
   .chart-wrap { position: relative; }
 
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
 
   /* Table */
   .table-wrap { overflow-x: auto; }
@@ -475,6 +478,113 @@
     white-space: pre-wrap;
   }
   .ask-hint { font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+  /* ── Top progress bar (non-blocking loading indicator) ─────────── */
+  #topProgress {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    z-index: 300;
+    display: none;
+    overflow: hidden;
+    background: rgba(192,57,43,.15);
+  }
+  #topProgress.show { display: block; }
+  #topProgress::after {
+    content: "";
+    position: absolute;
+    top: 0; bottom: 0;
+    width: 40%;
+    background: var(--red);
+    animation: indeterminate 1.1s ease-in-out infinite;
+  }
+  @keyframes indeterminate {
+    0%   { left: -40%; }
+    100% { left: 100%; }
+  }
+
+  /* A section being refreshed dims but stays visible — no full-screen block */
+  .busy { opacity: .45; pointer-events: none; transition: opacity .15s; }
+
+  /* ── Toasts (inline error notices replacing alert()) ───────────── */
+  #toasts {
+    position: fixed;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 400;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: center;
+    width: max-content;
+    max-width: calc(100vw - 32px);
+  }
+  .toast {
+    background: #1e293b;
+    color: #f8fafc;
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    box-shadow: 0 4px 16px rgba(0,0,0,.3);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    max-width: 100%;
+  }
+  .toast.error { background: #7f1d1d; }
+  .toast button {
+    background: rgba(255,255,255,.15);
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .toast button:hover { background: rgba(255,255,255,.3); }
+
+  /* ── Mobile filter-drawer toggle ───────────────────────────────── */
+  #filterToggle {
+    display: none;
+    border: 1px solid rgba(255,255,255,.5);
+    background: none;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+
+  /* ── Responsive layout ─────────────────────────────────────────── */
+  @media (max-width: 900px) {
+    header { flex-wrap: wrap; padding: 10px 14px; gap: 10px; }
+    header h1 { font-size: 15px; }
+    header p  { display: none; }
+    .db-status { display: none; }
+    .view-toggle { margin-left: 0 !important; }
+    #filterToggle { display: inline-block; margin-left: auto; }
+
+    .layout { grid-template-columns: 1fr; min-height: 0; }
+    aside {
+      display: none;
+      position: static;
+      height: auto;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+    aside.open { display: block; }
+
+    main { padding: 14px 12px; }
+    .stat-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .stat-card .value { font-size: 22px; }
+    .two-col { grid-template-columns: 1fr; }
+    td { max-width: 150px; }
+  }
 </style>
 </head>
 <body data-view="comms">
@@ -482,6 +592,9 @@
 <div class="loading-overlay" id="loadingOverlay">
   <div class="spinner"></div> Loading…
 </div>
+
+<div id="topProgress" role="status" aria-live="polite" aria-label="Loading"></div>
+<div id="toasts"></div>
 
 <div id="subj-tooltip"></div>
 
@@ -501,9 +614,10 @@
     <p id="headerSub">Office of the Commissioner of Lobbying — communication reports 2014–present</p>
   </div>
   <div class="view-toggle" role="tablist" style="margin-left:auto">
-    <button id="viewCommsBtn" class="active" role="tab">Communications</button>
-    <button id="viewRegsBtn" role="tab">Registrations</button>
+    <button id="viewCommsBtn" class="active" role="tab" aria-selected="true">Communications</button>
+    <button id="viewRegsBtn" role="tab" aria-selected="false">Registrations</button>
   </div>
+  <button id="filterToggle" aria-controls="sidebar" aria-expanded="false">☰ Filters</button>
   <div class="db-status" id="dbStatus">Connecting…</div>
 </header>
 
@@ -515,7 +629,7 @@
 <div class="layout">
 
   <!-- ── Sidebar ─────────────────────────────────────────────── -->
-  <aside>
+  <aside id="sidebar">
     <h2>Filters</h2>
 
     <div class="filter-group">
@@ -919,12 +1033,62 @@ const fmt = n => n?.toLocaleString("en-CA") ?? "—";
 const show = id => document.getElementById(id)?.classList.add("show");
 const hide = id => document.getElementById(id)?.classList.remove("show");
 
+// Escape API-derived strings before innerHTML interpolation (org names are
+// third-party input from the registry).
+const esc = s => String(s ?? "")
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+// Full-screen overlay is used ONLY for the very first load (empty page);
+// everything after uses the top progress bar + per-section dimming.
 function loading(on) {
   document.getElementById("loadingOverlay").classList.toggle("show", on);
 }
 
-async function apiFetch(path) {
-  const r = await fetch(API + path);
+let _inflight = 0;
+function progress(on) {
+  _inflight = Math.max(0, _inflight + (on ? 1 : -1));
+  document.getElementById("topProgress").classList.toggle("show", _inflight > 0);
+}
+
+// Dim a section while it refreshes (content stays visible — no layout jump)
+function setBusy(id, on) {
+  document.getElementById(id)?.classList.toggle("busy", on);
+}
+
+// One AbortController per load kind: a new request cancels its stale
+// predecessor so a slow old response can never overwrite a newer one.
+const _aborters = {};
+function newSignal(kind) {
+  _aborters[kind]?.abort();
+  _aborters[kind] = new AbortController();
+  return _aborters[kind].signal;
+}
+
+function showToast(msg, retryFn = null, ms = 6000) {
+  const box = document.getElementById("toasts");
+  const t = document.createElement("div");
+  t.className = "toast error";
+  const span = document.createElement("span");
+  span.textContent = msg;
+  t.appendChild(span);
+  if (retryFn) {
+    const b = document.createElement("button");
+    b.textContent = "Retry";
+    b.addEventListener("click", () => { t.remove(); retryFn(); });
+    t.appendChild(b);
+  }
+  const x = document.createElement("button");
+  x.textContent = "✕";
+  x.setAttribute("aria-label", "Dismiss");
+  x.addEventListener("click", () => t.remove());
+  t.appendChild(x);
+  box.appendChild(t);
+  setTimeout(() => t.remove(), ms);
+}
+
+async function apiFetch(path, signal = undefined) {
+  const r = await fetch(API + path, { signal });
   if (!r.ok) throw new Error(`API error ${r.status}`);
   return r.json();
 }
@@ -968,6 +1132,103 @@ function filtersToQS(extra = {}) {
     .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
     .join("&");
 }
+
+// ── URL state (shareable/bookmarkable filters) ────────────────────────────
+// The address bar always reflects the current view + filters + page, via
+// replaceState (the drill "← Back" button remains the in-app navigation).
+function syncURL() {
+  const p = new URLSearchParams();
+  if (currentView === "regs") p.set("v", "regs");
+
+  const mFrom = document.getElementById("monthFrom").value.padStart(2, "0");
+  const mTo   = document.getElementById("monthTo").value.padStart(2, "0");
+  const df = `${document.getElementById("yearFrom").value}-${mFrom}`;
+  const dt = `${document.getElementById("yearTo").value}-${mTo}`;
+  const now = new Date();
+  const defTo = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  if (df !== "2014-01") p.set("df", df);
+  if (dt !== defTo)     p.set("dt", dt);
+
+  const types = [...document.querySelectorAll(".reg-type-cb:checked")].map(cb => cb.value);
+  if (types.length > 0 && types.length < 3) p.set("rt", types.join(","));
+
+  const subj = document.getElementById("subjectSelect").value;
+  if (subj) p.set("subj", subj);
+  const inst = document.getElementById("institutionSelect").value;
+  if (inst) p.set("inst", inst);
+  const rinst = document.getElementById("regInstitutionSelect").value;
+  if (rinst) p.set("rinst", rinst);
+
+  if (commsNorm) {
+    p.set("cnorm", commsNorm);
+    p.set("client", document.getElementById("clientInput").value.trim());
+  } else if (clientSelected.exact && clientSelected.name) {
+    p.set("client", clientSelected.name);
+    p.set("cx", "1");
+  } else {
+    const c = clientSelected.name || document.getElementById("clientInput").value.trim();
+    if (c) p.set("client", c);
+  }
+
+  const firm = document.getElementById("firmInput").value.trim();
+  if (firm) p.set("firm", firm);
+  const dpoh = document.getElementById("dpohInput").value.trim();
+  if (dpoh) p.set("dpoh", dpoh);
+  if (document.getElementById("newOnlyCb").checked)       p.set("new", "1");
+  if (document.getElementById("firstTimeOnlyCb").checked) p.set("ft", "1");
+
+  if (currentView === "comms" && currentPage > 0)  p.set("p",  currentPage + 1);
+  if (currentView === "regs"  && rCurrentPage > 0) p.set("rp", rCurrentPage + 1);
+
+  const qs = p.toString();
+  history.replaceState(null, "", qs ? "?" + qs : location.pathname);
+}
+
+// Restore controls from the URL on first load. Returns the view to open.
+function applyURLParams() {
+  const p = new URLSearchParams(location.search);
+  if (![...p.keys()].length) return "comms";
+
+  const setDate = (val, mEl, yEl) => {
+    const m = /^(\d{4})-(\d{2})$/.exec(val || "");
+    if (!m) return;
+    document.getElementById(yEl).value = m[1];
+    document.getElementById(mEl).value = parseInt(m[2], 10);
+  };
+  setDate(p.get("df"), "monthFrom", "yearFrom");
+  setDate(p.get("dt"), "monthTo", "yearTo");
+
+  if (p.get("rt")) {
+    const on = p.get("rt").split(",");
+    document.querySelectorAll(".reg-type-cb").forEach(cb => cb.checked = on.includes(cb.value));
+  }
+  // Dropdowns are populated async in init(); stash desired values for later.
+  pendingSelects = {
+    subject: p.get("subj") || "",
+    institution: p.get("inst") || "",
+    regInstitution: p.get("rinst") || "",
+  };
+
+  const client = p.get("client") || "";
+  if (p.get("cnorm")) {
+    commsNorm = p.get("cnorm");
+    document.getElementById("clientInput").value = client;
+  } else if (client) {
+    document.getElementById("clientInput").value = client;
+    clientSelected = { name: client, num: "", exact: p.get("cx") === "1" };
+  }
+
+  document.getElementById("firmInput").value = p.get("firm") || "";
+  document.getElementById("dpohInput").value = p.get("dpoh") || "";
+  document.getElementById("newOnlyCb").checked       = p.get("new") === "1";
+  document.getElementById("firstTimeOnlyCb").checked = p.get("ft") === "1";
+
+  currentPage  = Math.max(0, (parseInt(p.get("p"), 10)  || 1) - 1);
+  rCurrentPage = Math.max(0, (parseInt(p.get("rp"), 10) || 1) - 1);
+
+  return p.get("v") === "regs" ? "regs" : "comms";
+}
+let pendingSelects = null;
 
 // ── Chart helpers ──────────────────────────────────────────────────────────
 const PALETTE = [
@@ -1087,9 +1348,9 @@ function renderStats(d) {
     : d.top_dpoh.map((r, i) => `
         <tr>
           <td>${i + 1}</td>
-          <td><strong>${r.name}</strong></td>
-          <td style="color:var(--muted)">${r.title || ""}</td>
-          <td>${r.institution}</td>
+          <td><strong>${esc(r.name)}</strong></td>
+          <td style="color:var(--muted)">${esc(r.title || "")}</td>
+          <td>${esc(r.institution)}</td>
           <td><strong>${fmt(r.count)}</strong></td>
         </tr>`).join("");
 }
@@ -1110,24 +1371,24 @@ function renderTable(d) {
     const type = REG_LABELS[r.reg_type] || r.reg_type;
     const dpohList = (r.dpoh_names || "").split("|")
       .map(s => s.trim()).filter(Boolean)
-      .map(s => `<span class="tag">${s}</span>`).join(" ");
+      .map(s => `<span class="tag">${esc(s)}</span>`).join(" ");
     const instList = (r.institutions || "").split("|")
       .map(s => s.trim()).filter(Boolean)
-      .map(s => `<span class="tag red">${s}</span>`).join(" ");
+      .map(s => `<span class="tag red">${esc(s)}</span>`).join(" ");
     const subjList = (r.subjects || "").split("|")
       .map(s => s.trim()).filter(Boolean)
-      .map(s => `<span class="tag green">${s}</span>`).join(" ");
+      .map(s => `<span class="tag green">${esc(s)}</span>`).join(" ");
     const details = (r.subject_details || "").trim();
 
     return `<tr>
-      <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/cmmLgPblcVw?comlogId=${r.comlog_id}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
-      <td style="white-space:nowrap">${r.comm_date}</td>
-      <td><strong>${r.client_name}</strong>${r.client_num ? `<br><span class="client-num">reg #${r.client_num}</span>` : ""}</td>
-      <td>${r.lobbyist}</td>
+      <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/cmmLgPblcVw?comlogId=${encodeURIComponent(r.comlog_id)}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
+      <td style="white-space:nowrap">${esc(r.comm_date)}</td>
+      <td><strong>${esc(r.client_name)}</strong>${r.client_num ? `<br><span class="client-num">reg #${esc(r.client_num)}</span>` : ""}</td>
+      <td>${esc(r.lobbyist)}</td>
       <td>${dpohList || "—"}</td>
       <td>${instList || "—"}</td>
-      <td class="subj-cell" data-detail="${details ? details.replace(/"/g, '&quot;') : ''}">${subjList || "—"}</td>
-      <td style="white-space:nowrap;color:var(--muted)">${type}</td>
+      <td class="subj-cell" data-detail="${esc(details)}">${subjList || "—"}</td>
+      <td style="white-space:nowrap;color:var(--muted)">${esc(type)}</td>
     </tr>`;
   }).join("");
 
@@ -1142,33 +1403,44 @@ function renderTable(d) {
 }
 
 // ── Load everything ───────────────────────────────────────────────────────
-async function loadAll() {
-  loading(true);
+async function loadAll(resetPage = true) {
+  const signal = newSignal("comms");
+  progress(true);
+  setBusy("commsView", true);
   try {
-    const qs = filtersToQS();
+    if (resetPage) currentPage = 0;
     const [statsData, tableData] = await Promise.all([
-      apiFetch("/api/stats" + qs),
-      apiFetch("/api/communications" + filtersToQS({ limit: PAGE_SIZE, offset: 0 })),
+      apiFetch("/api/stats" + filtersToQS(), signal),
+      apiFetch("/api/communications" + filtersToQS({ limit: PAGE_SIZE, offset: currentPage * PAGE_SIZE }), signal),
     ]);
-    currentPage = 0;
     renderStats(statsData);
     renderTable(tableData);
+    syncURL();
   } catch (e) {
+    if (e.name === "AbortError") return;   // superseded by a newer request
     console.error(e);
-    alert("Error loading data: " + e.message);
+    showToast("Couldn't load data — " + e.message, () => loadAll(resetPage));
   } finally {
-    loading(false);
+    progress(false);
+    setBusy("commsView", false);
   }
 }
 
 async function loadTable() {
-  loading(true);
+  const signal = newSignal("commsTable");
+  progress(true);
+  setBusy("comms-section", true);
   try {
     const qs = filtersToQS({ limit: PAGE_SIZE, offset: currentPage * PAGE_SIZE });
-    const data = await apiFetch("/api/communications" + qs);
-    renderTable(data);
+    renderTable(await apiFetch("/api/communications" + qs, signal));
+    syncURL();
+  } catch (e) {
+    if (e.name === "AbortError") return;
+    console.error(e);
+    showToast("Couldn't load records — " + e.message, loadTable);
   } finally {
-    loading(false);
+    progress(false);
+    setBusy("comms-section", false);
   }
 }
 
@@ -1206,7 +1478,7 @@ function updateDrillBar() {
   const bar = document.getElementById("drillBar");
   if (drillStack.length === 0) { bar.classList.remove("show"); return; }
   document.getElementById("drillLabel").innerHTML =
-    `Drilled into <strong>${drillStack[drillStack.length - 1].appliedLabel}</strong>`;
+    `Drilled into <strong>${esc(drillStack[drillStack.length - 1].appliedLabel)}</strong>`;
   bar.classList.add("show");
 }
 
@@ -1343,11 +1615,15 @@ clientInput.addEventListener("input", () => {
   const q = clientInput.value.trim();
   if (q.length < 2) { clientList.classList.remove("open"); return; }
   acTimer = setTimeout(async () => {
-    const data = await apiFetch(`/api/clients?q=${encodeURIComponent(q)}`);
-    clientList.innerHTML = data.map(c =>
-      `<li data-name="${c.client_name}" data-num="${c.client_num}">${c.client_name}</li>`
-    ).join("");
-    clientList.classList.toggle("open", data.length > 0);
+    try {
+      const data = await apiFetch(`/api/clients?q=${encodeURIComponent(q)}`, newSignal("clients"));
+      clientList.innerHTML = data.map(c =>
+        `<li data-name="${esc(c.client_name)}" data-num="${esc(c.client_num)}">${esc(c.client_name)}</li>`
+      ).join("");
+      clientList.classList.toggle("open", data.length > 0);
+    } catch (e) {
+      if (e.name !== "AbortError") clientList.classList.remove("open");
+    }
   }, 300);
 });
 
@@ -1376,9 +1652,25 @@ document.getElementById("nextBtn").addEventListener("click", () => {
 
 // ── Apply / Clear ─────────────────────────────────────────────────────────
 // Dispatch to whichever view is active — the sidebar filters are shared.
-function applyCurrent() { currentView === "regs" ? loadRegAll() : loadAll(); }
+function applyCurrent() {
+  closeFilterDrawer();   // no-op on desktop
+  currentView === "regs" ? loadRegAll() : loadAll();
+}
 
 document.getElementById("applyBtn").addEventListener("click", applyCurrent);
+
+// Mobile filter drawer
+const sidebarEl = document.getElementById("sidebar");
+const filterToggleBtn = document.getElementById("filterToggle");
+function closeFilterDrawer() {
+  sidebarEl.classList.remove("open");
+  filterToggleBtn.setAttribute("aria-expanded", "false");
+}
+filterToggleBtn.addEventListener("click", () => {
+  const open = sidebarEl.classList.toggle("open");
+  filterToggleBtn.setAttribute("aria-expanded", String(open));
+  if (open) sidebarEl.scrollIntoView({ behavior: "smooth", block: "start" });
+});
 
 document.getElementById("clearBtn").addEventListener("click", () => {
   const now = new Date();
@@ -1420,7 +1712,7 @@ document.getElementById("main").addEventListener("mouseover", e => {
   }
 
   if (cell.dataset.detail) {
-    subjTooltip.innerHTML = [...new Set(cell.dataset.detail.split(" || "))].map(d => `• ${d}`).join("<br>");
+    subjTooltip.innerHTML = [...new Set(cell.dataset.detail.split(" || "))].map(d => `• ${esc(d)}`).join("<br>");
   } else {
     // Registry detail text is only in the weekly bulk file (recently added
     // records lack it until the next rebuild) and only exists for reports
@@ -1451,44 +1743,59 @@ document.getElementById("main").addEventListener("mouseleave", () => {
 });
 
 // ── Update check ──────────────────────────────────────────────────────────
+// Two distinct situations:
+//  - deployable_update: a newer DB is PUBLISHED but this server hasn't picked
+//    it up (e.g. the redeploy hook failed) — the button genuinely fixes this.
+//  - update_available only: the registry has new source data that no pipeline
+//    run has ingested yet — a redeploy can't create data, so no button; the
+//    nightly pipeline will pick it up.
 async function checkForUpdate() {
   try {
     const data = await apiFetch("/api/check-update");
-    if (!data.update_available) return;
-
     const banner = document.getElementById("updateBanner");
-    const btn    = document.getElementById("updateBtn");
-    banner.classList.add("show");
+    const bannerText = banner.querySelector("span");
+    const btn = document.getElementById("updateBtn");
 
-    btn.addEventListener("click", async () => {
-      btn.disabled = true;
-      btn.textContent = "Triggering rebuild…";
-      try {
-        await fetch("/api/trigger-update", { method: "POST" });
-      } catch {
-        btn.textContent = "Error — try again";
-        btn.disabled = false;
-        return;
-      }
-
-      // Update banner message and start polling for completion
-      const bannerText = banner.querySelector("span");
-      bannerText.innerHTML = "⏳ <strong>Database rebuild in progress</strong> — this takes about 2 minutes. The page will reload automatically when the updated data is ready.";
-      btn.style.display = "none";
-
-      const poll = setInterval(async () => {
+    if (data.deployable_update) {
+      banner.classList.add("show");
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        btn.textContent = "Deploying…";
         try {
-          const status = await apiFetch("/api/check-update");
-          if (!status.update_available) {
-            clearInterval(poll);
-            bannerText.innerHTML = "✓ <strong>Update complete!</strong> Reloading…";
-            setTimeout(() => window.location.reload(), 1500);
-          }
+          const r = await fetch("/api/trigger-update", { method: "POST" });
+          if (!r.ok) throw new Error();
         } catch {
-          // server mid-restart — keep polling
+          btn.textContent = "Error — try again";
+          btn.disabled = false;
+          return;
         }
-      }, 15000);
-    });
+        bannerText.innerHTML = "⏳ <strong>Deploying the updated database</strong> — takes about 2 minutes. The page will reload automatically.";
+        btn.style.display = "none";
+
+        let polls = 0;
+        const poll = setInterval(async () => {
+          if (++polls > 40) {   // ~10 min — give up rather than spin forever
+            clearInterval(poll);
+            bannerText.innerHTML = "This is taking longer than expected — try refreshing the page in a few minutes.";
+            return;
+          }
+          try {
+            const status = await apiFetch("/api/check-update");
+            if (!status.deployable_update) {
+              clearInterval(poll);
+              bannerText.innerHTML = "✓ <strong>Update complete!</strong> Reloading…";
+              setTimeout(() => window.location.reload(), 1500);
+            }
+          } catch {
+            // server mid-restart — keep polling
+          }
+        }, 15000);
+      });
+    } else if (data.update_available) {
+      bannerText.innerHTML = "ℹ️ <strong>New data is available at the registry</strong> — it will be included in the next automatic refresh (runs daily).";
+      btn.style.display = "none";
+      banner.classList.add("show");
+    }
   } catch {
     // silently ignore — update check is best-effort
   }
@@ -1605,9 +1912,9 @@ function renderRegTable(d) {
     tbody.innerHTML = d.rows.map(r => {
       const type = R_TYPE_LABELS[r.reg_type] || r.reg_type;
       const instList = (r.institutions || "").split("|").map(s => s.trim()).filter(Boolean)
-        .map(s => `<span class="tag red">${s}</span>`).join(" ");
+        .map(s => `<span class="tag red">${esc(s)}</span>`).join(" ");
       const subjList = (r.subjects || "").split("|").map(s => s.trim()).filter(Boolean)
-        .map(s => `<span class="tag green">${s}</span>`).join(" ");
+        .map(s => `<span class="tag green">${esc(s)}</span>`).join(" ");
       const details = (r.subject_details || "").trim();
       const badges = [];
       if (r.first_time_org)
@@ -1617,22 +1924,22 @@ function renderRegTable(d) {
         : `<span class="tag" style="opacity:.55">Renewal</span>`);
       const newBadge = badges.join(" ");
       const firmLob = r.firm_name
-        ? `<strong>${r.firm_name}</strong><br><span class="client-num">${r.lobbyist}</span>`
-        : `${r.lobbyist}`;
+        ? `<strong>${esc(r.firm_name)}</strong><br><span class="client-num">${esc(r.lobbyist)}</span>`
+        : `${esc(r.lobbyist)}`;
       const commsCell = r.comm_count > 0
-        ? `<a href="#" class="comm-link" data-norm="${(r.norm_name || '').replace(/"/g,'&quot;')}" data-name="${(r.client_name || '').replace(/"/g,'&quot;')}" title="View this organization's communication reports">${fmt(r.comm_count)} report${r.comm_count === 1 ? "" : "s"} ↗</a>`
+        ? `<a href="#" class="comm-link" data-norm="${esc(r.norm_name || '')}" data-name="${esc(r.client_name || '')}" title="View this organization's communication reports">${fmt(r.comm_count)} report${r.comm_count === 1 ? "" : "s"} ↗</a>`
         : `<span style="color:var(--muted)">none yet</span>`;
 
       return `<tr>
-        <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/vwRg?regId=${r.reg_id}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
-        <td style="white-space:nowrap">${r.posted_date}</td>
+        <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/vwRg?regId=${encodeURIComponent(r.reg_id)}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
+        <td style="white-space:nowrap">${esc(r.posted_date)}</td>
         <td>${newBadge}</td>
-        <td><strong>${r.client_name}</strong>${r.client_num ? `<br><span class="client-num">reg #${r.client_num}</span>` : ""}</td>
+        <td><strong>${esc(r.client_name)}</strong>${r.client_num ? `<br><span class="client-num">reg #${esc(r.client_num)}</span>` : ""}</td>
         <td style="white-space:nowrap">${commsCell}</td>
         <td>${firmLob}</td>
         <td>${instList || "—"}</td>
-        <td class="subj-cell" data-detail="${details ? details.replace(/"/g, '&quot;') : ''}">${subjList || "—"}</td>
-        <td style="white-space:nowrap;color:var(--muted)">${type}</td>
+        <td class="subj-cell" data-detail="${esc(details)}">${subjList || "—"}</td>
+        <td style="white-space:nowrap;color:var(--muted)">${esc(type)}</td>
       </tr>`;
     }).join("");
   }
@@ -1645,32 +1952,44 @@ function renderRegTable(d) {
 }
 
 // ── Load ──────────────────────────────────────────────────────────────────
-async function loadRegAll() {
-  loading(true);
+async function loadRegAll(resetPage = true) {
+  const signal = newSignal("regs");
+  progress(true);
+  setBusy("regsView", true);
   try {
-    const qs = filtersToRegQS();
+    if (resetPage) rCurrentPage = 0;
     const [statsData, tableData] = await Promise.all([
-      apiFetch("/api/reg-stats" + qs),
-      apiFetch("/api/registrations" + filtersToRegQS({ limit: PAGE_SIZE, offset: 0 })),
+      apiFetch("/api/reg-stats" + filtersToRegQS(), signal),
+      apiFetch("/api/registrations" + filtersToRegQS({ limit: PAGE_SIZE, offset: rCurrentPage * PAGE_SIZE }), signal),
     ]);
-    rCurrentPage = 0;
     renderRegStats(statsData);
     renderRegTable(tableData);
+    syncURL();
   } catch (e) {
+    if (e.name === "AbortError") return;
     console.error(e);
-    alert("Error loading registrations: " + e.message);
+    showToast("Couldn't load registrations — " + e.message, () => loadRegAll(resetPage));
   } finally {
-    loading(false);
+    progress(false);
+    setBusy("regsView", false);
   }
 }
 
 async function loadRegTable() {
-  loading(true);
+  const signal = newSignal("regsTable");
+  progress(true);
+  setBusy("regs-section", true);
   try {
     const qs = filtersToRegQS({ limit: PAGE_SIZE, offset: rCurrentPage * PAGE_SIZE });
-    renderRegTable(await apiFetch("/api/registrations" + qs));
+    renderRegTable(await apiFetch("/api/registrations" + qs, signal));
+    syncURL();
+  } catch (e) {
+    if (e.name === "AbortError") return;
+    console.error(e);
+    showToast("Couldn't load registrations — " + e.message, loadRegTable);
   } finally {
-    loading(false);
+    progress(false);
+    setBusy("regs-section", false);
   }
 }
 
@@ -1711,7 +2030,7 @@ function updateRegDrillBar() {
   const bar = document.getElementById("regDrillBar");
   if (regDrillStack.length === 0) { bar.classList.remove("show"); return; }
   document.getElementById("regDrillLabel").innerHTML =
-    `Drilled into <strong>${regDrillStack[regDrillStack.length - 1].appliedLabel}</strong>`;
+    `Drilled into <strong>${esc(regDrillStack[regDrillStack.length - 1].appliedLabel)}</strong>`;
   bar.classList.add("show");
 }
 
@@ -1806,14 +2125,19 @@ function switchView(view) {
   if (view === currentView) return;
   currentView = view;
   document.body.setAttribute("data-view", view);
-  document.getElementById("viewCommsBtn").classList.toggle("active", view === "comms");
-  document.getElementById("viewRegsBtn").classList.toggle("active", view === "regs");
+  const cb = document.getElementById("viewCommsBtn");
+  const rb = document.getElementById("viewRegsBtn");
+  cb.classList.toggle("active", view === "comms");
+  rb.classList.toggle("active", view === "regs");
+  cb.setAttribute("aria-selected", String(view === "comms"));
+  rb.setAttribute("aria-selected", String(view === "regs"));
   updateHeaderSub();
 
   if (view === "regs" && !regLoaded) {
     regLoaded = true;
     loadRegAll();
   } else {
+    syncURL();
     // Charts created while hidden need a resize once their pane is visible
     setTimeout(() => Object.values(charts).forEach(c => { try { c.resize(); } catch (e) {} }), 0);
   }
@@ -1825,16 +2149,15 @@ document.getElementById("viewRegsBtn").addEventListener("click", () => switchVie
 // ── Health check + init ───────────────────────────────────────────────────
 async function init() {
   initDateDropdowns();  // sync — sets up date selects so filtersToQS() works
+  const initialView = applyURLParams();   // restore any shared/bookmarked state
 
   loading(true);
   try {
-    const [health, subjects, institutions, regInstitutions, statsData, tableData] = await Promise.all([
+    const [health, subjects, institutions, regInstitutions] = await Promise.all([
       apiFetch("/api/health"),
       apiFetch("/api/subjects"),
       apiFetch("/api/institutions"),
       apiFetch("/api/reg-institutions"),
-      apiFetch("/api/stats" + filtersToQS()),
-      apiFetch("/api/communications" + filtersToQS({ limit: PAGE_SIZE, offset: 0 })),
     ]);
 
     const [minY, maxY] = health.date_range.map(d => d.slice(0, 4));
@@ -1850,15 +2173,35 @@ async function init() {
     const regInstSel = document.getElementById("regInstitutionSelect");
     regInstitutions.forEach(i => regInstSel.add(new Option(i.institution, i.institution)));
 
-    currentPage = 0;
-    renderStats(statsData);
-    renderTable(tableData);
+    // Select values carried in the URL can only be applied once the
+    // dropdowns above are populated
+    if (pendingSelects) {
+      subSel.value     = pendingSelects.subject;
+      instSel.value    = pendingSelects.institution;
+      regInstSel.value = pendingSelects.regInstitution;
+      pendingSelects = null;
+    }
   } catch (e) {
     document.getElementById("dbStatus").textContent = "DB unavailable";
     console.error(e);
+    showToast("Couldn't reach the database — " + e.message, () => location.reload());
     return;
   } finally {
     loading(false);
+  }
+
+  if (initialView === "regs") {
+    currentView = "regs";
+    regLoaded = true;
+    document.body.setAttribute("data-view", "regs");
+    document.getElementById("viewCommsBtn").classList.remove("active");
+    document.getElementById("viewRegsBtn").classList.add("active");
+    document.getElementById("viewCommsBtn").setAttribute("aria-selected", "false");
+    document.getElementById("viewRegsBtn").setAttribute("aria-selected", "true");
+    updateHeaderSub();
+    loadRegAll(false);   // false: keep the page number from the URL
+  } else {
+    loadAll(false);
   }
 
   checkForUpdate();  // fire-and-forget; shows banner if update available

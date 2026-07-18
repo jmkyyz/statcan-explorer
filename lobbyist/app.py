@@ -20,6 +20,12 @@ from flask_cors import CORS
 app = Flask(__name__)
 CORS(app)
 
+try:
+    from flask_compress import Compress
+    Compress(app)   # gzip/brotli on JSON + HTML responses
+except ImportError:
+    pass
+
 # DB path is overridable so a scratch DB can be served during local verification
 # without touching the live lobby.db.
 DB_PATH = Path(os.environ.get("LOBBY_DB_PATH", Path(__file__).parent / "lobby.db"))
@@ -27,6 +33,8 @@ PORT = int(os.environ.get("PORT", 5002))
 COMMS_ZIP_URL = "https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip"
 REGS_ZIP_URL  = "https://lobbycanada.gc.ca/media/zwcjycef/registrations_enregistrements_ocl_cal.zip"
 RENDER_DEPLOY_HOOK = os.environ.get("RENDER_DEPLOY_HOOK", "")
+# Version stamp the pipeline publishes beside lobby.db (see update_lobby_db.sh)
+META_ASSET_URL = "https://github.com/jmkyyz/statcan-explorer/releases/download/db-latest/lobby-meta.json"
 
 try:
     from curl_cffi import requests as cffi_requests
@@ -106,13 +114,21 @@ def _cache_get(key: str):
     return None
 
 
-def _cache_set(key: str, val):
+def _cache_set(key: str, val, ttl: int = CACHE_TTL):
     with _cache_lock:
-        _cache[key] = {"val": val, "exp": time.time() + CACHE_TTL}
+        _cache[key] = {"val": val, "exp": time.time() + ttl}
         if len(_cache) > CACHE_MAX:
             # Evict the entry with the earliest expiry
             oldest = min(_cache, key=lambda k: _cache[k]["exp"])
             del _cache[oldest]
+
+
+def _cached_json(payload, max_age: int):
+    """jsonify + a browser/CDN Cache-Control header, for endpoints whose data
+    only changes when the DB is rebuilt (i.e. at most daily)."""
+    resp = jsonify(payload)
+    resp.headers["Cache-Control"] = f"public, max-age={max_age}"
+    return resp
 
 
 # ── Filter helpers ───────────────────────────────────────────────────────────
@@ -154,7 +170,9 @@ def build_filter_parts(params: dict):
     elif client_exact:
         # Exact match — reproduces the Top-Clients ranking (which groups by the
         # full name string) and avoids LIKE over-matching short names.
-        wheres.append("c.client_name = ?")
+        # COLLATE NOCASE so idx_c_client (a NOCASE index) is usable; a binary =
+        # would full-scan communications on every drill-down click.
+        wheres.append("c.client_name = ? COLLATE NOCASE")
         binds.append(client_exact)
     elif client_q:
         wheres.append("c.client_name LIKE ? COLLATE NOCASE")
@@ -227,7 +245,9 @@ def build_reg_filter_parts(params: dict):
         wheres.append("o.first_date = r.posted_date")
 
     if client_exact:
-        wheres.append("r.client_name = ?")
+        # NOCASE so idx_r_client (a NOCASE index) is usable — see the
+        # communications counterpart above.
+        wheres.append("r.client_name = ? COLLATE NOCASE")
         binds.append(client_exact)
     elif client_q:
         wheres.append("r.client_name LIKE ? COLLATE NOCASE")
@@ -270,41 +290,59 @@ def build_reg_filter_select(params: dict):
 
 @app.route("/")
 def index():
-    return send_from_directory(Path(__file__).parent, "lobby-explorer.html")
+    resp = send_from_directory(Path(__file__).parent, "lobby-explorer.html")
+    # Always revalidate (cheap 304 via the ETag Flask sets) so a redeploy's
+    # frontend changes reach browsers immediately.
+    resp.headers["Cache-Control"] = "no-cache"
+    return resp
 
 
 # ── Health ───────────────────────────────────────────────────────────────────
+
+def _health_aggregates(con) -> dict:
+    """The full-table aggregates behind /api/health. Cached — they only change
+    when the DB is rebuilt, and every worker restarts on redeploy."""
+    agg = _cache_get("__health_agg__")
+    if agg is None:
+        total = con.execute("SELECT COUNT(*) FROM communications").fetchone()[0]
+        min_d, max_d = con.execute(
+            "SELECT MIN(comm_date), MAX(comm_date) FROM communications"
+        ).fetchone()
+        if _has_reg_tables(con):
+            reg_row = con.execute(
+                "SELECT COUNT(*), COALESCE(SUM(is_original),0), MIN(posted_date), MAX(posted_date) "
+                "FROM registrations"
+            ).fetchone()
+        else:
+            reg_row = (0, 0, None, None)
+        agg = {
+            "total_comms": total,
+            "date_range": [min_d, max_d],
+            "total_regs": reg_row[0],
+            "new_regs": reg_row[1],
+            "reg_date_range": [reg_row[2], reg_row[3]],
+        }
+        _cache_set("__health_agg__", agg)
+    return agg
+
 
 @app.route("/api/health")
 def health():
     try:
         with get_db() as con:
-            total = con.execute("SELECT COUNT(*) FROM communications").fetchone()[0]
-            min_d = con.execute("SELECT MIN(comm_date) FROM communications").fetchone()[0]
-            max_d = con.execute("SELECT MAX(comm_date) FROM communications").fetchone()[0]
+            agg = _health_aggregates(con)
             patched = con.execute(
                 "SELECT value FROM meta WHERE key='patched_at'"
             ).fetchone()
             patch_count = con.execute(
                 "SELECT value FROM meta WHERE key='patch_new_count'"
             ).fetchone()
-            if _has_reg_tables(con):
-                reg_row = con.execute(
-                    "SELECT COUNT(*), COALESCE(SUM(is_original),0), MIN(posted_date), MAX(posted_date) "
-                    "FROM registrations"
-                ).fetchone()
-            else:
-                reg_row = (0, 0, None, None)
-        return jsonify({
+        return _cached_json({
             "status": "ok",
-            "total_comms": total,
-            "date_range": [min_d, max_d],
+            **agg,
             "patched_at": patched[0] if patched else None,
             "patch_new_count": int(patch_count[0]) if patch_count else 0,
-            "total_regs": reg_row[0],
-            "new_regs": reg_row[1],
-            "reg_date_range": [reg_row[2], reg_row[3]],
-        })
+        }, max_age=300)
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -315,21 +353,21 @@ def health():
 def subjects():
     cached = _cache_get("__subjects__")
     if cached is not None:
-        return jsonify(cached)
+        return _cached_json(cached, max_age=3600)
     with get_db() as con:
         rows = con.execute(
             "SELECT subject_code, description FROM subject_types ORDER BY description"
         ).fetchall()
     result = rows_to_list(rows)
     _cache_set("__subjects__", result)
-    return jsonify(result)
+    return _cached_json(result, max_age=3600)
 
 
 @app.route("/api/institutions")
 def institutions():
     cached = _cache_get("__institutions__")
     if cached is not None:
-        return jsonify(cached)
+        return _cached_json(cached, max_age=3600)
     with get_db() as con:
         rows = con.execute(
             """SELECT institution, COUNT(DISTINCT comlog_id) AS comm_count
@@ -338,26 +376,39 @@ def institutions():
         ).fetchall()
     result = rows_to_list(rows)
     _cache_set("__institutions__", result)
-    return jsonify(result)
+    return _cached_json(result, max_age=3600)
+
+
+_clients_cache: dict = {}
+_clients_lock = threading.Lock()
+
+
+def _client_list():
+    """All distinct (client_name, client_num) pairs (~16k), loaded once per
+    worker so the typeahead is an in-memory substring filter instead of a
+    leading-wildcard LIKE full scan per keystroke."""
+    with _clients_lock:
+        if "rows" not in _clients_cache:
+            with get_db() as con:
+                rows = con.execute(
+                    """SELECT DISTINCT client_name, client_num FROM communications
+                       WHERE client_name != '' ORDER BY client_name"""
+                ).fetchall()
+            _clients_cache["rows"] = [
+                (r["client_name"].lower(), r["client_name"], r["client_num"]) for r in rows
+            ]
+        return _clients_cache["rows"]
 
 
 @app.route("/api/clients")
 def clients():
-    q = (request.args.get("q") or "").strip()
-    with get_db() as con:
-        if q:
-            rows = con.execute(
-                """SELECT DISTINCT client_name, client_num FROM communications
-                   WHERE client_name LIKE ? COLLATE NOCASE
-                   ORDER BY client_name LIMIT 50""",
-                (f"%{q}%",),
-            ).fetchall()
-        else:
-            rows = con.execute(
-                """SELECT DISTINCT client_name, client_num FROM communications
-                   ORDER BY client_name LIMIT 200"""
-            ).fetchall()
-    return jsonify(rows_to_list(rows))
+    q = (request.args.get("q") or "").strip().lower()
+    rows = _client_list()
+    if q:
+        hits = [r for r in rows if q in r[0]][:50]
+    else:
+        hits = rows[:200]
+    return jsonify([{"client_name": n, "client_num": c} for (_, n, c) in hits])
 
 
 # ── Stats ─────────────────────────────────────────────────────────────────────
@@ -818,7 +869,7 @@ def reg_institutions():
     ranks DPOH institutions from communications."""
     cached = _cache_get("__reg_institutions__")
     if cached is not None:
-        return jsonify(cached)
+        return _cached_json(cached, max_age=3600)
     with get_db() as con:
         if not _has_reg_tables(con):
             return jsonify([])
@@ -829,13 +880,23 @@ def reg_institutions():
         ).fetchall()
     result = rows_to_list(rows)
     _cache_set("__reg_institutions__", result)
-    return jsonify(result)
+    return _cached_json(result, max_age=3600)
 
 
 # ── Update check ─────────────────────────────────────────────────────────────
 
+CHECK_UPDATE_TTL = 900   # seconds; one pair of registry header checks per window
+
+
 @app.route("/api/check-update")
 def check_update():
+    # Server-side cache: without it every page load fires two synchronous
+    # header requests at lobbycanada.gc.ca (up to 15s each, holding a worker
+    # thread). One check per 15 min across all visitors is plenty — the
+    # source files change at most daily.
+    cached = _cache_get("__check_update__")
+    if cached is not None:
+        return jsonify(cached)
     try:
         # lobbycanada.gc.ca uses JA3 TLS fingerprint blocking — only curl_cffi
         # (Chrome impersonation) gets through. If not installed, skip check.
@@ -889,8 +950,28 @@ def check_update():
     patched_at = patched_row[0] if patched_row else ""
     patch_new_count = int(patch_count_row[0]) if patch_count_row else 0
 
-    return jsonify({
+    # A redeploy can only ever install a DB that is already *published* — it
+    # cannot create new data. So the rebuild button is offered only when the
+    # published version stamp is newer than what this server is running
+    # (e.g. the pipeline published but the redeploy hook failed). New data at
+    # the registry without a newer published DB is informational only.
+    deployable_update = False
+    remote_built_at = ""
+    try:
+        mr = http_requests.get(META_ASSET_URL, timeout=10)
+        if mr.ok:
+            remote_meta = mr.json()
+            remote_built_at = remote_meta.get("built_at", "")
+            remote_stamp = max(remote_built_at, remote_meta.get("patched_at", ""))
+            local_stamp = max(built_at or "", patched_at or "")
+            deployable_update = bool(remote_stamp) and remote_stamp > local_stamp
+    except Exception:
+        pass   # no stamp published yet, or GitHub unreachable — button stays hidden
+
+    payload = {
         "update_available": update_available,
+        "deployable_update": deployable_update,
+        "remote_built_at": remote_built_at,
         "comms_changed": comms_changed,
         "regs_changed": regs_changed,
         "remote_last_modified": remote_lm,
@@ -902,13 +983,31 @@ def check_update():
         "built_at": built_at,
         "patched_at": patched_at,
         "patch_new_count": patch_new_count,
-    })
+    }
+    _cache_set("__check_update__", payload, ttl=CHECK_UPDATE_TTL)
+    return jsonify(payload)
+
+
+TRIGGER_COOLDOWN_S = 600
+_trigger_state = {"last": 0.0}
 
 
 @app.route("/api/trigger-update", methods=["POST"])
 def trigger_update():
+    """Redeploy trigger for the on-page update banner. Guarded: only fires when
+    the server's own update check saw newer source data, and at most once per
+    cooldown window per worker — an unauthenticated visitor can no longer spam
+    Render redeploys."""
     if not RENDER_DEPLOY_HOOK:
         return jsonify({"error": "RENDER_DEPLOY_HOOK not configured"}), 503
+    chk = _cache_get("__check_update__")
+    if not (chk and chk.get("deployable_update")):
+        return jsonify({"error": "No newer published database to deploy."}), 409
+    now = time.time()
+    if now - _trigger_state["last"] < TRIGGER_COOLDOWN_S:
+        return jsonify({"error": "An update was already triggered recently — "
+                                 "it takes a few minutes to go live."}), 429
+    _trigger_state["last"] = now
     try:
         r = http_requests.post(RENDER_DEPLOY_HOOK, timeout=15)
         r.raise_for_status()
@@ -1258,6 +1357,13 @@ def _prewarm():
                     "SELECT COUNT(*) FROM registrations "
                     "WHERE posted_date >= '2014-01-01' AND posted_date < '2100-01-01'"
                 ).fetchone()
+
+            # Health aggregates (full-table counts) so /api/health never
+            # scans on a live request
+            _health_aggregates(con)
+
+        # Typeahead list (in-memory distinct clients)
+        _client_list()
 
         _cache_set("__subjects__", subj)
         _cache_set("__institutions__", inst)

@@ -7,3 +7,4 @@ update_lobby_db.log
 lobby_weekly.log
 __pycache__/
 *.pyc
+parquet/
