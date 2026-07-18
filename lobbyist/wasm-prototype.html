@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lobbyist Registrations — Static Prototype (DuckDB-WASM)</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --red: #c0392b; --red-lt: #e74c3c; --bg: #f4f5f7; --card: #fff;
+    --border: #dde1e7; --text: #1a1d23; --muted: #6b7280; --accent: #1d4ed8;
+  }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+         background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; }
+  header { background: var(--red); color: #fff; padding: 14px 24px;
+           display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  header h1 { font-size: 18px; }
+  header p { font-size: 12px; opacity: .85; }
+  .proto-pill { margin-left: auto; font-size: 11px; background: rgba(255,255,255,.2);
+                padding: 4px 10px; border-radius: 12px; }
+  .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: calc(100vh - 56px); }
+  aside { background: var(--card); border-right: 1px solid var(--border); padding: 20px 16px; }
+  aside h2 { font-size: 11px; font-weight: 700; text-transform: uppercase;
+             letter-spacing: .8px; color: var(--muted); margin-bottom: 14px; }
+  .filter-group { margin-bottom: 18px; }
+  .filter-group label { display: block; font-size: 12px; font-weight: 600;
+                        color: var(--muted); margin-bottom: 5px; }
+  .filter-group input, .filter-group select {
+    width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 13px; background: var(--bg); color: var(--text); outline: none; }
+  .cb-group label { display: flex; align-items: center; gap: 7px; font-size: 13px;
+                    font-weight: 400; color: var(--text); cursor: pointer; margin-bottom: 5px; }
+  .date-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 6px; }
+  .btn-apply { width: 100%; padding: 9px; background: var(--red); color: #fff; border: none;
+               border-radius: 6px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  main { padding: 20px 24px; min-width: 0; }
+  .stat-cards { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+  .stat-card .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+  .stat-card .value { font-size: 28px; font-weight: 700; color: var(--red); margin: 4px 0 2px; }
+  .stat-card .sub { font-size: 11px; color: var(--muted); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+          padding: 18px; margin-bottom: 16px; }
+  .card h3 { font-size: 13px; font-weight: 700; margin-bottom: 14px; }
+  .card h3 .ms { font-weight: 400; color: var(--muted); font-size: 11px; }
+  .two-col { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 16px; margin-bottom: 16px; }
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: var(--bg); padding: 9px 12px; text-align: left; font-size: 11px;
+       font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+       border-bottom: 2px solid var(--border); white-space: nowrap; }
+  td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; max-width: 220px; }
+  .tag { display: inline-block; background: #e8eeff; color: var(--accent); border-radius: 10px;
+         padding: 2px 8px; font-size: 11px; margin: 1px; overflow-wrap: break-word; max-width: 100%; }
+  .tag.red { background: #fee2e2; color: var(--red); }
+  .tag.green { background: #d1fae5; color: #065f46; }
+  .pagination { display: flex; align-items: center; gap: 8px; margin-top: 14px;
+                font-size: 12px; color: var(--muted); }
+  .page-btn { padding: 5px 12px; border: 1px solid var(--border); border-radius: 5px;
+              background: var(--card); cursor: pointer; font-size: 12px; }
+  .page-btn:disabled { opacity: .4; cursor: default; }
+  #bootStatus { padding: 40px; text-align: center; color: var(--muted); font-size: 14px; }
+  .busy { opacity: .45; pointer-events: none; }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { border-right: none; border-bottom: 1px solid var(--border); }
+    .stat-cards { grid-template-columns: repeat(2, minmax(0,1fr)); }
+    .two-col { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Lobbyist Registrations — Static Prototype</h1>
+    <p>DuckDB-WASM querying one Parquet file in your browser · no backend server</p>
+  </div>
+  <span class="proto-pill" id="protoPill">booting…</span>
+</header>
+
+<div id="bootStatus">Downloading data…</div>
+
+<div class="layout" id="app" style="display:none">
+  <aside>
+    <h2>Filters</h2>
+    <div class="filter-group">
+      <label>Date range (from / to)</label>
+      <div class="date-grid"><input type="month" id="dfInput" value="2014-01"><input type="month" id="dtInput"></div>
+    </div>
+    <div class="filter-group cb-group">
+      <label>Registration type</label>
+      <label><input type="checkbox" class="rt-cb" value="1" checked> Consultant</label>
+      <label><input type="checkbox" class="rt-cb" value="2" checked> In-house (Corporation)</label>
+      <label><input type="checkbox" class="rt-cb" value="3" checked> In-house (Organization)</label>
+    </div>
+    <div class="filter-group cb-group">
+      <label>Show</label>
+      <label><input type="checkbox" id="newOnly"> New registration filings only</label>
+      <label><input type="checkbox" id="ftOnly"> First-time organizations only</label>
+    </div>
+    <div class="filter-group">
+      <label>Subject / Topic</label>
+      <select id="subjSel"><option value="">All topics</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Government institution targeted</label>
+      <select id="instSel"><option value="">All institutions</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Client / Organization</label>
+      <input type="text" id="clientInput" placeholder="Search client name…">
+    </div>
+    <div class="filter-group">
+      <label>Lobbying firm</label>
+      <input type="text" id="firmInput" placeholder="Search firm name…">
+    </div>
+    <button class="btn-apply" id="applyBtn">Apply filters</button>
+  </aside>
+
+  <main>
+    <div class="stat-cards">
+      <div class="stat-card"><div class="label">First-time organizations</div><div class="value" id="sFt">—</div><div class="sub">first appearance in the registry</div></div>
+      <div class="stat-card"><div class="label">New registration filings</div><div class="value" id="sNew">—</div><div class="sub">new mandates filed</div></div>
+      <div class="stat-card"><div class="label">Total filings</div><div class="value" id="sTotal">—</div><div class="sub" id="sRenew"></div></div>
+      <div class="stat-card"><div class="label">Organizations</div><div class="value" id="sOrgs">—</div><div class="sub">distinct, name-matched</div></div>
+    </div>
+
+    <div class="card">
+      <h3>Registrations over time <span class="ms" id="msTime"></span></h3>
+      <div style="position:relative;height:220px"><canvas id="timeChart"></canvas></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card"><h3>Top lobbying firms</h3><div style="position:relative" id="firmWrap"><canvas id="firmChart"></canvas></div></div>
+      <div class="card"><h3>Top clients</h3><div style="position:relative" id="clientWrap"><canvas id="clientChart"></canvas></div></div>
+    </div>
+
+    <div class="card"><h3>Most-targeted institutions <span class="ms" id="msInst"></span></h3>
+      <div style="position:relative" id="instWrap"><canvas id="instChart"></canvas></div></div>
+
+    <div class="card"><h3>By subject matter <span class="ms" id="msSubj"></span></h3>
+      <div style="position:relative" id="subjWrap"><canvas id="subjChart"></canvas></div></div>
+
+    <div class="card" id="recordsCard">
+      <h3>Registration records <span id="countLabel" style="font-weight:400;color:var(--muted)"></span> <span class="ms" id="msTable"></span></h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Posted</th><th>Status</th><th>Client</th><th>Communications</th><th>Firm / Lobbyist</th><th>Institution(s)</th><th>Subject(s)</th><th>Type</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button class="page-btn" id="prevBtn" disabled>← Prev</button>
+        <span id="pageLabel"></span>
+        <button class="page-btn" id="nextBtn" disabled>Next →</button>
+        <span style="margin-left:auto" id="pageTotal"></span>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+import * as duckdb from "https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1.29.0/+esm";
+
+const PAGE_SIZE = 50;
+const TYPE_LABELS = { 1: "Consultant", 2: "In-house Corp", 3: "In-house Org" };
+const PALETTE = ["#c0392b","#2980b9","#27ae60","#8e44ad","#d35400",
+                 "#16a085","#2c3e50","#f39c12","#1abc9c","#e74c3c"];
+const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;")
+  .replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+const fmt = n => Number(n).toLocaleString("en-CA");
+const qs  = s => String(s).replace(/'/g, "''");   // SQL string literal escape
+
+let conn, charts = {}, page = 0, total = 0;
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+const boot = document.getElementById("bootStatus");
+const t0 = performance.now();
+
+const bundle = await duckdb.selectBundle(duckdb.getJsDelivrBundles());
+const workerUrl = URL.createObjectURL(
+  new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
+const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(workerUrl));
+await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+
+boot.textContent = "Downloading registrations data…";
+const resp = await fetch("parquet/registrations.parquet");
+const buf = new Uint8Array(await resp.arrayBuffer());
+const parquetMB = (buf.length / 1e6).toFixed(1);   // before registering — the buffer transfers to the worker
+await db.registerFileBuffer("registrations.parquet", buf);
+conn = await db.connect();
+await conn.query("CREATE VIEW regs AS SELECT * FROM 'registrations.parquet'");
+
+document.getElementById("protoPill").textContent =
+  `${parquetMB} MB parquet · ready in ${((performance.now()-t0)/1000).toFixed(1)}s`;
+
+// ── Query helpers ─────────────────────────────────────────────────────────
+async function q(sql) {
+  const t = performance.now();
+  const res = await conn.query(sql);
+  return { rows: res.toArray().map(r => r.toJSON()), ms: performance.now() - t };
+}
+
+function whereClause() {
+  const w = [];
+  const df = document.getElementById("dfInput").value || "2014-01";
+  const dt = document.getElementById("dtInput").value || "2099-12";
+  const [y, m] = dt.split("-").map(Number);
+  const end = `${y + Math.floor(m / 12)}-${String(m % 12 + 1).padStart(2, "0")}-01`;
+  w.push(`posted_date >= '${qs(df)}-01'`, `posted_date < '${qs(end)}'`);
+
+  const types = [...document.querySelectorAll(".rt-cb:checked")].map(cb => cb.value);
+  if (types.length > 0 && types.length < 3) w.push(`reg_type IN (${types.join(",")})`);
+  if (document.getElementById("newOnly").checked) w.push("is_original = 1");
+  if (document.getElementById("ftOnly").checked)  w.push("first_time_org = 1");
+
+  const subj = document.getElementById("subjSel").value;
+  if (subj) w.push(`list_contains(string_split(subjects, '|'), '${qs(subj)}')`);
+  const inst = document.getElementById("instSel").value;
+  if (inst) w.push(`list_contains(string_split(institutions, '|'), '${qs(inst)}')`);
+  const client = document.getElementById("clientInput").value.trim();
+  if (client) w.push(`client_name ILIKE '%${qs(client)}%'`);
+  const firm = document.getElementById("firmInput").value.trim();
+  if (firm) w.push(`firm_name ILIKE '%${qs(firm)}%'`);
+  return w.join(" AND ");
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────
+function destroy(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function barChart(id, wrapId, labels, data) {
+  destroy(id);
+  document.getElementById(wrapId).style.height = Math.max(180, labels.length * 30) + "px";
+  charts[id] = new Chart(document.getElementById(id), {
+    type: "bar",
+    data: { labels, datasets: [{ data, backgroundColor: data.map((_, i) => PALETTE[i % PALETTE.length]), borderRadius: 3 }] },
+    options: { indexAxis: "y", responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { x: { ticks: { font: { size: 11 } } },
+                y: { ticks: { font: { size: 11 }, autoSkip: false } } } },
+  });
+}
+
+function timeChart(labels, totals, news, ft) {
+  destroy("timeChart");
+  const mk = (label, data, color, bgA) => ({ label, data, borderColor: color,
+    backgroundColor: bgA, borderWidth: 2, pointRadius: labels.length > 60 ? 0 : 2, fill: true, tension: .3 });
+  charts["timeChart"] = new Chart(document.getElementById("timeChart"), {
+    type: "line",
+    data: { labels, datasets: [
+      mk("All filings", totals, "#2980b9", "rgba(41,128,185,.05)"),
+      mk("New filings", news, "#d35400", "rgba(211,84,0,.05)"),
+      mk("First-time orgs", ft, "#c0392b", "rgba(192,57,43,.08)"),
+    ]},
+    options: { responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, labels: { boxWidth: 12, font: { size: 11 } } } },
+      scales: { x: { ticks: { font: { size: 10 }, maxTicksLimit: 24, maxRotation: 45 } },
+                y: { ticks: { font: { size: 11 } }, beginAtZero: true } } },
+  });
+}
+
+// ── Loads ─────────────────────────────────────────────────────────────────
+async function loadStats() {
+  const W = whereClause();
+
+  const s = await q(`
+    SELECT COUNT(*) AS total, COALESCE(SUM(is_original),0) AS new_regs,
+           COUNT(DISTINCT CASE WHEN first_time_org = 1 THEN norm_name END) AS ft,
+           COUNT(DISTINCT CASE WHEN norm_name != '' THEN norm_name END) AS orgs
+    FROM regs WHERE ${W}`);
+  const r = s.rows[0];
+  document.getElementById("sTotal").textContent = fmt(r.total);
+  document.getElementById("sNew").textContent   = fmt(r.new_regs);
+  document.getElementById("sFt").textContent    = fmt(r.ft);
+  document.getElementById("sOrgs").textContent  = fmt(r.orgs);
+  document.getElementById("sRenew").textContent = `${fmt(Number(r.total) - Number(r.new_regs))} renewals / amendments`;
+
+  const tm = await q(`
+    SELECT posted_month AS m, COUNT(*) AS c, COALESCE(SUM(is_original),0) AS n,
+           COUNT(DISTINCT CASE WHEN first_time_org = 1 THEN norm_name END) AS ft
+    FROM regs WHERE ${W} GROUP BY m ORDER BY m`);
+  const months = tm.rows.slice(0, -1);   // drop the partial current month
+  timeChart(months.map(x => x.m), months.map(x => Number(x.c)),
+            months.map(x => Number(x.n)), months.map(x => Number(x.ft)));
+  document.getElementById("msTime").textContent = `· ${(s.ms + tm.ms).toFixed(0)} ms in-browser`;
+
+  const tf = await q(`SELECT firm_name, COUNT(*) c FROM regs WHERE ${W} AND firm_name != ''
+                      GROUP BY firm_name ORDER BY c DESC LIMIT 15`);
+  barChart("firmChart", "firmWrap", tf.rows.map(x => x.firm_name), tf.rows.map(x => Number(x.c)));
+
+  const tc = await q(`SELECT client_name, COUNT(*) c FROM regs WHERE ${W} AND client_name != ''
+                      GROUP BY client_name ORDER BY c DESC LIMIT 15`);
+  barChart("clientChart", "clientWrap", tc.rows.map(x => x.client_name), tc.rows.map(x => Number(x.c)));
+
+  const ti = await q(`
+    SELECT s AS inst, COUNT(DISTINCT reg_id) c FROM (
+      SELECT reg_id, unnest(string_split(institutions, '|')) AS s FROM regs WHERE ${W}
+    ) WHERE s != '' GROUP BY s ORDER BY c DESC LIMIT 15`);
+  barChart("instChart", "instWrap", ti.rows.map(x => x.inst), ti.rows.map(x => Number(x.c)));
+  document.getElementById("msInst").textContent = `· ${ti.ms.toFixed(0)} ms`;
+
+  const ts = await q(`
+    SELECT s AS subj, COUNT(DISTINCT reg_id) c FROM (
+      SELECT reg_id, unnest(string_split(subjects, '|')) AS s FROM regs WHERE ${W}
+    ) WHERE s != '' GROUP BY s ORDER BY c DESC LIMIT 20`);
+  barChart("subjChart", "subjWrap", ts.rows.map(x => x.subj), ts.rows.map(x => Number(x.c)));
+  document.getElementById("msSubj").textContent = `· ${ts.ms.toFixed(0)} ms`;
+}
+
+async function loadTable() {
+  const W = whereClause();
+  const ftOnly = document.getElementById("ftOnly").checked;
+
+  let cnt, rows;
+  if (ftOnly) {
+    cnt = await q(`SELECT COUNT(DISTINCT norm_name) c FROM regs WHERE ${W}`);
+    rows = await q(`
+      SELECT * FROM regs WHERE reg_id IN (
+        SELECT arg_min(reg_id, reg_id) FROM regs WHERE ${W} GROUP BY norm_name)
+      ORDER BY posted_date DESC, norm_name LIMIT ${PAGE_SIZE} OFFSET ${page * PAGE_SIZE}`);
+  } else {
+    cnt = await q(`SELECT COUNT(*) c FROM regs WHERE ${W}`);
+    rows = await q(`SELECT * FROM regs WHERE ${W}
+                    ORDER BY posted_date DESC LIMIT ${PAGE_SIZE} OFFSET ${page * PAGE_SIZE}`);
+  }
+  total = Number(cnt.rows[0].c);
+  document.getElementById("countLabel").textContent =
+    `— ${fmt(total)} ${ftOnly ? "first-time organizations" : "records"}`;
+  document.getElementById("msTable").textContent = `· ${(cnt.ms + rows.ms).toFixed(0)} ms`;
+
+  const tags = (str, cls) => (str || "").split("|").map(s => s.trim()).filter(Boolean)
+    .map(s => `<span class="tag ${cls}">${esc(s)}</span>`).join(" ");
+
+  document.getElementById("tbody").innerHTML = rows.rows.length === 0
+    ? `<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:40px">No registrations match.</td></tr>`
+    : rows.rows.map(r => {
+        const badges = [];
+        if (Number(r.first_time_org)) badges.push(`<span class="tag green">1st-time org</span>`);
+        badges.push(Number(r.is_original) ? `<span class="tag">New filing</span>`
+                                          : `<span class="tag" style="opacity:.55">Renewal</span>`);
+        const firmLob = r.firm_name
+          ? `<strong>${esc(r.firm_name)}</strong><br><span style="font-size:11px;color:var(--muted)">${esc(r.lobbyist)}</span>`
+          : esc(r.lobbyist);
+        return `<tr>
+          <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/vwRg?regId=${encodeURIComponent(r.reg_id)}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
+          <td style="white-space:nowrap">${esc(r.posted_date)}</td>
+          <td>${badges.join(" ")}</td>
+          <td><strong>${esc(r.client_name)}</strong></td>
+          <td style="white-space:nowrap">${Number(r.comm_count) > 0 ? fmt(r.comm_count) + " reports" : '<span style="color:var(--muted)">none yet</span>'}</td>
+          <td>${firmLob}</td>
+          <td>${tags(r.institutions, "red") || "—"}</td>
+          <td>${tags(r.subjects, "green") || "—"}</td>
+          <td style="white-space:nowrap;color:var(--muted)">${esc(TYPE_LABELS[r.reg_type] || r.reg_type)}</td>
+        </tr>`;
+      }).join("");
+
+  const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  document.getElementById("prevBtn").disabled = page === 0;
+  document.getElementById("nextBtn").disabled = page >= pages - 1;
+  document.getElementById("pageLabel").textContent = `Page ${page + 1} of ${pages}`;
+  document.getElementById("pageTotal").textContent = `${fmt(total)} total`;
+}
+
+async function loadAll() {
+  const main = document.querySelector("main");
+  main.classList.add("busy");
+  try { page = 0; await loadStats(); await loadTable(); }
+  finally { main.classList.remove("busy"); }
+}
+
+// ── Filter dropdown options (derived from the data itself) ────────────────
+async function populateFilters() {
+  const now = new Date();
+  document.getElementById("dtInput").value =
+    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
+  const insts = await q(`
+    SELECT s, COUNT(DISTINCT reg_id) c FROM (
+      SELECT reg_id, unnest(string_split(institutions,'|')) s FROM regs)
+    WHERE s != '' GROUP BY s ORDER BY c DESC`);
+  const iSel = document.getElementById("instSel");
+  insts.rows.forEach(r => iSel.add(new Option(r.s, r.s)));
+
+  const subjs = await q(`
+    SELECT DISTINCT unnest(string_split(subjects,'|')) s FROM regs ORDER BY s`);
+  const sSel = document.getElementById("subjSel");
+  subjs.rows.filter(r => r.s).forEach(r => sSel.add(new Option(r.s, r.s)));
+}
+
+// ── Wire up ───────────────────────────────────────────────────────────────
+document.getElementById("applyBtn").addEventListener("click", loadAll);
+document.querySelectorAll("input[type=text]").forEach(el =>
+  el.addEventListener("keydown", e => { if (e.key === "Enter") loadAll(); }));
+document.getElementById("prevBtn").addEventListener("click", async () => {
+  if (page > 0) { page--; await loadTable(); } });
+document.getElementById("nextBtn").addEventListener("click", async () => {
+  if (page < Math.ceil(total / PAGE_SIZE) - 1) { page++; await loadTable(); } });
+
+boot.style.display = "none";
+document.getElementById("app").style.display = "grid";
+await populateFilters();
+await loadAll();
+</script>
+</body>
+</html>
