@@ -1837,26 +1837,32 @@ function filtersToRegQS(extra = {}) {
     .join("&");
 }
 
-// Three-line time chart: all filings, new filings, first-time organizations
+// Time chart: all filings / new filings / first-time organizations.
+// When a "Show" filter narrows the set, "All filings" and "New filings"
+// become near-duplicates of the filtered series, so only the meaningful
+// line is charted.
 function makeRegTimeChart(labels, totals, news, firstTime) {
   destroyChart("rTimeChart");
   const ctx = document.getElementById("rTimeChart").getContext("2d");
+  const mk = (label, data, color, bg) => ({
+    label, data, borderColor: color, backgroundColor: bg, borderWidth: 2,
+    pointRadius: labels.length > 60 ? 0 : 2, fill: true, tension: 0.3,
+  });
+  let datasets;
+  if (document.getElementById("firstTimeOnlyCb").checked) {
+    datasets = [mk("First-time orgs", firstTime, "#c0392b", "rgba(192,57,43,.08)")];
+  } else if (document.getElementById("newOnlyCb").checked) {
+    datasets = [mk("New filings", news, "#d35400", "rgba(211,84,0,.05)")];
+  } else {
+    datasets = [
+      mk("All filings", totals, "#2980b9", "rgba(41,128,185,.05)"),
+      mk("New filings", news, "#d35400", "rgba(211,84,0,.05)"),
+      mk("First-time orgs", firstTime, "#c0392b", "rgba(192,57,43,.08)"),
+    ];
+  }
   charts["rTimeChart"] = new Chart(ctx, {
     type: "line",
-    data: {
-      labels,
-      datasets: [
-        { label: "All filings", data: totals, borderColor: "#2980b9",
-          backgroundColor: "rgba(41,128,185,.05)", borderWidth: 2,
-          pointRadius: labels.length > 60 ? 0 : 2, fill: true, tension: 0.3 },
-        { label: "New filings", data: news, borderColor: "#d35400",
-          backgroundColor: "rgba(211,84,0,.05)", borderWidth: 2,
-          pointRadius: labels.length > 60 ? 0 : 2, fill: true, tension: 0.3 },
-        { label: "First-time orgs", data: firstTime, borderColor: "#c0392b",
-          backgroundColor: "rgba(192,57,43,.08)", borderWidth: 2,
-          pointRadius: labels.length > 60 ? 0 : 2, fill: true, tension: 0.3 },
-      ],
-    },
+    data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: { legend: { display: true, labels: { boxWidth: 12, font: { size: 11 } } } },

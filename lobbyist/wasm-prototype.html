@@ -516,11 +516,21 @@ async function loadRegsStats() {
            COUNT(DISTINCT CASE WHEN first_time_org = 1 THEN norm_name END) AS ft
     FROM regs WHERE ${W} GROUP BY m ORDER BY m`);
   const months = tm.rows.slice(0, -1);
-  lineChart("timeChart", months.map(x => x.m), [
-    series("All filings", months.map(x => Number(x.c)), "#2980b9", "rgba(41,128,185,.05)", months.length),
-    series("New filings", months.map(x => Number(x.n)), "#d35400", "rgba(211,84,0,.05)", months.length),
-    series("First-time orgs", months.map(x => Number(x.ft)), "#c0392b", "rgba(192,57,43,.08)", months.length),
-  ]);
+  // When a Show filter narrows the set, "All filings"/"New filings" become
+  // near-duplicates of the filtered series — chart only the meaningful line.
+  const ftOn  = document.getElementById("ftOnly").checked;
+  const newOn = document.getElementById("newOnly").checked;
+  const S = [];
+  if (ftOn) {
+    S.push(series("First-time orgs", months.map(x => Number(x.ft)), "#c0392b", "rgba(192,57,43,.08)", months.length));
+  } else if (newOn) {
+    S.push(series("New filings", months.map(x => Number(x.n)), "#d35400", "rgba(211,84,0,.05)", months.length));
+  } else {
+    S.push(series("All filings", months.map(x => Number(x.c)), "#2980b9", "rgba(41,128,185,.05)", months.length),
+           series("New filings", months.map(x => Number(x.n)), "#d35400", "rgba(211,84,0,.05)", months.length),
+           series("First-time orgs", months.map(x => Number(x.ft)), "#c0392b", "rgba(192,57,43,.08)", months.length));
+  }
+  lineChart("timeChart", months.map(x => x.m), S);
   document.getElementById("msTime").textContent = `· ${(s.ms + tm.ms).toFixed(0)} ms in-browser`;
 
   const tf = await q(`SELECT firm_name, COUNT(*) c FROM regs WHERE ${W} AND firm_name != ''
