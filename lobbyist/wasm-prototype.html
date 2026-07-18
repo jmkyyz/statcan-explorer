@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Lobbyist Registrations — Static Prototype (DuckDB-WASM)</title>
+<title>Lobbyist Explorer — Static Prototype (DuckDB-WASM)</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -17,8 +17,21 @@
            display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   header h1 { font-size: 18px; }
   header p { font-size: 12px; opacity: .85; }
-  .proto-pill { margin-left: auto; font-size: 11px; background: rgba(255,255,255,.2);
+  .view-toggle { display: flex; gap: 4px; background: rgba(255,255,255,.15);
+                 border-radius: 8px; padding: 3px; margin-left: auto; }
+  .view-toggle button { border: none; background: none; color: #fff; font-size: 12px;
+                        font-weight: 600; padding: 5px 12px; border-radius: 6px;
+                        cursor: pointer; opacity: .8; white-space: nowrap; }
+  .view-toggle button.active { background: #fff; color: var(--red); opacity: 1; }
+  .proto-pill { font-size: 11px; background: rgba(255,255,255,.2);
                 padding: 4px 10px; border-radius: 12px; }
+
+  .view-pane { display: none; }
+  body[data-view="comms"] #commsView { display: block; }
+  body[data-view="regs"]  #regsView  { display: block; }
+  body[data-view="comms"] .regs-only  { display: none; }
+  body[data-view="regs"]  .comms-only { display: none; }
+
   .layout { display: grid; grid-template-columns: 280px minmax(0, 1fr); min-height: calc(100vh - 56px); }
   aside { background: var(--card); border-right: 1px solid var(--border); padding: 20px 16px; }
   aside h2 { font-size: 11px; font-weight: 700; text-transform: uppercase;
@@ -31,10 +44,7 @@
     font-size: 13px; background: var(--bg); color: var(--text); outline: none; }
   .cb-group label { display: flex; align-items: center; gap: 7px; font-size: 13px;
                     font-weight: 400; color: var(--text); cursor: pointer; margin-bottom: 5px; }
-  /* Checkboxes must not inherit the sidebar's input width:100% — that
-     stretches the box full-width and shoves its label to the far edge */
   .cb-group input[type=checkbox] { width: 14px; height: 14px; flex: none; }
-  /* Same From/To month+year dropdown rows as the live app */
   .date-range { display: flex; flex-direction: column; gap: 6px; }
   .date-row   { display: grid; grid-template-columns: auto 1fr; gap: 6px; align-items: center; }
   .date-row span { font-size: 11px; color: var(--muted); white-space: nowrap; }
@@ -78,12 +88,16 @@
   }
 </style>
 </head>
-<body>
+<body data-view="comms">
 
 <header>
   <div>
-    <h1>Lobbyist Registrations — Static Prototype</h1>
-    <p>DuckDB-WASM querying one Parquet file in your browser · no backend server</p>
+    <h1>Lobbyist Explorer — Static Prototype</h1>
+    <p>DuckDB-WASM querying Parquet files in your browser · no backend server</p>
+  </div>
+  <div class="view-toggle">
+    <button id="viewCommsBtn" class="active">Communications</button>
+    <button id="viewRegsBtn">Registrations</button>
   </div>
   <span class="proto-pill" id="protoPill">booting…</span>
 </header>
@@ -112,7 +126,7 @@
       <label><input type="checkbox" class="rt-cb" value="2" checked> In-house (Corporation)</label>
       <label><input type="checkbox" class="rt-cb" value="3" checked> In-house (Organization)</label>
     </div>
-    <div class="filter-group cb-group">
+    <div class="filter-group cb-group regs-only">
       <label>Show</label>
       <label><input type="checkbox" id="newOnly"> New registration filings only</label>
       <label><input type="checkbox" id="ftOnly"> First-time organizations only</label>
@@ -121,7 +135,11 @@
       <label>Subject / Topic</label>
       <select id="subjSel"><option value="">All topics</option></select>
     </div>
-    <div class="filter-group">
+    <div class="filter-group comms-only">
+      <label>Government institution lobbied</label>
+      <select id="cInstSel"><option value="">All institutions</option></select>
+    </div>
+    <div class="filter-group regs-only">
       <label>Government institution targeted</label>
       <select id="instSel"><option value="">All institutions</option></select>
     </div>
@@ -129,14 +147,70 @@
       <label>Client / Organization</label>
       <input type="text" id="clientInput" placeholder="Search client name…">
     </div>
-    <div class="filter-group">
+    <div class="filter-group regs-only">
       <label>Lobbying firm</label>
       <input type="text" id="firmInput" placeholder="Search firm name…">
+    </div>
+    <div class="filter-group comms-only">
+      <label>DPOH name (individual lobbied)</label>
+      <input type="text" id="dpohInput" placeholder="Search name…">
     </div>
     <button class="btn-apply" id="applyBtn">Apply filters</button>
   </aside>
 
   <main>
+
+   <!-- ══════════ COMMUNICATIONS VIEW ══════════ -->
+   <div id="commsView" class="view-pane">
+    <div class="stat-cards">
+      <div class="stat-card"><div class="label">Communications</div><div class="value" id="cTotal">—</div><div class="sub" id="cAmend"></div></div>
+      <div class="stat-card"><div class="label">Unique clients</div><div class="value" id="cClients">—</div><div class="sub">organizations</div></div>
+      <div class="stat-card"><div class="label">Unique lobbyists</div><div class="value" id="cLobbyists">—</div><div class="sub">registrants</div></div>
+      <div class="stat-card"><div class="label">Unique DPOHs</div><div class="value" id="cDpoh">—</div><div class="sub">officials lobbied</div></div>
+    </div>
+
+    <div class="card">
+      <h3>Communications over time <span class="ms" id="cMsTime"></span></h3>
+      <div style="position:relative;height:220px"><canvas id="cTimeChart"></canvas></div>
+    </div>
+
+    <div class="two-col">
+      <div class="card"><h3>Top clients</h3><div style="position:relative" id="cClientWrap"><canvas id="cClientChart"></canvas></div></div>
+      <div class="card"><h3>Top institutions lobbied</h3><div style="position:relative" id="cInstWrap"><canvas id="cInstChart"></canvas></div></div>
+    </div>
+
+    <div class="card"><h3>By subject matter <span class="ms" id="cMsSubj"></span></h3>
+      <div style="position:relative" id="cSubjWrap"><canvas id="cSubjChart"></canvas></div></div>
+
+    <div class="card">
+      <h3>Communication records <span id="cCountLabel" style="font-weight:400;color:var(--muted)"></span> <span class="ms" id="cMsTable"></span></h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Date</th><th>Client</th><th>Lobbyist</th><th>DPOH(s)</th><th>Institution(s)</th><th>Subject(s)</th><th>Type</th></tr></thead>
+          <tbody id="cTbody"></tbody>
+        </table>
+      </div>
+      <div class="pagination">
+        <button class="page-btn" id="cPrevBtn" disabled>← Prev</button>
+        <span id="cPageLabel"></span>
+        <button class="page-btn" id="cNextBtn" disabled>Next →</button>
+        <span style="margin-left:auto" id="cPageTotal"></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Most-lobbied officials (DPOHs) <span class="ms" id="cMsDpoh"></span></h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Name</th><th>Title</th><th>Institution</th><th>Communications</th></tr></thead>
+          <tbody id="cDpohBody"></tbody>
+        </table>
+      </div>
+    </div>
+   </div><!-- /commsView -->
+
+   <!-- ══════════ REGISTRATIONS VIEW ══════════ -->
+   <div id="regsView" class="view-pane">
     <div class="stat-cards">
       <div class="stat-card"><div class="label">First-time organizations</div><div class="value" id="sFt">—</div><div class="sub">first appearance in the registry</div></div>
       <div class="stat-card"><div class="label">New registration filings</div><div class="value" id="sNew">—</div><div class="sub">new mandates filed</div></div>
@@ -175,6 +249,8 @@
         <span style="margin-left:auto" id="pageTotal"></span>
       </div>
     </div>
+   </div><!-- /regsView -->
+
   </main>
 </div>
 
@@ -190,9 +266,15 @@ const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;")
 const fmt = n => Number(n).toLocaleString("en-CA");
 const qs  = s => String(s).replace(/'/g, "''");   // SQL string literal escape
 
-let conn, charts = {}, page = 0, total = 0;
+let conn, charts = {};
+let currentView = "comms";
+let cPage = 0, cTotal = 0;      // comms table state
+let page = 0, total = 0;        // regs table state
+let loadedMB = 0;
+const viewLoaded = { comms: false, regs: false };   // data files registered
+const viewRendered = { comms: false, regs: false }; // first query pass done
 
-// ── Boot ──────────────────────────────────────────────────────────────────
+// ── Boot the engine ───────────────────────────────────────────────────────
 const boot = document.getElementById("bootStatus");
 const t0 = performance.now();
 
@@ -201,45 +283,89 @@ const workerUrl = URL.createObjectURL(
   new Blob([`importScripts("${bundle.mainWorker}");`], { type: "text/javascript" }));
 const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), new Worker(workerUrl));
 await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-
-boot.textContent = "Downloading registrations data…";
-const resp = await fetch("parquet/registrations.parquet");
-const buf = new Uint8Array(await resp.arrayBuffer());
-const parquetMB = (buf.length / 1e6).toFixed(1);   // before registering — the buffer transfers to the worker
-await db.registerFileBuffer("registrations.parquet", buf);
 conn = await db.connect();
-await conn.query("CREATE VIEW regs AS SELECT * FROM 'registrations.parquet'");
 
-document.getElementById("protoPill").textContent =
-  `${parquetMB} MB parquet · ready in ${((performance.now()-t0)/1000).toFixed(1)}s`;
+async function registerParquet(file) {
+  const resp = await fetch(`parquet/${file}`);
+  if (!resp.ok) throw new Error(`fetch ${file}: HTTP ${resp.status}`);
+  const buf = new Uint8Array(await resp.arrayBuffer());
+  loadedMB += buf.length / 1e6;
+  await db.registerFileBuffer(file, buf);
+}
 
-// ── Query helpers ─────────────────────────────────────────────────────────
+function pill() {
+  document.getElementById("protoPill").textContent =
+    `${loadedMB.toFixed(1)} MB parquet · engine ready in ${((performance.now()-t0)/1000).toFixed(1)}s`;
+}
+
+// Per-view lazy data loading: the default view costs ~14 MB, the other ~21 MB
+// downloads only if the user switches to it. Each loader stores its in-flight
+// promise so concurrent callers share one download instead of racing.
+const _loads = {};
+function ensureComms() {
+  _loads.comms ??= (async () => {
+    await Promise.all([registerParquet("communications.parquet"), registerParquet("dpoh.parquet")]);
+    await conn.query("CREATE VIEW comms AS SELECT * FROM 'communications.parquet'");
+    await conn.query("CREATE VIEW dpoh  AS SELECT * FROM 'dpoh.parquet'");
+    viewLoaded.comms = true;
+    pill();
+  })();
+  return _loads.comms;
+}
+function ensureRegs() {
+  _loads.regs ??= (async () => {
+    await registerParquet("registrations.parquet");
+    await conn.query("CREATE VIEW regs AS SELECT * FROM 'registrations.parquet'");
+    viewLoaded.regs = true;
+    pill();
+  })();
+  return _loads.regs;
+}
+
 async function q(sql) {
   const t = performance.now();
   const res = await conn.query(sql);
   return { rows: res.toArray().map(r => r.toJSON()), ms: performance.now() - t };
 }
 
-function whereClause() {
-  const w = [];
+// ── Shared filter reads ───────────────────────────────────────────────────
+function dateBounds() {
   const pad = v => String(v).padStart(2, "0");
   const df = `${document.getElementById("yearFrom").value}-${pad(document.getElementById("monthFrom").value)}`;
   const y = Number(document.getElementById("yearTo").value);
   const m = Number(document.getElementById("monthTo").value);
   const end = `${y + Math.floor(m / 12)}-${pad(m % 12 + 1)}-01`;
-  w.push(`posted_date >= '${qs(df)}-01'`, `posted_date < '${qs(end)}'`);
+  return [df + "-01", end];
+}
 
+function sharedFilters(dateCol, w) {
+  const [start, end] = dateBounds();
+  w.push(`${dateCol} >= '${qs(start)}'`, `${dateCol} < '${qs(end)}'`);
   const types = [...document.querySelectorAll(".rt-cb:checked")].map(cb => cb.value);
   if (types.length > 0 && types.length < 3) w.push(`reg_type IN (${types.join(",")})`);
-  if (document.getElementById("newOnly").checked) w.push("is_original = 1");
-  if (document.getElementById("ftOnly").checked)  w.push("first_time_org = 1");
-
   const subj = document.getElementById("subjSel").value;
   if (subj) w.push(`list_contains(string_split(subjects, '|'), '${qs(subj)}')`);
-  const inst = document.getElementById("instSel").value;
-  if (inst) w.push(`list_contains(string_split(institutions, '|'), '${qs(inst)}')`);
   const client = document.getElementById("clientInput").value.trim();
   if (client) w.push(`client_name ILIKE '%${qs(client)}%'`);
+}
+
+function commsWhere() {
+  const w = [];
+  sharedFilters("comm_date", w);
+  const inst = document.getElementById("cInstSel").value;
+  if (inst) w.push(`list_contains(string_split(institutions, '|'), '${qs(inst)}')`);
+  const dpoh = document.getElementById("dpohInput").value.trim();
+  if (dpoh) w.push(`dpoh_names ILIKE '%${qs(dpoh)}%'`);
+  return w.join(" AND ");
+}
+
+function regsWhere() {
+  const w = [];
+  sharedFilters("posted_date", w);
+  if (document.getElementById("newOnly").checked) w.push("is_original = 1");
+  if (document.getElementById("ftOnly").checked)  w.push("first_time_org = 1");
+  const inst = document.getElementById("instSel").value;
+  if (inst) w.push(`list_contains(string_split(institutions, '|'), '${qs(inst)}')`);
   const firm = document.getElementById("firmInput").value.trim();
   if (firm) w.push(`firm_name ILIKE '%${qs(firm)}%'`);
   return w.join(" AND ");
@@ -261,27 +387,117 @@ function barChart(id, wrapId, labels, data) {
   });
 }
 
-function timeChart(labels, totals, news, ft) {
-  destroy("timeChart");
-  const mk = (label, data, color, bgA) => ({ label, data, borderColor: color,
-    backgroundColor: bgA, borderWidth: 2, pointRadius: labels.length > 60 ? 0 : 2, fill: true, tension: .3 });
-  charts["timeChart"] = new Chart(document.getElementById("timeChart"), {
+function lineChart(id, labels, datasets) {
+  destroy(id);
+  charts[id] = new Chart(document.getElementById(id), {
     type: "line",
-    data: { labels, datasets: [
-      mk("All filings", totals, "#2980b9", "rgba(41,128,185,.05)"),
-      mk("New filings", news, "#d35400", "rgba(211,84,0,.05)"),
-      mk("First-time orgs", ft, "#c0392b", "rgba(192,57,43,.08)"),
-    ]},
+    data: { labels, datasets },
     options: { responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: true, labels: { boxWidth: 12, font: { size: 11 } } } },
+      plugins: { legend: { display: datasets.length > 1, labels: { boxWidth: 12, font: { size: 11 } } } },
       scales: { x: { ticks: { font: { size: 10 }, maxTicksLimit: 24, maxRotation: 45 } },
                 y: { ticks: { font: { size: 11 } }, beginAtZero: true } } },
   });
 }
 
-// ── Loads ─────────────────────────────────────────────────────────────────
-async function loadStats() {
-  const W = whereClause();
+const series = (label, data, color, bgA, n) => ({ label, data, borderColor: color,
+  backgroundColor: bgA, borderWidth: 2, pointRadius: n > 60 ? 0 : 2, fill: true, tension: .3 });
+
+// ══════════ COMMUNICATIONS ══════════
+async function loadCommsStats() {
+  const W = commsWhere();
+
+  const s = await q(`
+    SELECT COUNT(*) AS total, COALESCE(SUM(is_amendment),0) AS amendments,
+           COUNT(DISTINCT client_num) AS clients, COUNT(DISTINCT reg_num) AS lobbyists
+    FROM comms WHERE ${W}`);
+  const r = s.rows[0];
+  document.getElementById("cTotal").textContent     = fmt(r.total);
+  document.getElementById("cAmend").textContent     = `${fmt(r.amendments)} amendments`;
+  document.getElementById("cClients").textContent   = fmt(r.clients);
+  document.getElementById("cLobbyists").textContent = fmt(r.lobbyists);
+
+  const ud = await q(`
+    SELECT COUNT(DISTINCT name_key) c FROM dpoh
+    WHERE comlog_id IN (SELECT comlog_id FROM comms WHERE ${W})`);
+  document.getElementById("cDpoh").textContent = fmt(ud.rows[0].c);
+
+  const tm = await q(`
+    SELECT comm_month AS m, COUNT(*) AS c FROM comms WHERE ${W} GROUP BY m ORDER BY m`);
+  const months = tm.rows.slice(0, -1);   // drop the partial current month
+  lineChart("cTimeChart", months.map(x => x.m),
+    [series("Communications", months.map(x => Number(x.c)), "#c0392b", "rgba(192,57,43,.08)", months.length)]);
+  document.getElementById("cMsTime").textContent = `· ${(s.ms + ud.ms + tm.ms).toFixed(0)} ms in-browser`;
+
+  const tc = await q(`SELECT client_name, COUNT(*) c FROM comms WHERE ${W} AND client_name != ''
+                      GROUP BY client_name ORDER BY c DESC LIMIT 15`);
+  barChart("cClientChart", "cClientWrap", tc.rows.map(x => x.client_name), tc.rows.map(x => Number(x.c)));
+
+  const ti = await q(`
+    SELECT s AS inst, COUNT(DISTINCT comlog_id) c FROM (
+      SELECT comlog_id, unnest(string_split(institutions, '|')) AS s FROM comms WHERE ${W}
+    ) WHERE s != '' GROUP BY s ORDER BY c DESC LIMIT 15`);
+  barChart("cInstChart", "cInstWrap", ti.rows.map(x => x.inst), ti.rows.map(x => Number(x.c)));
+
+  const ts = await q(`
+    SELECT s AS subj, COUNT(DISTINCT comlog_id) c FROM (
+      SELECT comlog_id, unnest(string_split(subjects, '|')) AS s FROM comms WHERE ${W}
+    ) WHERE s != '' GROUP BY s ORDER BY c DESC LIMIT 20`);
+  barChart("cSubjChart", "cSubjWrap", ts.rows.map(x => x.subj), ts.rows.map(x => Number(x.c)));
+  document.getElementById("cMsSubj").textContent = `· ${ts.ms.toFixed(0)} ms`;
+
+  const td = await q(`
+    SELECT max(name) AS name, max(title) AS title, institution, COUNT(DISTINCT comlog_id) c
+    FROM dpoh WHERE comlog_id IN (SELECT comlog_id FROM comms WHERE ${W})
+    GROUP BY name_key, institution ORDER BY c DESC LIMIT 20`);
+  document.getElementById("cDpohBody").innerHTML = td.rows.map((x, i) => `
+    <tr><td>${i + 1}</td><td><strong>${esc(x.name)}</strong></td>
+    <td style="color:var(--muted)">${esc(x.title)}</td><td>${esc(x.institution)}</td>
+    <td><strong>${fmt(x.c)}</strong></td></tr>`).join("");
+  document.getElementById("cMsDpoh").textContent = `· ${td.ms.toFixed(0)} ms`;
+}
+
+async function loadCommsTable() {
+  const W = commsWhere();
+  const cnt = await q(`SELECT COUNT(*) c FROM comms WHERE ${W}`);
+  const rows = await q(`SELECT * FROM comms WHERE ${W}
+                        ORDER BY comm_date DESC LIMIT ${PAGE_SIZE} OFFSET ${cPage * PAGE_SIZE}`);
+  cTotal = Number(cnt.rows[0].c);
+  document.getElementById("cCountLabel").textContent = `— ${fmt(cTotal)} records`;
+  document.getElementById("cMsTable").textContent = `· ${(cnt.ms + rows.ms).toFixed(0)} ms`;
+
+  const tags = (str, cls) => (str || "").split("|").map(s => s.trim()).filter(Boolean)
+    .map(s => `<span class="tag ${cls}">${esc(s)}</span>`).join(" ");
+
+  document.getElementById("cTbody").innerHTML = rows.rows.length === 0
+    ? `<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:40px">No records match.</td></tr>`
+    : rows.rows.map(r => `<tr>
+        <td><a href="https://lobbycanada.gc.ca/app/secure/ocl/lrs/do/cmmLgPblcVw?comlogId=${encodeURIComponent(r.comlog_id)}" target="_blank" style="color:var(--accent);font-size:11px;white-space:nowrap">View ↗</a></td>
+        <td style="white-space:nowrap">${esc(r.comm_date)}</td>
+        <td><strong>${esc(r.client_name)}</strong></td>
+        <td>${esc(r.lobbyist)}</td>
+        <td>${tags(r.dpoh_names, "") || "—"}</td>
+        <td>${tags(r.institutions, "red") || "—"}</td>
+        <td>${tags(r.subjects, "green") || "—"}</td>
+        <td style="white-space:nowrap;color:var(--muted)">${esc(TYPE_LABELS[r.reg_type] || r.reg_type)}</td>
+      </tr>`).join("");
+
+  const pages = Math.max(1, Math.ceil(cTotal / PAGE_SIZE));
+  document.getElementById("cPrevBtn").disabled = cPage === 0;
+  document.getElementById("cNextBtn").disabled = cPage >= pages - 1;
+  document.getElementById("cPageLabel").textContent = `Page ${cPage + 1} of ${pages}`;
+  document.getElementById("cPageTotal").textContent = `${fmt(cTotal)} total`;
+}
+
+async function loadCommsAll() {
+  const main = document.querySelector("main");
+  main.classList.add("busy");
+  try { cPage = 0; await loadCommsStats(); await loadCommsTable(); viewRendered.comms = true; }
+  finally { main.classList.remove("busy"); }
+}
+
+// ══════════ REGISTRATIONS ══════════
+async function loadRegsStats() {
+  const W = regsWhere();
 
   const s = await q(`
     SELECT COUNT(*) AS total, COALESCE(SUM(is_original),0) AS new_regs,
@@ -299,9 +515,12 @@ async function loadStats() {
     SELECT posted_month AS m, COUNT(*) AS c, COALESCE(SUM(is_original),0) AS n,
            COUNT(DISTINCT CASE WHEN first_time_org = 1 THEN norm_name END) AS ft
     FROM regs WHERE ${W} GROUP BY m ORDER BY m`);
-  const months = tm.rows.slice(0, -1);   // drop the partial current month
-  timeChart(months.map(x => x.m), months.map(x => Number(x.c)),
-            months.map(x => Number(x.n)), months.map(x => Number(x.ft)));
+  const months = tm.rows.slice(0, -1);
+  lineChart("timeChart", months.map(x => x.m), [
+    series("All filings", months.map(x => Number(x.c)), "#2980b9", "rgba(41,128,185,.05)", months.length),
+    series("New filings", months.map(x => Number(x.n)), "#d35400", "rgba(211,84,0,.05)", months.length),
+    series("First-time orgs", months.map(x => Number(x.ft)), "#c0392b", "rgba(192,57,43,.08)", months.length),
+  ]);
   document.getElementById("msTime").textContent = `· ${(s.ms + tm.ms).toFixed(0)} ms in-browser`;
 
   const tf = await q(`SELECT firm_name, COUNT(*) c FROM regs WHERE ${W} AND firm_name != ''
@@ -327,8 +546,8 @@ async function loadStats() {
   document.getElementById("msSubj").textContent = `· ${ts.ms.toFixed(0)} ms`;
 }
 
-async function loadTable() {
-  const W = whereClause();
+async function loadRegsTable() {
+  const W = regsWhere();
   const ftOnly = document.getElementById("ftOnly").checked;
 
   let cnt, rows;
@@ -381,14 +600,35 @@ async function loadTable() {
   document.getElementById("pageTotal").textContent = `${fmt(total)} total`;
 }
 
-async function loadAll() {
+async function loadRegsAll() {
   const main = document.querySelector("main");
   main.classList.add("busy");
-  try { page = 0; await loadStats(); await loadTable(); }
+  try { page = 0; await loadRegsStats(); await loadRegsTable(); viewRendered.regs = true; }
   finally { main.classList.remove("busy"); }
 }
 
-// ── Filter dropdown options (derived from the data itself) ────────────────
+// ── View switching ────────────────────────────────────────────────────────
+async function switchView(view) {
+  if (view === currentView) return;
+  currentView = view;
+  document.body.setAttribute("data-view", view);
+  document.getElementById("viewCommsBtn").classList.toggle("active", view === "comms");
+  document.getElementById("viewRegsBtn").classList.toggle("active", view === "regs");
+
+  if (view === "regs") {
+    await ensureRegs();
+    await fillRegInstitutions();
+    if (!viewRendered.regs) await loadRegsAll();
+  } else {
+    await ensureComms();
+    if (!viewRendered.comms) await loadCommsAll();
+  }
+  setTimeout(() => Object.values(charts).forEach(c => { try { c.resize(); } catch (e) {} }), 0);
+}
+document.getElementById("viewCommsBtn").addEventListener("click", () => switchView("comms"));
+document.getElementById("viewRegsBtn").addEventListener("click", () => switchView("regs"));
+
+// ── Filters init ──────────────────────────────────────────────────────────
 function initDateDropdowns() {
   const now = new Date();
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -406,32 +646,55 @@ function initDateDropdowns() {
 async function populateFilters() {
   initDateDropdowns();
 
+  // Subjects + comms institutions from the comms data (loaded at boot)
+  const subjs = await q(`
+    SELECT DISTINCT unnest(string_split(subjects,'|')) s FROM comms ORDER BY s`);
+  const sSel = document.getElementById("subjSel");
+  subjs.rows.filter(r => r.s).forEach(r => sSel.add(new Option(r.s, r.s)));
+
+  const cInsts = await q(`
+    SELECT s, COUNT(DISTINCT comlog_id) c FROM (
+      SELECT comlog_id, unnest(string_split(institutions,'|')) s FROM comms)
+    WHERE s != '' GROUP BY s ORDER BY c DESC`);
+  const ciSel = document.getElementById("cInstSel");
+  cInsts.rows.forEach(r => ciSel.add(new Option(r.s, r.s)));
+}
+
+// Reg-institutions dropdown fills on first switch to the regs view
+let regInstFilled = false;
+async function fillRegInstitutions() {
+  if (regInstFilled) return;
+  regInstFilled = true;
   const insts = await q(`
     SELECT s, COUNT(DISTINCT reg_id) c FROM (
       SELECT reg_id, unnest(string_split(institutions,'|')) s FROM regs)
     WHERE s != '' GROUP BY s ORDER BY c DESC`);
   const iSel = document.getElementById("instSel");
   insts.rows.forEach(r => iSel.add(new Option(r.s, r.s)));
-
-  const subjs = await q(`
-    SELECT DISTINCT unnest(string_split(subjects,'|')) s FROM regs ORDER BY s`);
-  const sSel = document.getElementById("subjSel");
-  subjs.rows.filter(r => r.s).forEach(r => sSel.add(new Option(r.s, r.s)));
 }
 
 // ── Wire up ───────────────────────────────────────────────────────────────
-document.getElementById("applyBtn").addEventListener("click", loadAll);
+function applyCurrent() { currentView === "regs" ? loadRegsAll() : loadCommsAll(); }
+document.getElementById("applyBtn").addEventListener("click", applyCurrent);
 document.querySelectorAll("input[type=text]").forEach(el =>
-  el.addEventListener("keydown", e => { if (e.key === "Enter") loadAll(); }));
-document.getElementById("prevBtn").addEventListener("click", async () => {
-  if (page > 0) { page--; await loadTable(); } });
-document.getElementById("nextBtn").addEventListener("click", async () => {
-  if (page < Math.ceil(total / PAGE_SIZE) - 1) { page++; await loadTable(); } });
+  el.addEventListener("keydown", e => { if (e.key === "Enter") applyCurrent(); }));
 
+document.getElementById("cPrevBtn").addEventListener("click", async () => {
+  if (cPage > 0) { cPage--; await loadCommsTable(); } });
+document.getElementById("cNextBtn").addEventListener("click", async () => {
+  if (cPage < Math.ceil(cTotal / PAGE_SIZE) - 1) { cPage++; await loadCommsTable(); } });
+document.getElementById("prevBtn").addEventListener("click", async () => {
+  if (page > 0) { page--; await loadRegsTable(); } });
+document.getElementById("nextBtn").addEventListener("click", async () => {
+  if (page < Math.ceil(total / PAGE_SIZE) - 1) { page++; await loadRegsTable(); } });
+
+// ── Go ────────────────────────────────────────────────────────────────────
+boot.textContent = "Downloading communications data…";
+await ensureComms();
 boot.style.display = "none";
 document.getElementById("app").style.display = "grid";
 await populateFilters();
-await loadAll();
+await loadCommsAll();
 </script>
 </body>
 </html>

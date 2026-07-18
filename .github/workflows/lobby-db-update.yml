@@ -137,7 +137,9 @@ jobs:
           && inputs.dry_run != true
         run: |
           gh release upload db-latest lobbyist/lobby.db lobby-meta.json \
-            lobbyist/parquet/registrations.parquet --clobber --repo "$GITHUB_REPOSITORY"
+            lobbyist/parquet/registrations.parquet \
+            lobbyist/parquet/communications.parquet \
+            lobbyist/parquet/dpoh.parquet --clobber --repo "$GITHUB_REPOSITORY"
           gh release edit db-latest \
             --notes "Built $(date -u '+%Y-%m-%d %H:%M UTC') by GitHub Actions from lobbycanada.gc.ca open data" \
             --repo "$GITHUB_REPOSITORY"

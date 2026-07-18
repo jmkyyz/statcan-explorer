@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
 """
-build_parquet.py — export the Registrations slice of lobby.db to Parquet.
+build_parquet.py — export lobby.db to the Parquet files behind the static
+(DuckDB-WASM) frontend, replacing the Flask query endpoints.
 
-First step of the static (Parquet + DuckDB-WASM) architecture: one
-denormalized file the browser can query directly, replacing the
-/api/reg-stats and /api/registrations server endpoints.
+Three files:
+  registrations.parquet  — one denormalized row per registration (subjects /
+                           institutions / detail texts pipe-joined, the same
+                           shape app.py's _decorate_regs returns)
+  communications.parquet — one denormalized row per communication report
+                           (DPOH names / institutions / subjects pipe-joined,
+                           matching _decorate_comms)
+  dpoh.parquet           — one row per official per communication, for the
+                           official-level aggregations the wide file can't
+                           answer (top DPOHs with title+institution, unique-
+                           DPOH counts)
 
-Subjects / institutions / detail texts are pipe-joined per registration —
-the same shape app.py's _decorate_regs returns — so the whole Registrations
-view runs off a single file. DuckDB unnests the pipe lists at query time for
-the aggregation charts.
+DuckDB unnests the pipe-joined lists at query time for the aggregation charts.
 
 Env overrides (match build_db.py conventions):
   LOBBY_DB_PATH    source SQLite DB   (default: ./lobby.db)
@@ -103,16 +109,90 @@ def build():
     n, lo, hi = con.execute(
         "SELECT COUNT(*), MIN(posted_date), MAX(posted_date) FROM regs"
     ).fetchone()
+    log(f"{out.name} = {out.stat().st_size/1e6:.1f} MB, {n:,} rows, {lo} → {hi}")
+
+    # ── Communications ───────────────────────────────────────────────────────
+    comms_out = OUT_DIR / "communications.parquet"
+    log("Denormalizing communications ...")
+    con.execute("""
+        CREATE TEMP TABLE comms AS
+        SELECT c.comlog_id,
+               c.comm_date,
+               c.comm_month,
+               CAST(c.reg_type AS TINYINT)     AS reg_type,
+               CAST(c.is_amendment AS TINYINT) AS is_amendment,
+               c.client_name,
+               c.client_num,
+               c.reg_num,
+               trim(COALESCE(c.reg_first,'') || ' ' || COALESCE(c.reg_last,'')) AS lobbyist,
+               c.norm_name,
+               COALESCE(d.names, '') AS dpoh_names,
+               COALESCE(d.insts, '') AS institutions,
+               COALESCE(s.subj, '')  AS subjects,
+               COALESCE(sd.det, '')  AS subject_details
+        FROM ldb.communications c
+        LEFT JOIN (
+            SELECT comlog_id,
+                   array_to_string(list_distinct(list(trim(COALESCE(dpoh_first,'') || ' ' || COALESCE(dpoh_last,'')))
+                                   FILTER (WHERE trim(COALESCE(dpoh_first,'') || ' ' || COALESCE(dpoh_last,'')) != '')), '|') AS names,
+                   array_to_string(list_distinct(list(institution) FILTER (WHERE institution != '')), '|') AS insts
+            FROM ldb.dpoh GROUP BY comlog_id
+        ) d ON d.comlog_id = c.comlog_id
+        LEFT JOIN (
+            SELECT su.comlog_id,
+                   array_to_string(list_distinct(list(st.description)), '|') AS subj
+            FROM ldb.subjects su
+            JOIN ldb.subject_types st ON st.subject_code = su.subject_code
+            GROUP BY su.comlog_id
+        ) s ON s.comlog_id = c.comlog_id
+        LEFT JOIN (
+            SELECT comlog_id,
+                   array_to_string(list_distinct(list(detail_text)), ' || ') AS det
+            FROM ldb.subject_details GROUP BY comlog_id
+        ) sd ON sd.comlog_id = c.comlog_id
+    """)
+    con.execute(f"""
+        COPY (SELECT * FROM comms ORDER BY comm_date DESC)
+        TO '{comms_out}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 32768)
+    """)
+    cn, clo, chi = con.execute(
+        "SELECT COUNT(*), MIN(comm_date), MAX(comm_date) FROM comms"
+    ).fetchone()
+    log(f"{comms_out.name} = {comms_out.stat().st_size/1e6:.1f} MB, {cn:,} rows, {clo} → {chi}")
+
+    # ── DPOH (official-level rows) ────────────────────────────────────────────
+    dpoh_out = OUT_DIR / "dpoh.parquet"
+    log("Exporting dpoh ...")
+    # name_key mirrors app.py's distinct-DPOH key (last,first) exactly so
+    # unique-official counts match the server; name is for display only.
+    con.execute(f"""
+        COPY (
+            SELECT comlog_id,
+                   COALESCE(dpoh_last,'') || ',' || COALESCE(dpoh_first,'') AS name_key,
+                   trim(COALESCE(dpoh_first,'') || ' ' || COALESCE(dpoh_last,'')) AS name,
+                   COALESCE(dpoh_title, '') AS title,
+                   COALESCE(institution, '') AS institution
+            FROM ldb.dpoh
+            WHERE COALESCE(dpoh_last,'') != ''
+            ORDER BY comlog_id DESC
+        ) TO '{dpoh_out}' (FORMAT PARQUET, COMPRESSION ZSTD, ROW_GROUP_SIZE 65536)
+    """)
+    dn = con.execute(f"SELECT COUNT(*) FROM '{dpoh_out}'").fetchone()[0]
+    log(f"{dpoh_out.name} = {dpoh_out.stat().st_size/1e6:.1f} MB, {dn:,} rows")
+
     meta = {
         "built_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
-        "rows": n,
+        "reg_rows": n,
         "posted_date_range": [lo, hi],
+        "comm_rows": cn,
+        "comm_date_range": [clo, chi],
         "source_db": str(DB_PATH),
     }
     (OUT_DIR / "meta.json").write_text(json.dumps(meta, indent=2))
     con.close()
 
-    log(f"Done. {out.name} = {out.stat().st_size/1e6:.1f} MB, {n:,} rows, {lo} → {hi}")
+    total_mb = sum(f.stat().st_size for f in OUT_DIR.glob("*.parquet")) / 1e6
+    log(f"Done. Total parquet payload = {total_mb:.1f} MB")
 
 
 if __name__ == "__main__":

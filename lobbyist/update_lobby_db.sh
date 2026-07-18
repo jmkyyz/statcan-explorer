@@ -152,12 +152,15 @@ print(json.dumps({'built_at': m.get('built_at',''), 'patched_at': m.get('patched
 " > /tmp/lobby-meta.json
 gh release upload db-latest /tmp/lobby-meta.json --clobber
 
-# Registrations parquet for the static (DuckDB-WASM) frontend — optional while
-# that architecture is being proven; skipped quietly if duckdb isn't installed.
+# Parquet files for the static (DuckDB-WASM) frontend — optional while that
+# architecture is being proven; skipped quietly if duckdb isn't installed.
 if python3 -c "import duckdb" 2>/dev/null; then
-    echo "==> Building registrations.parquet ..."
+    echo "==> Building parquet files ..."
     if python3 -u lobbyist/build_parquet.py; then
-        gh release upload db-latest lobbyist/parquet/registrations.parquet --clobber
+        gh release upload db-latest \
+          lobbyist/parquet/registrations.parquet \
+          lobbyist/parquet/communications.parquet \
+          lobbyist/parquet/dpoh.parquet --clobber
     else
         echo "    (parquet build failed — continuing; the SQLite app is unaffected)"
     fi
