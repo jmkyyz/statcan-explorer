@@ -1,0 +1,20 @@
+# Registration stub so this workflow is dispatchable — the real pipeline
+# (schedule + steps) lives on feature/parquet-wasm-rearch and replaces this
+# file when that branch merges. No schedule here on purpose: the Mac launchd
+# job remains the production pipeline until the re-architecture ships.
+
+name: lobby-db-update
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build only — skip publish and Render redeploy"
+        type: boolean
+        default: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Stub on main — dispatch this workflow with ref feature/parquet-wasm-rearch to run the real pipeline."
