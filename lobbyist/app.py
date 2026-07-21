@@ -1452,9 +1452,48 @@ def _fetch_missing_parquet():
             print(f"Parquet fetch failed for {name}: {e}", flush=True)
 
 
+# The /beta DuckDB-WASM libraries (34MB wasm + siblings) used to ship through the
+# git checkout, but a redeploy can drop them (large blobs), which 404s /beta.
+# They're now pinned in a stable release and fetched here the same way parquet is,
+# so /beta self-heals regardless of what the build checkout produced.
+_VENDOR_FILES = (
+    "duckdb-eh.wasm", "duckdb-eh.wasm.gz",
+    "duckdb-browser-eh.worker.js", "duckdb-browser-eh.worker.js.gz",
+    "duckdb-browser.mjs", "duckdb-browser.mjs.gz",
+    "chart.umd.min.js", "chart.umd.min.js.gz",
+    "xlsx.full.min.js", "xlsx.full.min.js.gz",
+)
+
+
+def _fetch_missing_vendor():
+    """Fetch any missing static/vendor library from the pinned vendor-libs
+    release. Mirrors _fetch_missing_parquet: skip files already present, download
+    to .tmp + atomic rename so a request never sees a partial file."""
+    vendor_dir = Path(__file__).parent / "static" / "vendor"
+    release = "https://github.com/jmkyyz/statcan-explorer/releases/download/vendor-libs"
+    vendor_dir.mkdir(parents=True, exist_ok=True)
+    for name in _VENDOR_FILES:
+        dest = vendor_dir / name
+        if dest.exists():
+            continue
+        tmp = vendor_dir / (name + f".tmp{os.getpid()}")
+        try:
+            with http_requests.get(f"{release}/{name}", stream=True, timeout=300) as r:
+                r.raise_for_status()
+                with open(tmp, "wb") as f:
+                    for chunk in r.iter_content(1 << 20):
+                        f.write(chunk)
+            tmp.rename(dest)
+            print(f"Fetched vendor {name}", flush=True)
+        except Exception as e:
+            tmp.unlink(missing_ok=True)
+            print(f"Vendor fetch failed for {name}: {e}", flush=True)
+
+
 _ensure_indexes()
 threading.Thread(target=_prewarm, daemon=True).start()
 threading.Thread(target=_fetch_missing_parquet, daemon=True).start()
+threading.Thread(target=_fetch_missing_vendor, daemon=True).start()
 
 
 # ── Run ───────────────────────────────────────────────────────────────────────
