@@ -29,6 +29,9 @@
   .view-toggle button.active { background: #fff; color: var(--red); opacity: 1; }
   .proto-pill { font-size: 11px; background: rgba(255,255,255,.2);
                 padding: 4px 10px; border-radius: 12px; }
+  .classic-link { font-size: 12px; color: rgba(255,255,255,.85); text-decoration: none;
+                  white-space: nowrap; border-bottom: 1px solid rgba(255,255,255,.45); }
+  .classic-link:hover { color: #fff; border-bottom-color: #fff; }
   #filterToggle { display: none; border: 1px solid rgba(255,255,255,.5); background: none;
                   color: #fff; font-size: 12px; font-weight: 600; padding: 5px 12px;
                   border-radius: 6px; cursor: pointer; white-space: nowrap; }
@@ -181,6 +184,7 @@
     <button id="viewRegsBtn">Registrations</button>
   </div>
   <div class="hdr-right">
+    <a class="classic-link" href="/classic" title="Open the classic server-backed version">Classic view</a>
     <button id="filterToggle">☰ Filters</button>
     <span class="proto-pill" id="protoPill">booting…</span>
   </div>

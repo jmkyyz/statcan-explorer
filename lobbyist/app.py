@@ -18,7 +18,7 @@ import requests as http_requests
 from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder=None)   # custom /static route below; built-in unused
 CORS(app)
 
 try:
@@ -287,30 +287,38 @@ def build_reg_filter_select(params: dict):
     return sql, binds
 
 
-# ── Static frontend ──────────────────────────────────────────────────────────
+# ── Frontends ────────────────────────────────────────────────────────────────
+# Soft launch (July 2026): the DuckDB-WASM app (formerly /beta) is now the
+# default at /. The server-backed app is kept at /classic as a fallback. /beta
+# stays as an alias for existing bookmarks/links. The WASM HTML uses relative
+# asset paths, so it works at both / (→ /static, /parquet) and /beta/
+# (→ /beta/static, /beta/parquet); both route sets are registered below.
 
-@app.route("/")
-def index():
-    resp = send_from_directory(Path(__file__).parent, "lobby-explorer.html")
+_VENDOR_TYPES = {".wasm": "application/wasm", ".mjs": "text/javascript",
+                 ".js": "text/javascript"}
+
+
+def _serve_frontend(filename):
+    resp = send_from_directory(Path(__file__).parent, filename)
     # Always revalidate (cheap 304 via the ETag Flask sets) so a redeploy's
     # frontend changes reach browsers immediately.
     resp.headers["Cache-Control"] = "no-cache"
     return resp
 
 
-# ── /beta: static DuckDB-WASM frontend (candidate replacement for /) ─────────
-
-_VENDOR_TYPES = {".wasm": "application/wasm", ".mjs": "text/javascript",
-                 ".js": "text/javascript"}
-
-
+@app.route("/")
 @app.route("/beta/")
-def beta_index():
-    resp = send_from_directory(Path(__file__).parent, "wasm-prototype.html")
-    resp.headers["Cache-Control"] = "no-cache"
-    return resp
+def index():
+    return _serve_frontend("wasm-prototype.html")
 
 
+@app.route("/classic")
+@app.route("/classic/")
+def classic_index():
+    return _serve_frontend("lobby-explorer.html")
+
+
+@app.route("/static/<path:filename>")
 @app.route("/beta/static/<path:filename>")
 def beta_static(filename):
     """Vendored, version-pinned libraries (the HTML references them with ?v=
@@ -331,6 +339,7 @@ def beta_static(filename):
     return resp
 
 
+@app.route("/parquet/<path:filename>")
 @app.route("/beta/parquet/<path:filename>")
 def beta_parquet(filename):
     """Data files — replaced by the daily pipeline, so always revalidate

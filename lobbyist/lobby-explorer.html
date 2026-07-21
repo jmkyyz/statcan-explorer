@@ -41,6 +41,12 @@
   header .maple { display: flex; align-items: center; flex: none; }
   header h1 { font-size: 18px; font-weight: 700; letter-spacing: .3px; }
   header p  { font-size: 12px; opacity: .85; }
+  .newver-link {
+    font-size: 12px; color: #fff; text-decoration: none; white-space: nowrap;
+    background: rgba(255,255,255,.18); padding: 4px 10px; border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.5);
+  }
+  .newver-link:hover { background: rgba(255,255,255,.32); }
   .db-status {
     margin-left: auto;
     font-size: 11px;
@@ -617,6 +623,7 @@
     <button id="viewCommsBtn" class="active" role="tab" aria-selected="true">Communications</button>
     <button id="viewRegsBtn" role="tab" aria-selected="false">Registrations</button>
   </div>
+  <a class="newver-link" href="/" title="Try the new faster in-browser version">✨ New version</a>
   <button id="filterToggle" aria-controls="sidebar" aria-expanded="false">☰ Filters</button>
   <div class="db-status" id="dbStatus">Connecting…</div>
 </header>
