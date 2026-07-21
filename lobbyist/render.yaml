@@ -11,14 +11,7 @@ services:
       for f in registrations communications dpoh; do
       curl -L --fail --retry 5 --retry-all-errors --retry-delay 5 -o "parquet/$f.parquet"
       "https://github.com/jmkyyz/statcan-explorer/releases/download/db-latest/$f.parquet"
-      || exit 1; done &&
-      mkdir -p static/vendor &&
-      for f in duckdb-eh.wasm duckdb-eh.wasm.gz duckdb-browser-eh.worker.js
-      duckdb-browser-eh.worker.js.gz duckdb-browser.mjs duckdb-browser.mjs.gz
-      chart.umd.min.js chart.umd.min.js.gz xlsx.full.min.js xlsx.full.min.js.gz; do
-      curl -L --fail --retry 5 --retry-all-errors --retry-delay 5 -o "static/vendor/$f"
-      "https://github.com/jmkyyz/statcan-explorer/releases/download/vendor-libs/$f"
-      || echo "vendor $f fetch failed — startup thread will retry"; done
+      || exit 1; done
     startCommand: gunicorn --workers 2 --threads 4 --bind 0.0.0.0:$PORT --timeout 120 app:app
     envVars:
       - key: PORT

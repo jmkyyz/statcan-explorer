@@ -8,8 +8,3 @@ lobby_weekly.log
 __pycache__/
 *.pyc
 parquet/
-
-# DuckDB-WASM engine (34MB) — too large for a reliable git checkout on Render.
-# Fetched at build + startup from the pinned `vendor-libs` release instead.
-static/vendor/duckdb-eh.wasm
-static/vendor/duckdb-eh.wasm.gz
