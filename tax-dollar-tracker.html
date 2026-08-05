@@ -317,7 +317,8 @@ body {
 
     <div class="estimate-banner">
       <strong>Estimates only.</strong> Income tax calculated using 2025 brackets, basic personal amount credit,
-      Ontario and PEI surtaxes, and Quebec federal abatement. CPP, EI, and other credits are not applied.
+      the Ontario surtax and Ontario Health Premium, and the Quebec federal abatement. CPP, EI, and other credits
+      are not applied, and the figure you enter is treated as taxable income.
       Spending allocations are approximate percentages from 2023–24 public accounts.
     </div>
 
@@ -420,7 +421,13 @@ body {
         <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501" target="_blank">Table 10-10-0005-01, Government finance statistics (2023)</a>;
         individual provincial public accounts 2023–24</li>
       <li>Spending allocations are approximate and rounded to the nearest 1%. Actual allocations vary year to year.</li>
-      <li>Ontario surtax and Quebec federal abatement (16.5%) are applied. PEI surtax eliminated for 2025 (restructured into bracket rates). See methodology document for full list of simplifications.</li>
+      <li><strong>Ontario:</strong> the surtax (20% of Ontario tax over $5,710, plus a further 36% over $7,307) and the
+        Ontario Health Premium (up to $900, collected as Ontario income tax on Form ON428) are both applied. The Ontario
+        Tax Reduction, which lowers or eliminates provincial tax for low-income filers and those with dependants, is not —
+        so Ontario tax is overstated at the bottom of the income range.</li>
+      <li>The Quebec federal abatement (16.5%) is applied. Ontario is the only province or territory with an income tax
+        surtax in 2025; PEI's was eliminated for 2024 and later and folded into its bracket rates. See the methodology
+        document for the full list of simplifications.</li>
     </ul>
   </div>
 
@@ -544,8 +551,13 @@ const PROVINCES = {
   },
   YT: {
     name: 'Yukon',
-    // Mirrors federal bracket thresholds
-    brackets: [[57375,.064],[114750,.09],[177882,.109],[253414,.1293],[500000,.128],[Infinity,.15]],
+    // Mirrors federal bracket thresholds up to $177,882, then 12.8% to $500,000.
+    // Source: CRA Form YT428 (5011-C), 2025 — five brackets, not six.
+    // Do NOT reinstate a 12.93% band at $253,414: that figure is an *effective* rate with the
+    // federal BPA clawback baked in (12.8% + 1,591/75,532 × 6.4% = 12.935%), not a statutory rate.
+    brackets: [[57375,.064],[114750,.09],[177882,.109],[500000,.128],[Infinity,.15]],
+    // Yukon claims the federal BPA, so it phases down over $177,882–$253,414. Not modelled,
+    // consistent with the federal BPA phase-down also not being modelled.
     bpa: 16129,
     chtPct: 0,
     spending: { health:28, socialEI:7,  debt:2,  admin:5, education:24, transport:16, justice:8, housing:1, environment:7, other:2 },
@@ -586,6 +598,23 @@ const CATS = [
 // TAX CALCULATION
 // ═══════════════════════════════════════════════════════════════
 
+// Ontario Health Premium — a step function of taxable income, collected as Ontario income tax
+// on Form ON428 line 89 and carried to T1 line 42800. Not indexed; unchanged since 2004.
+// Each ramp is capped at the plateau above it, so the schedule is monotonic and continuous.
+function ontarioHealthPremium(income) {
+  if (income <= 20000)  return 0;
+  if (income <= 25000)  return Math.min(300, (income -  20000) * 0.06);
+  if (income <= 36000)  return 300;
+  if (income <= 38500)  return Math.min(450, 300 + (income -  36000) * 0.06);
+  if (income <= 48000)  return 450;
+  if (income <= 48600)  return Math.min(600, 450 + (income -  48000) * 0.25);
+  if (income <= 72000)  return 600;
+  if (income <= 72600)  return Math.min(750, 600 + (income -  72000) * 0.25);
+  if (income <= 200000) return 750;
+  if (income <= 200600) return Math.min(900, 750 + (income - 200000) * 0.25);
+  return 900;
+}
+
 function calcTax(income, brackets, bpa) {
   let tax = 0;
   let prev = 0;
@@ -616,16 +645,18 @@ function calculate(income, provKey) {
   // ── Provincial tax ────────────────────────────────────────────
   let provTax = calcTax(income, prov.brackets, prov.bpa);
 
-  // Ontario surtax (2025 thresholds):
-  //   20% on Ontario tax over $7,307
-  // + 36% on Ontario tax over $7,446  (additional, so 56% total above $7,446)
+  // Ontario surtax (2025 thresholds), then the Ontario Health Premium.
+  // Source: CRA Form ON428 (5006-C) — surtax at lines 66-68, health premium at line 89.
+  //   20% on Ontario tax over $5,710
+  // + 36% on Ontario tax over $7,307  (additional, so 56% total above $7,307)
+  // The premium is added after the surtax, as on the form, and flows to T1 line 42800.
   if (provKey === 'ON') {
-    const surtax = Math.max(0, provTax - 7307) * 0.20
-                 + Math.max(0, provTax - 7446) * 0.36;
-    provTax = Math.round(provTax + surtax);
+    const surtax = Math.max(0, provTax - 5710) * 0.20
+                 + Math.max(0, provTax - 7307) * 0.36;
+    provTax = Math.round(provTax + surtax) + ontarioHealthPremium(income);
   }
 
-  // PEI surtax eliminated for 2025 — replaced by restructured bracket rates
+  // PEI surtax eliminated for 2024 and later — replaced by restructured bracket rates
 
   // ── Spending allocation ───────────────────────────────────────
   const total = fedTax + provTax;
