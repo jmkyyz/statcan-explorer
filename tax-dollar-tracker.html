@@ -339,9 +339,10 @@ body {
     <div class="estimate-banner">
       <strong>Estimates only.</strong> Income tax is calculated from 2025 brackets and the basic personal
       amount, plus the Ontario surtax and Health Premium and the Quebec federal abatement. Employment
-      credits and provincial low-income reductions are not applied, so the tax figure runs high — see the
-      note below the rates. The figure you enter is treated as taxable income.
-      Spending allocations use 2024–25 federal Public Accounts actuals and Statistics Canada's 2024
+      credits and provincial low-income reductions are not applied, pushing up the tax figure at every
+      income and especially for individuals with lower incomes (see the note below the rates). The figure
+      you enter is treated as taxable income.
+      Spending allocations use 2024–25 federal Public Accounts and Statistics Canada's 2024
       provincial-territorial-local functional estimates, and assume income tax funds every category in
       the same proportion as total spending.
     </div>
@@ -377,19 +378,19 @@ body {
 
     <div class="scope-note">
       <strong>What this covers.</strong> Federal and provincial income tax only. It does not include CPP or
-      EI contributions, HST, property tax, or fuel and carbon charges — so it is not the full gap between
-      your gross pay and what lands in your account. CPP and EI are left out deliberately: they are
-      contributions to benefits you get back, not taxes. The <em>effective</em> rate is tax as a share of all
-      your income; the <em>marginal</em> rate applies only to your next dollar earned.
+      EI contributions, GST/HST, property tax, or fuel and carbon charges, so it is not the full gap between
+      your gross pay and what you're left with at the end of the day. CPP and EI are excluded deliberately
+      since they are contributions to benefits you may later receive, not taxes. The <em>effective</em> rate
+      is tax as a share of all your income; the <em>marginal</em> rate applies only to your next dollar earned.
       <br><br>
-      <strong>Your own tax bill is probably lower than this.</strong> The tool applies the basic personal
-      amount and nothing else. It does not apply the credits most employees can claim — the CPP and EI
-      premiums you pay generate tax credits, and there is a Canada Employment Amount on top — nor the
-      low-income reductions most provinces offer. Ontario's, for example, eliminates provincial tax
-      entirely below $18,569 and phases out by $24,391. The tax shown here therefore runs high, by a few
-      per cent at upper incomes and by considerably more at lower ones. <strong>None of this changes the
-      split below.</strong> Those credits scale your whole tax bill up or down; they do not move money
-      between categories, so every share in the chart stays the same.
+      <strong>Why your own tax bill may be lower than this.</strong> The tool applies the basic personal
+      amount and nothing else. It does not apply tax credits or deductions most employees can claim, such as
+      those for CPP and EI premiums, or the Canada Employment Amount. Nor does it include low-income
+      reductions most provinces offer. Ontario, for example, eliminates provincial tax entirely below
+      $18,569, with the reduction phasing out by $24,391. The tax shown here therefore runs high, by a few
+      per cent at upper incomes and by considerably more at lower ones. However, this does not change the
+      spending breakdown below, because those credits scale your whole tax bill rather than moving money
+      between categories.
     </div>
 
     <!-- Chart -->
@@ -405,21 +406,20 @@ body {
         <canvas id="taxChart"></canvas>
       </div>
       <div class="chart-note">
-        Ranked by combined total (largest → smallest). Federal portion first, provincial stacked on top.
-        Hover a segment for the exact amount.
+        Ranked by combined total (largest to smallest), with the federal portion first and the provincial
+        portion stacked on top. Hover over a segment for the exact amount.
       </div>
       <div class="chart-note" style="margin-top:6px;">
         <strong>Note on federal transfers:</strong> The Canada Health Transfer, Canada Social Transfer,
         Equalization and Territorial Formula Financing are federal payments to provinces, shown here as
-        federal rows. Your province then spends those same dollars, so they also sit inside the provincial
+        federal rows. Provinces then spend those same dollars, so the money also sits inside the provincial
         bars — the CHT within health, the CST across social services and post-secondary education. The
-        overlap is not netted out; the two colours answer different questions.
+        overlap is not netted out.
         <br>
-        <strong>Note on the provincial split:</strong> the green bars divide your provincial tax the way
-        <em>provincial, territorial and local</em> government spending divides — the Statistics Canada
-        series that consolidates municipalities, school boards, hospitals and universities with the
-        province. It is the only basis on which jurisdictions can be compared, but it is wider than the
-        provincial government alone.
+        <strong>Note on the provincial split:</strong> The green bars for provincial spending are based on
+        Statistics Canada's Government Spending by Function tables, which consolidate municipalities, school
+        boards, hospitals and universities with the province. That is wider than the provincial government
+        alone, and it is the basis on which jurisdictions can be compared.
       </div>
     </div>
 
@@ -453,72 +453,33 @@ body {
         <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/frequently-asked-questions-individuals/canadian-income-tax-rates-individuals-current-previous-years.html" target="_blank">Federal and provincial/territorial rates</a></li>
       <li><strong>Federal spending:</strong> Receiver General for Canada —
         <a href="https://www.tpsgc-pwgsc.gc.ca/recgen/cpc-pac/2025/vol1/s3/charges-expenses-eng.html" target="_blank">Public
-        Accounts of Canada 2025, Volume I, Section 3 (Expenses)</a>, fiscal year 2024–25 actuals. These are
-        audited actuals, not budget projections. The denominator is total expenses excluding net actuarial
-        losses, $543,279M; net actuarial losses of $4,020M are a non-cash revaluation of pension and
-        future-benefit obligations and are left out of both the categories and the total.
-        <br><br>
-        Largest line items: elderly benefits $80,294M (Old Age Security $60,648M, Guaranteed Income
-        Supplement $18,910M, Allowance $632M), public debt charges $53,410M, Employment Insurance $24,880M
-        plus the Canada Child Benefit $28,574M, the Canada Health Transfer $52,070M, Equalization $25,253M
-        with Territorial Financing $5,159M, and the Canada Social Transfer $16,909M.
+        Accounts of Canada 2025, Volume I, Section 3 (Expenses)</a>, fiscal year 2024–25. This is actual
+        spending, not budget projections, measured against total expenses of $543,279M.
         <br><br>
         Transfers and debt are taken as program lines; the functional categories are ministry totals, net
-        of each ministry's own public debt charges. No ministry is counted on both sides, so the two cuts
-        do not overlap. <strong>Other is a residual</strong> — the total less every named category — and it
-        holds Canadian Heritage, Energy and Natural Resources, Fisheries and Oceans, Global Affairs'
-        diplomatic and consular operations, the operating costs of the Finance, Employment and Workforce
-        Development and National Revenue ministries, and the negative provision for valuation and other
-        items.
-        <br><br>
-        Two rows need a caveat. <strong>Veterans Affairs</strong> is the only category not on the ministry
-        basis: the Public Accounts show the Veterans Affairs segment at $546M because veterans' disability
-        and future benefits are recognised as personnel expenses government-wide, so the figure used is
-        total expenses from
+        of each ministry's own public debt charges. Veterans Affairs is the only category not included on
+        the ministry basis, because in the Public Accounts veterans' disability and future benefits are
+        recognized as personnel expenses government-wide, leaving the department's own segment at just
+        $546M. The figure included in the tracker is therefore the $7,209M of total expenses from
         <a href="https://www.veterans.gc.ca/en/about-vac/reports-policies-and-legislation/departmental-reports/departmental-financial-statements/departmental-financial-statements-2024-2025" target="_blank">Veterans
-        Affairs' audited departmental financial statements</a> ($7,209M). <strong>Carbon Price Rebates</strong>
-        covers the Climate action incentive and the portion of fuel charge proceeds returned to small
-        business. The consumer fuel charge ended during 2025, so this row falls away in later years — it is
-        shown because it was real spending in 2024–25.</li>
+        Affairs' audited departmental financial statements</a>. Carbon Price Rebates covers the Climate
+        action incentive and the portion of fuel charge proceeds returned to small business. The consumer
+        fuel charge ended during 2025. It is shown here because it was real spending in 2024–25.</li>
       <li><strong>Provincial spending:</strong> Statistics Canada —
         <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501" target="_blank">Table
         10-10-0005-01, Canadian Classification of Functions of Government (CCOFOG) by consolidated
-        government component</a>, reference year 2024, released 27 November 2025. The series used is
-        <em>consolidated provincial-territorial and local governments</em>. Each category is a CCOFOG
-        function or a group of them, so the ten shares are a partition of total expenditure and sum to
-        100% without adjustment.
-        <br><br>
-        Two things follow from that choice and are worth stating plainly. <strong>The universe is wider
-        than the provincial government.</strong> It consolidates municipalities, school boards, hospitals
-        and universities along with the province, which is why the column is labelled provincial,
-        territorial and local rather than provincial. Statistics Canada publishes this consolidated series
-        precisely because provinces delegate different functions to municipalities, so it is the basis on
-        which jurisdictions can be compared; the province-only series carries a footnote advising against
-        comparison. <strong>It is an operating-expense view.</strong> CCOFOG excludes capital acquisition
-        and consumption of fixed capital, so long-lived assets are understated — most visibly for
-        transportation, where roads and transit are capital-heavy.</li>
-      <li><strong>How a tax dollar is allocated:</strong> your federal tax is spread across federal
-        spending in proportion to what Ottawa spends on each category, and your provincial tax across
-        provincial-territorial-local spending the same way. This assumes personal income tax funds every
-        category in the same proportion as total spending, which is a simplification: income tax is
-        roughly half of federal revenue and about a quarter of provincial revenue, and no revenue source
-        is earmarked to a particular category. It is the same method the UK uses for its Annual Tax
-        Summary.
-        <br><br>
-        <strong>Federal transfers appear on both sides.</strong> The Canada Health Transfer, Canada Social
-        Transfer, Equalization and Territorial Formula Financing are shown as federal rows, because that
-        is where your federal tax goes. Your province then spends those same dollars, so they are also
-        inside the provincial column — the CHT within health, the CST across social services and
-        post-secondary education, Equalization and TFF across everything. The two columns answer different
-        questions and the overlap is not netted out.</li>
+        government component</a>, reference year 2024. The series used is consolidated
+        provincial-territorial and local governments. Each category is a government spending function or a
+        group of them, and the ten provincial categories sum to 100% without adjustment. The StatCan tables
+        consolidate municipalities, school boards, hospitals and universities within provincial spending.
+        Because CCOFOG is an operating-expense view, it excludes capital acquisition and consumption of
+        fixed capital, which understates spending on long-lived assets such as transportation, where roads
+        and transit are capital heavy.</li>
       <li>Spending shares are rounded to one decimal place. Actual allocations vary year to year.</li>
-      <li><strong>Ontario:</strong> the surtax (20% of Ontario tax over $5,710, plus a further 36% over $7,307) and the
-        Ontario Health Premium (up to $900, collected as Ontario income tax on Form ON428) are both applied. The Ontario
-        Tax Reduction, which lowers or eliminates provincial tax for low-income filers and those with dependants, is not —
-        so Ontario tax is overstated at the bottom of the income range.</li>
-      <li>The Quebec federal abatement (16.5%) is applied. Ontario is the only province or territory with an income tax
-        surtax in 2025; PEI's was eliminated for 2024 and later and folded into its bracket rates. See the methodology
-        document for the full list of simplifications.</li>
+      <li><strong>Ontario:</strong> the surtax and the Ontario Health Premium are both applied. The Ontario
+        Tax Reduction, which lowers or eliminates provincial tax for low-income filers and those with
+        dependants, is not, resulting in an overstatement of tax at the bottom of the income range.</li>
+      <li>The Quebec federal abatement is applied.</li>
     </ul>
   </div>
 
@@ -684,16 +645,17 @@ const CATS = [
   { key:'health',       label:'Direct Health Spending',        fedPct: 2.59, provKey:'health'      },  // T3.6 Health ministry $14,055M
   { key:'cst',          label:'Canada Social Transfer',        fedPct: 3.11, provKey:null          },  // T3.7 $16,909M
   { key:'socialEI',     label:'Social Assistance & Income Support', fedPct: 9.84, provKey:'socialEI',
-    note:'What sits inside this differs sharply by province, so the totals compare better than the parts. '
-       + 'Childcare is 42% of Quebec’s social protection spending against 22% of Ontario’s, because '
-       + 'Quebec delivers it as a public program; disability support is 51% of Alberta’s.' },  // T3.7 EI $24,880M + CCB $28,574M
+    note:'Spending inside this function differs sharply by province, so totals compare better than the '
+       + 'parts. For instance, childcare is 42 per cent of Quebec’s social assistance spending against '
+       + '22 per cent of Ontario’s, because Quebec delivers childcare as a public program. Disability '
+       + 'support, meanwhile, accounts for 51 per cent of Alberta’s.' },  // T3.7 EI $24,880M + CCB $28,574M
   { key:'oas',          label:'OAS & Retirement',              fedPct:14.78, provKey:null          },  // T3.10 OAS $60,648M + GIS $18,910M + Allowance $632M
   { key:'debt',         label:'Debt Servicing',                fedPct: 9.83, provKey:'debt'        },  // T3.8 $53,410M
   { key:'fiscalTx',     label:'Fiscal Transfers to Provinces', fedPct: 5.61, provKey:null          },  // T3.10 Equalization $25,253M + Territorial Financing $5,159M
   { key:'admin',        label:'Government Administration',     fedPct: 3.75, provKey:'admin',
     note:'On the provincial side this is what remains of general public services once debt charges are '
        + 'taken out, so it absorbs whatever a province classifies as overhead rather than as a program. '
-       + 'It runs from 2.9% in Ontario to 15.2% in Nunavut.' },  // T3.6 Treasury Board, PSPC, Privy Council, Parliament, Gov Gen, Democratic Institutions
+       + 'It runs from 2.9 per cent in Ontario to 15.2 per cent in Nunavut.' },  // T3.6 Treasury Board, PSPC, Privy Council, Parliament, Gov Gen, Democratic Institutions
   { key:'education',    label:'Education',                     fedPct: 0.70, provKey:'education'   },  // T3.10 Canada Student Grants $2,584M + Education Savings Grant $1,199M
   { key:'transport',    label:'Transportation & Infra',        fedPct: 1.10, provKey:'transport'   },  // T3.6 Transport ministry $5,958M
   { key:'indigenous',   label:'Indigenous Services',           fedPct: 7.24, provKey:null          },  // T3.6 Indigenous Services $26,737M + Crown-Indigenous Relations $12,612M
@@ -708,10 +670,10 @@ const CATS = [
   { key:'agriculture',  label:'Agriculture & Food',            fedPct: 0.73, provKey:null          },  // T3.6 Agriculture and Agri-Food $3,953M
   { key:'veterans',     label:'Veterans Affairs',              fedPct: 1.33, provKey:null          },  // $7,209M — see note below
   { key:'other',        label:'Other',                         fedPct: 8.65, provKey:'other',
-    note:'A residual on both sides, so its contents differ by jurisdiction and it is the least comparable '
-       + 'row here. Provincially it holds recreation and culture plus economic affairs other than '
-       + 'transport — resource and industry programs, which is why it is largest in Alberta, '
-       + 'Saskatchewan and the territories.' },  // residual, $46,993M
+    note:'This is a residual category for both federal and provincial spending, so its contents differ by '
+       + 'jurisdiction and it is the least comparable row. Provincially it holds recreation and culture '
+       + 'plus economic affairs other than transport, which is mostly resource and industry programs — '
+       + 'the reason it is largest in Alberta, Saskatchewan and the territories.' },  // residual, $46,993M
 ];
 
 // Veterans Affairs is the one row not on the ministry-segment basis. Table 3.6 shows the
