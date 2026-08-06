@@ -331,9 +331,10 @@ body {
   <div id="results">
 
     <div class="estimate-banner">
-      <strong>Estimates only.</strong> Income tax calculated using 2025 brackets, basic personal amount credit,
-      the Ontario surtax and Ontario Health Premium, and the Quebec federal abatement. CPP, EI, and other credits
-      are not applied, and the figure you enter is treated as taxable income.
+      <strong>Estimates only.</strong> Income tax is calculated from 2025 brackets and the basic personal
+      amount, plus the Ontario surtax and Health Premium and the Quebec federal abatement. Employment
+      credits and provincial low-income reductions are not applied, so the tax figure runs high — see the
+      note below the rates. The figure you enter is treated as taxable income.
       Spending allocations use 2024–25 federal Public Accounts actuals and Statistics Canada's 2024
       provincial-territorial-local functional estimates, and assume income tax funds every category in
       the same proportion as total spending.
@@ -371,8 +372,18 @@ body {
     <div class="scope-note">
       <strong>What this covers.</strong> Federal and provincial income tax only. It does not include CPP or
       EI contributions, HST, property tax, or fuel and carbon charges — so it is not the full gap between
-      your gross pay and what lands in your account. The <em>effective</em> rate is tax as a share of all
+      your gross pay and what lands in your account. CPP and EI are left out deliberately: they are
+      contributions to benefits you get back, not taxes. The <em>effective</em> rate is tax as a share of all
       your income; the <em>marginal</em> rate applies only to your next dollar earned.
+      <br><br>
+      <strong>Your own tax bill is probably lower than this.</strong> The tool applies the basic personal
+      amount and nothing else. It does not apply the credits most employees can claim — the CPP and EI
+      premiums you pay generate tax credits, and there is a Canada Employment Amount on top — nor the
+      low-income reductions most provinces offer. Ontario's, for example, eliminates provincial tax
+      entirely below $18,569 and phases out by $24,391. The tax shown here therefore runs high, by a few
+      per cent at upper incomes and by considerably more at lower ones. <strong>None of this changes the
+      split below.</strong> Those credits scale your whole tax bill up or down; they do not move money
+      between categories, so every share in the chart stays the same.
     </div>
 
     <!-- Chart -->
@@ -665,7 +676,7 @@ const CATS = [
   { key:'cht',          label:'Canada Health Transfer',        fedPct: 9.58, provKey:null          },  // T3.7 $52,070M
   { key:'health',       label:'Direct Health Spending',        fedPct: 2.59, provKey:'health'      },  // T3.6 Health ministry $14,055M
   { key:'cst',          label:'Canada Social Transfer',        fedPct: 3.11, provKey:null          },  // T3.7 $16,909M
-  { key:'socialEI',     label:'Social Assistance & EI',        fedPct: 9.84, provKey:'socialEI'    },  // T3.7 EI $24,880M + CCB $28,574M
+  { key:'socialEI',     label:'Social Assistance & Income Support', fedPct: 9.84, provKey:'socialEI' },  // T3.7 EI $24,880M + CCB $28,574M
   { key:'oas',          label:'OAS & Retirement',              fedPct:14.78, provKey:null          },  // T3.10 OAS $60,648M + GIS $18,910M + Allowance $632M
   { key:'debt',         label:'Debt Servicing',                fedPct: 9.83, provKey:'debt'        },  // T3.8 $53,410M
   { key:'fiscalTx',     label:'Fiscal Transfers to Provinces', fedPct: 5.61, provKey:null          },  // T3.10 Equalization $25,253M + Territorial Financing $5,159M
