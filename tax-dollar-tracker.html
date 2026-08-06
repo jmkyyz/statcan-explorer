@@ -363,9 +363,17 @@ body {
         Hover a segment for the exact amount.
       </div>
       <div class="chart-note" style="margin-top:6px;">
-        <strong>Note on federal transfers:</strong> The Canada Health Transfer and Canada Social Transfer are federal payments to provinces shown here as federal-only items.
-        For the CHT, each province's health share is further reduced by its actual 2023–24 CHT allocation (Finance Canada per-capita data) to remove CHT-funded healthcare from the provincial column.
-        The CST adjustment has not been made: because provinces spend CST at their discretion across social services and post-secondary education, the per-province split between those two categories is not publicly available. Provincial social assistance and education figures remain modestly elevated by CST funding.
+        <strong>Note on federal transfers:</strong> The Canada Health Transfer, Canada Social Transfer,
+        Equalization and Territorial Formula Financing are federal payments to provinces, shown here as
+        federal rows. Your province then spends those same dollars, so they also sit inside the provincial
+        bars — the CHT within health, the CST across social services and post-secondary education. The
+        overlap is not netted out; the two colours answer different questions.
+        <br>
+        <strong>Note on the provincial split:</strong> the green bars divide your provincial tax the way
+        <em>provincial, territorial and local</em> government spending divides — the Statistics Canada
+        series that consolidates municipalities, school boards, hospitals and universities with the
+        province. It is the only basis on which jurisdictions can be compared, but it is wider than the
+        provincial government alone.
       </div>
     </div>
 
@@ -402,25 +410,39 @@ body {
         Major line items include: Canada Health Transfer ($54.7B, shown as a separate federal transfer),
         direct federal health programs — Health Canada, PHAC (~$11B), elderly benefits ($83.1B),
         EI + Canada Child Benefit ($60.6B), and public debt charges ($55.6B) from Budget 2025 projections.
-        Equalization and Territorial Formula Financing ($31.7B) are included in Govt Administration.
-        The CHT row has no provincial counterpart. Additionally, the provincial health spending
-        percentages (Statistics Canada) include CHT-funded healthcare delivery. To correct for this,
-        each province's health share is reduced by its 2023-24 CHT allocation as a proportion of total
-        provincial expenditure (Finance Canada per-capita CHT data; provincial public accounts 2022-23),
-        and all provincial categories are renormalized so they continue to distribute the full provincial
-        tax paid. Territories (NT, NU, YT) receive equivalent health funding through Territorial Formula
-        Financing rather than CHT directly and are not adjusted.
-        The Canada Social Transfer ($15.9B) is a block transfer spent at provincial discretion across
-        social services and post-secondary education. Because the inter-category split is not publicly
-        reported per province, no equivalent adjustment is made; provincial social assistance and
-        education figures remain modestly elevated by CST funding in unknown proportions.
-        "Fiscal Transfers &amp; Admin" also includes Equalization ($21.9B) and Territorial Formula
-        Financing ($4.2B) — unconditional transfers that fund provincial/territorial programs across
-        all categories.</li>
+        Equalization and Territorial Formula Financing ($31.7B) are included in Govt Administration.</li>
       <li><strong>Provincial spending:</strong> Statistics Canada —
-        <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501" target="_blank">Table 10-10-0005-01, Government finance statistics (2023)</a>;
-        individual provincial public accounts 2023–24</li>
-      <li>Spending allocations are approximate and rounded to the nearest 1%. Actual allocations vary year to year.</li>
+        <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501" target="_blank">Table
+        10-10-0005-01, Canadian Classification of Functions of Government (CCOFOG) by consolidated
+        government component</a>, reference year 2024, released 27 November 2025. The series used is
+        <em>consolidated provincial-territorial and local governments</em>. Each category is a CCOFOG
+        function or a group of them, so the ten shares are a partition of total expenditure and sum to
+        100% without adjustment.
+        <br><br>
+        Two things follow from that choice and are worth stating plainly. <strong>The universe is wider
+        than the provincial government.</strong> It consolidates municipalities, school boards, hospitals
+        and universities along with the province, which is why the column is labelled provincial,
+        territorial and local rather than provincial. Statistics Canada publishes this consolidated series
+        precisely because provinces delegate different functions to municipalities, so it is the basis on
+        which jurisdictions can be compared; the province-only series carries a footnote advising against
+        comparison. <strong>It is an operating-expense view.</strong> CCOFOG excludes capital acquisition
+        and consumption of fixed capital, so long-lived assets are understated — most visibly for
+        transportation, where roads and transit are capital-heavy.</li>
+      <li><strong>How a tax dollar is allocated:</strong> your federal tax is spread across federal
+        spending in proportion to what Ottawa spends on each category, and your provincial tax across
+        provincial-territorial-local spending the same way. This assumes personal income tax funds every
+        category in the same proportion as total spending, which is a simplification: income tax is
+        roughly half of federal revenue and about a quarter of provincial revenue, and no revenue source
+        is earmarked to a particular category. It is the same method the UK uses for its Annual Tax
+        Summary.
+        <br><br>
+        <strong>Federal transfers appear on both sides.</strong> The Canada Health Transfer, Canada Social
+        Transfer, Equalization and Territorial Formula Financing are shown as federal rows, because that
+        is where your federal tax goes. Your province then spends those same dollars, so they are also
+        inside the provincial column — the CHT within health, the CST across social services and
+        post-secondary education, Equalization and TFF across everything. The two columns answer different
+        questions and the overlap is not netted out.</li>
+      <li>Spending shares are rounded to one decimal place. Actual allocations vary year to year.</li>
       <li><strong>Ontario:</strong> the surtax (20% of Ontario tax over $5,710, plus a further 36% over $7,307) and the
         Ontario Health Premium (up to $900, collected as Ontario income tax on Form ON428) are both applied. The Ontario
         Tax Reduction, which lowers or eliminates provincial tax for low-income filers and those with dependants, is not —
@@ -449,105 +471,102 @@ const FED_BRACKETS = [
 ];
 const FED_BPA = 16129;  // BPA for income ≤ $177,882; phases down to $14,538 above that (not modelled)
 
+// Spending shares: Statistics Canada Table 10-10-0005-01, Canadian Classification of
+// Functions of Government (CCOFOG) by consolidated government component — component
+// "Consolidated provincial-territorial and local governments", reference year 2024
+// (released 27 November 2025). Regenerate with:
+//     python3 tax-dollar-tracker-review/build_provincial_spending.py --year 2024
+//
+// The ten categories are a partition of the ten CCOFOG divisions, so each jurisdiction
+// sums to exactly 100.0:
+//   health      707            education   709            socialEI  710
+//   justice     703            housing     706            environment 705
+//   debt        7017           transport   7045
+//   admin       701 − 7017     other       702 + 708 + (704 − 7045)
+//
+// Two caveats that belong in any write-up of these numbers. The universe is provincial,
+// territorial AND local — it includes municipalities, school boards, hospitals and
+// universities, so it is not "the provincial government" alone. And CCOFOG excludes
+// capital acquisition and consumption of fixed capital (table footnote 3), so this is an
+// operating-expense view; that understates transport most, roads and transit being
+// capital-heavy.
 const PROVINCES = {
   AB: {
     name: 'Alberta',
     // New 8% entry bracket on first $60,000 introduced Jan 1 2025
     brackets: [[60000,.08],[151234,.10],[181481,.12],[241974,.13],[362961,.14],[Infinity,.15]],
     bpa: 22323,
-    // chtPct: 2023-24 CHT allocation ($49.4B equal per-capita) as % of 2022-23 total provincial expenditure ($62.1B)
-    chtPct: 9.4,
-    spending: { health:43, socialEI:7,  debt:3,  admin:5, education:18, transport:8,  justice:5, housing:3, environment:4, other:4 },
+    spending: { health:33.4, socialEI:13.7, debt:4.0,  admin:5.8,  education:18.2, transport:4.4, justice:5.1, housing:1.9, environment:1.6, other:11.9 },  // total expenditure $85,040M
   },
   BC: {
     name: 'British Columbia',
     brackets: [[49279,.0506],[98560,.077],[113158,.105],[137407,.1229],[186306,.147],[259829,.168],[Infinity,.205]],
     bpa: 12932,
-    // chtPct: CHT $6.81B / total exp $82B
-    chtPct: 8.3,
-    spending: { health:39, socialEI:10, debt:5,  admin:5, education:18, transport:7,  justice:5, housing:3, environment:4, other:4 },
+    spending: { health:38.3, socialEI:15.6, debt:4.9,  admin:4.1,  education:15.3, transport:3.8, justice:5.6, housing:1.9, environment:2.7, other:7.8 },  // total expenditure $102,626M
   },
   MB: {
     name: 'Manitoba',
     // 2025 Manitoba Budget froze indexation; thresholds updated to $47k/$100k
     brackets: [[47000,.108],[100000,.1275],[Infinity,.174]],
     bpa: 15780,
-    // chtPct: CHT $1.77B / total exp ~$20B
-    chtPct: 8.9,
-    spending: { health:37, socialEI:11, debt:8,  admin:5, education:20, transport:7,  justice:5, housing:2, environment:3, other:2 },
+    spending: { health:37.6, socialEI:15.6, debt:9.1,  admin:4.3,  education:16.9, transport:2.2, justice:5.9, housing:1.6, environment:1.5, other:5.3 },  // total expenditure $27,900M
   },
   NB: {
     name: 'New Brunswick',
     // Substantially restructured for 2025 — reduced top rate, new thresholds
     brackets: [[51306,.094],[102614,.14],[190060,.16],[Infinity,.195]],
     bpa: 13396,
-    // chtPct: CHT $1.05B / total exp $11.3B
-    chtPct: 9.3,
-    spending: { health:42, socialEI:8,  debt:9,  admin:4, education:17, transport:7,  justice:5, housing:2, environment:4, other:2 },
+    spending: { health:40.4, socialEI:9.3,  debt:5.1,  admin:7.4,  education:18.7, transport:5.6, justice:5.0, housing:1.8, environment:1.2, other:5.5 },  // total expenditure $15,117M
   },
   NL: {
     name: 'Newfoundland and Labrador',
     brackets: [[44192,.087],[88382,.145],[157792,.158],[220910,.178],[282214,.198],[564429,.208],[1128858,.213],[Infinity,.218]],
     bpa: 11067,
-    // chtPct: CHT $0.68B / total exp $9.4B
-    chtPct: 7.2,
-    spending: { health:42, socialEI:6,  debt:9,  admin:4, education:16, transport:9,  justice:5, housing:2, environment:5, other:2 },
+    spending: { health:41.1, socialEI:7.3,  debt:9.2,  admin:9.0,  education:16.7, transport:3.9, justice:4.2, housing:1.1, environment:1.4, other:6.1 },  // total expenditure $10,740M
   },
   NS: {
     name: 'Nova Scotia',
     brackets: [[30507,.0879],[61015,.1495],[95883,.1667],[154650,.175],[Infinity,.21]],
     bpa: 11744,
-    // chtPct: CHT $1.32B / total exp $13.2B
-    chtPct: 10.0,
-    spending: { health:43, socialEI:8,  debt:8,  admin:4, education:17, transport:7,  justice:5, housing:2, environment:4, other:2 },
+    spending: { health:40.9, socialEI:7.3,  debt:4.2,  admin:6.4,  education:18.4, transport:3.5, justice:5.0, housing:5.6, environment:2.2, other:6.5 },  // total expenditure $19,370M
   },
   NT: {
     name: 'Northwest Territories',
     brackets: [[51964,.059],[103930,.086],[168967,.122],[Infinity,.1405]],
     bpa: 17842,
-    chtPct: 0, // territories receive equivalent health funding via TFF, not CHT directly
-    spending: { health:30, socialEI:7,  debt:2,  admin:5, education:22, transport:14, justice:8, housing:3, environment:7, other:2 },
+    spending: { health:30.0, socialEI:12.8, debt:1.9,  admin:12.0, education:10.2, transport:7.0, justice:6.0, housing:3.1, environment:4.4, other:12.6 },  // total expenditure $2,883M
   },
   NU: {
     name: 'Nunavut',
     brackets: [[54707,.04],[109413,.07],[177881,.09],[Infinity,.115]],
     bpa: 19274,
-    chtPct: 0,
-    spending: { health:29, socialEI:8,  debt:1,  admin:5, education:25, transport:12, justice:8, housing:4, environment:6, other:2 },
+    spending: { health:30.5, socialEI:11.5, debt:0.5,  admin:15.2, education:11.4, transport:5.0, justice:5.5, housing:3.6, environment:0.7, other:16.1 },  // total expenditure $3,080M
   },
   ON: {
     name: 'Ontario',
     brackets: [[52886,.0505],[105775,.0915],[150000,.1116],[220000,.1216],[Infinity,.1316]],
     bpa: 12747,
-    // chtPct: CHT $19.0B / total exp $187.1B
-    chtPct: 10.2,
-    spending: { health:40, socialEI:11, debt:9,  admin:5, education:18, transport:5,  justice:5, housing:3, environment:3, other:1 },
+    spending: { health:33.7, socialEI:14.9, debt:6.5,  admin:2.9,  education:19.3, transport:6.3, justice:5.4, housing:1.4, environment:2.0, other:7.6 },  // total expenditure $273,632M
   },
   PE: {
     name: 'Prince Edward Island',
     // Restructured for 2025 with new rates and thresholds; surtax eliminated
     brackets: [[33328,.095],[64656,.1347],[105000,.166],[140000,.1762],[Infinity,.19]],
     bpa: 14650,
-    // chtPct: CHT $0.22B / total exp $2.7B
-    chtPct: 8.2,
-    spending: { health:40, socialEI:7,  debt:7,  admin:5, education:20, transport:8,  justice:5, housing:2, environment:4, other:2 },
+    spending: { health:34.9, socialEI:10.2, debt:5.8,  admin:7.4,  education:19.0, transport:4.7, justice:3.4, housing:1.4, environment:3.5, other:9.7 },  // total expenditure $3,195M
   },
   QC: {
     name: 'Quebec',
     brackets: [[53255,.14],[106495,.19],[129590,.24],[Infinity,.2575]],
     bpa: 18571,
-    // chtPct: CHT $11.2B / total exp $136.6B
-    chtPct: 8.2,
-    spending: { health:40, socialEI:12, debt:7,  admin:4, education:20, transport:6,  justice:4, housing:2, environment:3, other:2 },
+    spending: { health:31.4, socialEI:15.9, debt:10.5, admin:7.1,  education:14.9, transport:4.7, justice:4.2, housing:0.9, environment:2.2, other:8.2 },  // total expenditure $187,448M
   },
   SK: {
     name: 'Saskatchewan',
     // BPA boosted by Dec 2024 Affordability Measures
     brackets: [[53463,.105],[152750,.125],[Infinity,.145]],
     bpa: 19491,
-    // chtPct: CHT $1.54B / total exp $19.0B
-    chtPct: 8.1,
-    spending: { health:38, socialEI:6,  debt:3,  admin:6, education:19, transport:10, justice:6, housing:3, environment:5, other:4 },
+    spending: { health:32.4, socialEI:16.7, debt:5.0,  admin:3.3,  education:17.8, transport:2.8, justice:6.7, housing:1.9, environment:1.9, other:11.5 },  // total expenditure $25,564M
   },
   YT: {
     name: 'Yukon',
@@ -559,8 +578,7 @@ const PROVINCES = {
     // Yukon claims the federal BPA, so it phases down over $177,882–$253,414. Not modelled,
     // consistent with the federal BPA phase-down also not being modelled.
     bpa: 16129,
-    chtPct: 0,
-    spending: { health:28, socialEI:7,  debt:2,  admin:5, education:24, transport:16, justice:8, housing:1, environment:7, other:2 },
+    spending: { health:26.6, socialEI:9.9,  debt:0.6,  admin:10.2, education:12.6, transport:9.2, justice:8.8, housing:4.2, environment:6.9, other:11.0 },  // total expenditure $1,851M
   },
 };
 
@@ -661,30 +679,26 @@ function calculate(income, provKey) {
   // ── Spending allocation ───────────────────────────────────────
   const total = fedTax + provTax;
 
-  // Subtract CHT-funded portion from provincial health, then renormalize
-  // so provincial category amounts still distribute the full provTax.
-  // chtPct is CHT allocation as % of total provincial expenditure (2023-24 CHT / 2022-23 actuals).
-  const rawCats = CATS.map(cat => {
-    const fedAmt     = Math.round((cat.fedPct / 100) * fedTax);
-    const rawPct     = cat.provKey ? (prov.spending[cat.provKey] || 0) : 0;
-    const adjProvPct = (cat.key === 'health')
-      ? Math.max(0, rawPct - (prov.chtPct || 0))
-      : rawPct;
-    return { label: cat.label, fedAmt, adjProvPct };
-  });
-
-  const totalAdjPct = rawCats.reduce((s, c) => s + c.adjProvPct, 0);
-
-  const catData = rawCats.map(c => {
-    const provAmt = (totalAdjPct > 0 && c.adjProvPct > 0)
-      ? Math.round((c.adjProvPct / totalAdjPct) * provTax)
-      : 0;
+  // Each column is allocated across its own spending shares: federal tax over federal
+  // spending, provincial tax over provincial-territorial-local spending.
+  //
+  // No adjustment is made for the federal transfers (CHT, CST, Equalization, TFF) that
+  // part-fund the provincial column. An earlier version subtracted each province's CHT
+  // share from its health category and then renormalised the remaining categories back to
+  // 100%, which did not remove those dollars from the provincial column at all — it moved
+  // them onto education, debt, justice and the rest, inflating each by about 11% of its own
+  // value. Distorting nine categories to correct one is worse than leaving the overlap in
+  // place and saying so, which is what the Sources note now does.
+  const catData = CATS.map(cat => {
+    const fedAmt  = Math.round((cat.fedPct / 100) * fedTax);
+    const provPct = cat.provKey ? (prov.spending[cat.provKey] || 0) : 0;
+    const provAmt = Math.round((provPct / 100) * provTax);
     return {
-      label:    c.label,
-      fedAmt:   c.fedAmt,
+      label:    cat.label,
+      fedAmt,
       provAmt,
-      combined: c.fedAmt + provAmt,
-      pct:      total > 0 ? (c.fedAmt + provAmt) / total : 0,
+      combined: fedAmt + provAmt,
+      pct:      total > 0 ? (fedAmt + provAmt) / total : 0,
     };
   }).sort((a, b) => b.combined - a.combined);
 
