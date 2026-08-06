@@ -128,13 +128,28 @@ body {
 /* ── Stat cards ── */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin-bottom: 20px;
+}
+@media (max-width: 980px) {
+  .stats-grid { grid-template-columns: repeat(3, 1fr); }
 }
 @media (max-width: 600px) {
   .stats-grid { grid-template-columns: repeat(2, 1fr); }
 }
+.scope-note {
+  background: white;
+  border-left: 3px solid var(--blue);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 13px 16px;
+  margin-bottom: 20px;
+  font-size: 0.83rem;
+  line-height: 1.55;
+  color: #4b5563;
+}
+.scope-note strong { color: #1f2937; }
 .stat-card {
   background: white;
   border-radius: var(--radius);
@@ -346,6 +361,20 @@ body {
         <div class="stat-value" id="stat-rate">—</div>
         <div class="stat-sub">of gross income</div>
       </div>
+      <div class="stat-card">
+        <div class="stat-label">Marginal Rate</div>
+        <div class="stat-value" id="stat-marginal">—</div>
+        <div class="stat-sub">on your next dollar</div>
+      </div>
+    </div>
+
+    <div class="scope-note">
+      <strong>What this covers.</strong> Federal and provincial income tax only. It does not include CPP or
+      EI contributions, HST, property tax, or fuel and carbon charges — so it is not the full gap between
+      your gross pay and what lands in your account. The <em>effective</em> rate is tax as a share of all
+      your income; the <em>marginal</em> rate applies only to your next dollar earned. The marginal rate is
+      always the higher of the two, and it is the one people usually have in mind when they say what
+      bracket they are in.
     </div>
 
     <!-- Chart -->
@@ -719,6 +748,38 @@ function calcTax(income, brackets, bpa) {
   return Math.max(0, Math.round(tax));
 }
 
+// The share of the NEXT dollar of income that goes to income tax.
+//
+// Shown beside the effective rate because the gap between them is the single most common
+// misreading of a tool like this: someone who knows they are "in the 43% bracket" sees an
+// effective rate half that and concludes the number is wrong. Both are true.
+//
+// Computed from the bracket schedules rather than by differencing calculate(), whose
+// per-dollar rounding is large enough to move the answer by a tenth of a point. The Ontario
+// Health Premium is deliberately excluded: it is a step function whose narrow ramps would
+// push the displayed rate near 70% inside a few $600-wide bands. Excluding it also matches
+// the combined marginal rates published by CRA and TaxTips.
+function marginalRate(income, provKey) {
+  const prov = PROVINCES[provKey];
+  const rateAt = (inc, brackets) => {
+    for (const [limit, rate] of brackets) if (inc < limit) return rate;
+    return brackets[brackets.length - 1][1];
+  };
+
+  // Quebec's 16.5% abatement reduces net federal tax, so it reduces the federal margin too.
+  let fedRate = rateAt(income, FED_BRACKETS);
+  if (provKey === 'QC') fedRate *= (1 - 0.165);
+
+  let provRate = rateAt(income, prov.brackets);
+  if (provKey === 'ON') {
+    // The surtax is a percentage of Ontario tax, so it multiplies the Ontario margin.
+    const onTax = calcTax(income, prov.brackets, prov.bpa);
+    if      (onTax > 7307) provRate *= 1.56;
+    else if (onTax > 5710) provRate *= 1.20;
+  }
+  return fedRate + provRate;
+}
+
 function calculate(income, provKey) {
   const prov = PROVINCES[provKey];
 
@@ -954,6 +1015,7 @@ function handleCalculate() {
   document.getElementById('stat-provincial').textContent = fmt(provTax);
   document.getElementById('stat-prov-pct').textContent  = fmtPct(provTax / income) + ' of income';
   document.getElementById('stat-rate').textContent      = fmtPct(effRate);
+  document.getElementById('stat-marginal').textContent  = fmtPct(marginalRate(income, provKey));
 
   // Render
   renderChart(catData, total);
