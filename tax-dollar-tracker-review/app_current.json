@@ -1,0 +1,1009 @@
+{
+ "fedBrackets": [
+  [
+   57375,
+   0.145
+  ],
+  [
+   114750,
+   0.205
+  ],
+  [
+   177882,
+   0.26
+  ],
+  [
+   253414,
+   0.29
+  ],
+  [
+   null,
+   0.33
+  ]
+ ],
+ "fedBpa": 16129,
+ "provinces": {
+  "AB": {
+   "name": "Alberta",
+   "bpa": 22323,
+   "brackets": [
+    [
+     60000,
+     0.08
+    ],
+    [
+     151234,
+     0.1
+    ],
+    [
+     181481,
+     0.12
+    ],
+    [
+     241974,
+     0.13
+    ],
+    [
+     362961,
+     0.14
+    ],
+    [
+     null,
+     0.15
+    ]
+   ],
+   "spending": {
+    "health": 33.4,
+    "socialEI": 13.7,
+    "debt": 4,
+    "admin": 5.8,
+    "education": 18.2,
+    "transport": 4.4,
+    "justice": 5.1,
+    "housing": 1.9,
+    "environment": 1.6,
+    "other": 11.9
+   }
+  },
+  "BC": {
+   "name": "British Columbia",
+   "bpa": 12932,
+   "brackets": [
+    [
+     49279,
+     0.0506
+    ],
+    [
+     98560,
+     0.077
+    ],
+    [
+     113158,
+     0.105
+    ],
+    [
+     137407,
+     0.1229
+    ],
+    [
+     186306,
+     0.147
+    ],
+    [
+     259829,
+     0.168
+    ],
+    [
+     null,
+     0.205
+    ]
+   ],
+   "spending": {
+    "health": 38.3,
+    "socialEI": 15.6,
+    "debt": 4.9,
+    "admin": 4.1,
+    "education": 15.3,
+    "transport": 3.8,
+    "justice": 5.6,
+    "housing": 1.9,
+    "environment": 2.7,
+    "other": 7.8
+   }
+  },
+  "MB": {
+   "name": "Manitoba",
+   "bpa": 15780,
+   "brackets": [
+    [
+     47000,
+     0.108
+    ],
+    [
+     100000,
+     0.1275
+    ],
+    [
+     null,
+     0.174
+    ]
+   ],
+   "spending": {
+    "health": 37.6,
+    "socialEI": 15.6,
+    "debt": 9.1,
+    "admin": 4.3,
+    "education": 16.9,
+    "transport": 2.2,
+    "justice": 5.9,
+    "housing": 1.6,
+    "environment": 1.5,
+    "other": 5.3
+   }
+  },
+  "NB": {
+   "name": "New Brunswick",
+   "bpa": 13396,
+   "brackets": [
+    [
+     51306,
+     0.094
+    ],
+    [
+     102614,
+     0.14
+    ],
+    [
+     190060,
+     0.16
+    ],
+    [
+     null,
+     0.195
+    ]
+   ],
+   "spending": {
+    "health": 40.4,
+    "socialEI": 9.3,
+    "debt": 5.1,
+    "admin": 7.4,
+    "education": 18.7,
+    "transport": 5.6,
+    "justice": 5,
+    "housing": 1.8,
+    "environment": 1.2,
+    "other": 5.5
+   }
+  },
+  "NL": {
+   "name": "Newfoundland and Labrador",
+   "bpa": 11067,
+   "brackets": [
+    [
+     44192,
+     0.087
+    ],
+    [
+     88382,
+     0.145
+    ],
+    [
+     157792,
+     0.158
+    ],
+    [
+     220910,
+     0.178
+    ],
+    [
+     282214,
+     0.198
+    ],
+    [
+     564429,
+     0.208
+    ],
+    [
+     1128858,
+     0.213
+    ],
+    [
+     null,
+     0.218
+    ]
+   ],
+   "spending": {
+    "health": 41.1,
+    "socialEI": 7.3,
+    "debt": 9.2,
+    "admin": 9,
+    "education": 16.7,
+    "transport": 3.9,
+    "justice": 4.2,
+    "housing": 1.1,
+    "environment": 1.4,
+    "other": 6.1
+   }
+  },
+  "NS": {
+   "name": "Nova Scotia",
+   "bpa": 11744,
+   "brackets": [
+    [
+     30507,
+     0.0879
+    ],
+    [
+     61015,
+     0.1495
+    ],
+    [
+     95883,
+     0.1667
+    ],
+    [
+     154650,
+     0.175
+    ],
+    [
+     null,
+     0.21
+    ]
+   ],
+   "spending": {
+    "health": 40.9,
+    "socialEI": 7.3,
+    "debt": 4.2,
+    "admin": 6.4,
+    "education": 18.4,
+    "transport": 3.5,
+    "justice": 5,
+    "housing": 5.6,
+    "environment": 2.2,
+    "other": 6.5
+   }
+  },
+  "NT": {
+   "name": "Northwest Territories",
+   "bpa": 17842,
+   "brackets": [
+    [
+     51964,
+     0.059
+    ],
+    [
+     103930,
+     0.086
+    ],
+    [
+     168967,
+     0.122
+    ],
+    [
+     null,
+     0.1405
+    ]
+   ],
+   "spending": {
+    "health": 30,
+    "socialEI": 12.8,
+    "debt": 1.9,
+    "admin": 12,
+    "education": 10.2,
+    "transport": 7,
+    "justice": 6,
+    "housing": 3.1,
+    "environment": 4.4,
+    "other": 12.6
+   }
+  },
+  "NU": {
+   "name": "Nunavut",
+   "bpa": 19274,
+   "brackets": [
+    [
+     54707,
+     0.04
+    ],
+    [
+     109413,
+     0.07
+    ],
+    [
+     177881,
+     0.09
+    ],
+    [
+     null,
+     0.115
+    ]
+   ],
+   "spending": {
+    "health": 30.5,
+    "socialEI": 11.5,
+    "debt": 0.5,
+    "admin": 15.2,
+    "education": 11.4,
+    "transport": 5,
+    "justice": 5.5,
+    "housing": 3.6,
+    "environment": 0.7,
+    "other": 16.1
+   }
+  },
+  "ON": {
+   "name": "Ontario",
+   "bpa": 12747,
+   "brackets": [
+    [
+     52886,
+     0.0505
+    ],
+    [
+     105775,
+     0.0915
+    ],
+    [
+     150000,
+     0.1116
+    ],
+    [
+     220000,
+     0.1216
+    ],
+    [
+     null,
+     0.1316
+    ]
+   ],
+   "spending": {
+    "health": 33.7,
+    "socialEI": 14.9,
+    "debt": 6.5,
+    "admin": 2.9,
+    "education": 19.3,
+    "transport": 6.3,
+    "justice": 5.4,
+    "housing": 1.4,
+    "environment": 2,
+    "other": 7.6
+   }
+  },
+  "PE": {
+   "name": "Prince Edward Island",
+   "bpa": 14650,
+   "brackets": [
+    [
+     33328,
+     0.095
+    ],
+    [
+     64656,
+     0.1347
+    ],
+    [
+     105000,
+     0.166
+    ],
+    [
+     140000,
+     0.1762
+    ],
+    [
+     null,
+     0.19
+    ]
+   ],
+   "spending": {
+    "health": 34.9,
+    "socialEI": 10.2,
+    "debt": 5.8,
+    "admin": 7.4,
+    "education": 19,
+    "transport": 4.7,
+    "justice": 3.4,
+    "housing": 1.4,
+    "environment": 3.5,
+    "other": 9.7
+   }
+  },
+  "QC": {
+   "name": "Quebec",
+   "bpa": 18571,
+   "brackets": [
+    [
+     53255,
+     0.14
+    ],
+    [
+     106495,
+     0.19
+    ],
+    [
+     129590,
+     0.24
+    ],
+    [
+     null,
+     0.2575
+    ]
+   ],
+   "spending": {
+    "health": 31.4,
+    "socialEI": 15.9,
+    "debt": 10.5,
+    "admin": 7.1,
+    "education": 14.9,
+    "transport": 4.7,
+    "justice": 4.2,
+    "housing": 0.9,
+    "environment": 2.2,
+    "other": 8.2
+   }
+  },
+  "SK": {
+   "name": "Saskatchewan",
+   "bpa": 19491,
+   "brackets": [
+    [
+     53463,
+     0.105
+    ],
+    [
+     152750,
+     0.125
+    ],
+    [
+     null,
+     0.145
+    ]
+   ],
+   "spending": {
+    "health": 32.4,
+    "socialEI": 16.7,
+    "debt": 5,
+    "admin": 3.3,
+    "education": 17.8,
+    "transport": 2.8,
+    "justice": 6.7,
+    "housing": 1.9,
+    "environment": 1.9,
+    "other": 11.5
+   }
+  },
+  "YT": {
+   "name": "Yukon",
+   "bpa": 16129,
+   "brackets": [
+    [
+     57375,
+     0.064
+    ],
+    [
+     114750,
+     0.09
+    ],
+    [
+     177882,
+     0.109
+    ],
+    [
+     500000,
+     0.128
+    ],
+    [
+     null,
+     0.15
+    ]
+   ],
+   "spending": {
+    "health": 26.6,
+    "socialEI": 9.9,
+    "debt": 0.6,
+    "admin": 10.2,
+    "education": 12.6,
+    "transport": 9.2,
+    "justice": 8.8,
+    "housing": 4.2,
+    "environment": 6.9,
+    "other": 11
+   }
+  }
+ },
+ "cats": [
+  {
+   "key": "cht",
+   "label": "Canada Health Transfer",
+   "fedPct": 9.58,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "health",
+   "label": "Direct Health Spending",
+   "fedPct": 2.59,
+   "provKey": "health",
+   "note": null
+  },
+  {
+   "key": "cst",
+   "label": "Canada Social Transfer",
+   "fedPct": 3.11,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "socialEI",
+   "label": "Social Assistance & Income Support",
+   "fedPct": 9.84,
+   "provKey": "socialEI",
+   "note": "What sits inside this differs sharply by province, so the totals compare better than the parts. Childcare is 42% of Quebec’s social protection spending against 22% of Ontario’s, because Quebec delivers it as a public program; disability support is 51% of Alberta’s."
+  },
+  {
+   "key": "oas",
+   "label": "OAS & Retirement",
+   "fedPct": 14.78,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "debt",
+   "label": "Debt Servicing",
+   "fedPct": 9.83,
+   "provKey": "debt",
+   "note": null
+  },
+  {
+   "key": "fiscalTx",
+   "label": "Fiscal Transfers to Provinces",
+   "fedPct": 5.61,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "admin",
+   "label": "Government Administration",
+   "fedPct": 3.75,
+   "provKey": "admin",
+   "note": "On the provincial side this is what remains of general public services once debt charges are taken out, so it absorbs whatever a province classifies as overhead rather than as a program. It runs from 2.9% in Ontario to 15.2% in Nunavut."
+  },
+  {
+   "key": "education",
+   "label": "Education",
+   "fedPct": 0.7,
+   "provKey": "education",
+   "note": null
+  },
+  {
+   "key": "transport",
+   "label": "Transportation & Infra",
+   "fedPct": 1.1,
+   "provKey": "transport",
+   "note": null
+  },
+  {
+   "key": "indigenous",
+   "label": "Indigenous Services",
+   "fedPct": 7.24,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "justice",
+   "label": "Justice & Public Safety",
+   "fedPct": 3.91,
+   "provKey": "justice",
+   "note": null
+  },
+  {
+   "key": "defence",
+   "label": "National Defence",
+   "fedPct": 6.62,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "housing",
+   "label": "Housing & Communities",
+   "fedPct": 2.58,
+   "provKey": "housing",
+   "note": null
+  },
+  {
+   "key": "environment",
+   "label": "Environment & Climate",
+   "fedPct": 0.57,
+   "provKey": "environment",
+   "note": null
+  },
+  {
+   "key": "carbon",
+   "label": "Carbon Price Rebates",
+   "fedPct": 2.8,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "science",
+   "label": "Science & Innovation",
+   "fedPct": 2.18,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "intlDev",
+   "label": "International Development",
+   "fedPct": 1.15,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "immigration",
+   "label": "Immigration & Settlement",
+   "fedPct": 1.35,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "agriculture",
+   "label": "Agriculture & Food",
+   "fedPct": 0.73,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "veterans",
+   "label": "Veterans Affairs",
+   "fedPct": 1.33,
+   "provKey": null,
+   "note": null
+  },
+  {
+   "key": "other",
+   "label": "Other",
+   "fedPct": 8.65,
+   "provKey": "other",
+   "note": "A residual on both sides, so its contents differ by jurisdiction and it is the least comparable row here. Provincially it holds recreation and culture plus economic affairs other than transport — resource and industry programs, which is why it is largest in Alberta, Saskatchewan and the territories."
+  }
+ ],
+ "samples": {
+  "AB": {
+   "40000": {
+    "fed": 3461,
+    "prov": 1414,
+    "total": 4875,
+    "marginal": 22.5
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 4514,
+    "total": 14108,
+    "marginal": 30.5
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 10014,
+    "total": 31722,
+    "marginal": 36
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 24755,
+    "total": 79826,
+    "marginal": 43
+   }
+  },
+  "BC": {
+   "40000": {
+    "fed": 3461,
+    "prov": 1370,
+    "total": 4831,
+    "marginal": 19.56
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 3820,
+    "total": 13414,
+    "marginal": 28.2
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 9236,
+    "total": 30944,
+    "marginal": 38.29
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 28036,
+    "total": 83107,
+    "marginal": 45.8
+   }
+  },
+  "MB": {
+   "40000": {
+    "fed": 3461,
+    "prov": 2616,
+    "total": 6077,
+    "marginal": 25.3
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 6942,
+    "total": 16536,
+    "marginal": 33.25
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 15349,
+    "total": 37057,
+    "marginal": 43.4
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 36229,
+    "total": 91300,
+    "marginal": 46.4
+   }
+  },
+  "NB": {
+   "40000": {
+    "fed": 3461,
+    "prov": 2501,
+    "total": 5962,
+    "marginal": 23.9
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 6881,
+    "total": 16475,
+    "marginal": 34.5
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 15128,
+    "total": 36836,
+    "marginal": 42
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 36426,
+    "total": 91497,
+    "marginal": 48.5
+   }
+  },
+  "NL": {
+   "40000": {
+    "fed": 3461,
+    "prov": 2517,
+    "total": 5978,
+    "marginal": 23.2
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 7349,
+    "total": 16943,
+    "marginal": 35
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 15865,
+    "total": 37573,
+    "marginal": 41.8
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 37251,
+    "total": 92322,
+    "marginal": 48.8
+   }
+  },
+  "NS": {
+   "40000": {
+    "fed": 3461,
+    "prov": 3068,
+    "total": 6529,
+    "marginal": 29.45
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 8542,
+    "total": 18136,
+    "marginal": 37.17
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 17993,
+    "total": 39701,
+    "marginal": 43.5
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 42330,
+    "total": 97401,
+    "marginal": 50
+   }
+  },
+  "NT": {
+   "40000": {
+    "fed": 3461,
+    "prov": 1307,
+    "total": 4768,
+    "marginal": 20.4
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 3994,
+    "total": 13588,
+    "marginal": 29.1
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 9663,
+    "total": 31371,
+    "marginal": 38.2
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 25802,
+    "total": 80873,
+    "marginal": 43.05
+   }
+  },
+  "NU": {
+   "40000": {
+    "fed": 3461,
+    "prov": 829,
+    "total": 4290,
+    "marginal": 18.5
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 2838,
+    "total": 12432,
+    "marginal": 27.5
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 7100,
+    "total": 28808,
+    "marginal": 35
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 19703,
+    "total": 74774,
+    "marginal": 40.5
+   }
+  },
+  "ON": {
+   "40000": {
+    "fed": 3461,
+    "prov": 1826,
+    "total": 5287,
+    "marginal": 19.55
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 4800,
+    "total": 14394,
+    "marginal": 29.65
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 11907,
+    "total": 33615,
+    "marginal": 43.41
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 34976,
+    "total": 90047,
+    "marginal": 49.53
+   }
+  },
+  "PE": {
+   "40000": {
+    "fed": 3461,
+    "prov": 2673,
+    "total": 6134,
+    "marginal": 27.97
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 7711,
+    "total": 17305,
+    "marginal": 37.1
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 17096,
+    "total": 38804,
+    "marginal": 43.62
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 39758,
+    "total": 94829,
+    "marginal": 48
+   }
+  },
+  "QC": {
+   "40000": {
+    "fed": 2890,
+    "prov": 3000,
+    "total": 5890,
+    "marginal": 26.11
+   },
+   "75000": {
+    "fed": 8011,
+    "prov": 8987,
+    "total": 16998,
+    "marginal": 36.12
+   },
+   "130000": {
+    "fed": 18126,
+    "prov": 20620,
+    "total": 38746,
+    "marginal": 47.46
+   },
+   "250000": {
+    "fed": 45984,
+    "prov": 51520,
+    "total": 97504,
+    "marginal": 49.96
+   }
+  },
+  "SK": {
+   "40000": {
+    "fed": 3461,
+    "prov": 2153,
+    "total": 5614,
+    "marginal": 25
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 6259,
+    "total": 15853,
+    "marginal": 33
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 13134,
+    "total": 34842,
+    "marginal": 38.5
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 30079,
+    "total": 85150,
+    "marginal": 43.5
+   }
+  },
+  "YT": {
+   "40000": {
+    "fed": 3461,
+    "prov": 1528,
+    "total": 4989,
+    "marginal": 20.9
+   },
+   "75000": {
+    "fed": 9594,
+    "prov": 4226,
+    "total": 13820,
+    "marginal": 29.5
+   },
+   "130000": {
+    "fed": 21708,
+    "prov": 9466,
+    "total": 31174,
+    "marginal": 36.9
+   },
+   "250000": {
+    "fed": 55071,
+    "prov": 23916,
+    "total": 78987,
+    "marginal": 41.8
+   }
+  }
+ }
+}
