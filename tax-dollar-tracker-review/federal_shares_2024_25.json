@@ -1,0 +1,113 @@
+{
+ "cht": [
+  52070.0,
+  9.58,
+  "Canada Health Transfer (T3.7)"
+ ],
+ "health": [
+  14055.0,
+  2.59,
+  "Health ministry: Health Canada, PHAC, CIHR (T3.6)"
+ ],
+ "cst": [
+  16909.0,
+  3.11,
+  "Canada Social Transfer (T3.7)"
+ ],
+ "socialEI": [
+  53454.0,
+  9.84,
+  "Employment Insurance 24,880 + Canada Child Benefit 28,574 (T3.7)"
+ ],
+ "oas": [
+  80294.0,
+  14.78,
+  "Elderly benefits: OAS 60,648 + GIS 18,910 + Allowance 632 (T3.7/T3.10)"
+ ],
+ "debt": [
+  53410.0,
+  9.83,
+  "Public debt charges (T3.8)"
+ ],
+ "fiscalTx": [
+  30457.0,
+  5.61,
+  "Fiscal arrangements: Equalization 25,253 + Territorial Financing 5,159 + other (T3.7)"
+ ],
+ "admin": [
+  20378.0,
+  3.75,
+  "Treasury Board + PSPC + Privy Council + Parliament + Governor General + Democratic Institutions (T3.6)"
+ ],
+ "education": [
+  3783.0,
+  0.7,
+  "Canada Student Grants + Canada Education Savings Grant (T3.10)"
+ ],
+ "transport": [
+  5958.0,
+  1.1,
+  "Transport ministry (T3.6)"
+ ],
+ "indigenous": [
+  39349.0,
+  7.24,
+  "Indigenous Services + Crown-Indigenous Relations and Northern Affairs (T3.6)"
+ ],
+ "justice": [
+  21233.0,
+  3.91,
+  "Justice + Public Safety ministries (T3.6)"
+ ],
+ "defence": [
+  35963.0,
+  6.62,
+  "National Defence ministry (T3.6)"
+ ],
+ "housing": [
+  14042.0,
+  2.58,
+  "Housing, Infrastructure and Communities ministry (T3.6)"
+ ],
+ "environment": [
+  3102.0,
+  0.57,
+  "Environment and Climate Change ministry (T3.6)"
+ ],
+ "carbon": [
+  15233.0,
+  2.8,
+  "Climate action incentive 12,664 + fuel charge returned to small business 2,569 (T3.10)"
+ ],
+ "science": [
+  11876.0,
+  2.18,
+  "Innovation, Science and Industry ministry (T3.6)"
+ ],
+ "intlDev": [
+  6232.0,
+  1.15,
+  "Global Affairs transfer payments only (T3.6); diplomatic and consular operations fall to Other"
+ ],
+ "immigration": [
+  7326.0,
+  1.35,
+  "Immigration, Refugees and Citizenship ministry (T3.6)"
+ ],
+ "agriculture": [
+  3953.0,
+  0.73,
+  "Agriculture and Agri-Food ministry (T3.6)"
+ ],
+ "veterans": [
+  7209.0,
+  1.33,
+  "Veterans Affairs departmental financial statements, total expenses (accrual)"
+ ],
+ "other": [
+  46993.0,
+  8.65,
+  "residual: all remaining ministries and programs"
+ ],
+ "_denominator": 543279.0
+}

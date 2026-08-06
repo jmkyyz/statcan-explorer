@@ -319,7 +319,9 @@ body {
       <strong>Estimates only.</strong> Income tax calculated using 2025 brackets, basic personal amount credit,
       the Ontario surtax and Ontario Health Premium, and the Quebec federal abatement. CPP, EI, and other credits
       are not applied, and the figure you enter is treated as taxable income.
-      Spending allocations are approximate percentages from 2023–24 public accounts.
+      Spending allocations use 2024–25 federal Public Accounts actuals and Statistics Canada's 2024
+      provincial-territorial-local functional estimates, and assume income tax funds every category in
+      the same proportion as total spending.
     </div>
 
     <!-- Stat cards -->
@@ -404,13 +406,35 @@ body {
     <ul>
       <li><strong>Tax brackets (2025):</strong> Canada Revenue Agency / TaxTips.ca —
         <a href="https://www.canada.ca/en/revenue-agency/services/tax/individuals/frequently-asked-questions-individuals/canadian-income-tax-rates-individuals-current-previous-years.html" target="_blank">Federal and provincial/territorial rates</a></li>
-      <li><strong>Federal spending:</strong> Government of Canada —
-        <a href="https://www.canada.ca/en/public-services-procurement/services/payments-accounting/public-accounts/2024.html" target="_blank">Public Accounts of Canada 2023–24 (Volume I)</a>
-        and <a href="https://budget.canada.ca/2025/home-accueil-en.html" target="_blank">Federal Budget 2025</a>.
-        Major line items include: Canada Health Transfer ($54.7B, shown as a separate federal transfer),
-        direct federal health programs — Health Canada, PHAC (~$11B), elderly benefits ($83.1B),
-        EI + Canada Child Benefit ($60.6B), and public debt charges ($55.6B) from Budget 2025 projections.
-        Equalization and Territorial Formula Financing ($31.7B) are included in Govt Administration.</li>
+      <li><strong>Federal spending:</strong> Receiver General for Canada —
+        <a href="https://www.tpsgc-pwgsc.gc.ca/recgen/cpc-pac/2025/vol1/s3/charges-expenses-eng.html" target="_blank">Public
+        Accounts of Canada 2025, Volume I, Section 3 (Expenses)</a>, fiscal year 2024–25 actuals. These are
+        audited actuals, not budget projections. The denominator is total expenses excluding net actuarial
+        losses, $543,279M; net actuarial losses of $4,020M are a non-cash revaluation of pension and
+        future-benefit obligations and are left out of both the categories and the total.
+        <br><br>
+        Largest line items: elderly benefits $80,294M (Old Age Security $60,648M, Guaranteed Income
+        Supplement $18,910M, Allowance $632M), public debt charges $53,410M, Employment Insurance $24,880M
+        plus the Canada Child Benefit $28,574M, the Canada Health Transfer $52,070M, Equalization $25,253M
+        with Territorial Financing $5,159M, and the Canada Social Transfer $16,909M.
+        <br><br>
+        Transfers and debt are taken as program lines; the functional categories are ministry totals, net
+        of each ministry's own public debt charges. No ministry is counted on both sides, so the two cuts
+        do not overlap. <strong>Other is a residual</strong> — the total less every named category — and it
+        holds Canadian Heritage, Energy and Natural Resources, Fisheries and Oceans, Global Affairs'
+        diplomatic and consular operations, the operating costs of the Finance, Employment and Workforce
+        Development and National Revenue ministries, and the negative provision for valuation and other
+        items.
+        <br><br>
+        Two rows need a caveat. <strong>Veterans Affairs</strong> is the only category not on the ministry
+        basis: the Public Accounts show the Veterans Affairs segment at $546M because veterans' disability
+        and future benefits are recognised as personnel expenses government-wide, so the figure used is
+        total expenses from
+        <a href="https://www.veterans.gc.ca/en/about-vac/reports-policies-and-legislation/departmental-reports/departmental-financial-statements/departmental-financial-statements-2024-2025" target="_blank">Veterans
+        Affairs' audited departmental financial statements</a> ($7,209M). <strong>Carbon Price Rebates</strong>
+        covers the Climate action incentive and the portion of fuel charge proceeds returned to small
+        business. The consumer fuel charge ended during 2025, so this row falls away in later years — it is
+        shown because it was real spending in 2024–25.</li>
       <li><strong>Provincial spending:</strong> Statistics Canada —
         <a href="https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501" target="_blank">Table
         10-10-0005-01, Canadian Classification of Functions of Government (CCOFOG) by consolidated
@@ -582,35 +606,68 @@ const PROVINCES = {
   },
 };
 
-// Shared spending taxonomy — 18 categories
-// fedPct = % of federal tax pool; provKey = key in province spending object (null = federal-only)
+// Shared spending taxonomy — 22 categories.
+// fedPct = % of federal tax pool; provKey = key in province spending object (null = federal-only).
+//
+// Federal shares: Public Accounts of Canada 2025 (Volume I, Section 3), fiscal year 2024-25
+// actuals. Denominator is total expenses excluding net actuarial losses, $543,279M — the
+// "Total expenses" line of Table 3.6. Net actuarial losses ($4,020M) are a non-cash
+// revaluation of pension and future-benefit obligations and are excluded from both sides.
+// Every share below traces to a printed line; the sources are noted per row as T3.6
+// (external expenses by ministry segment), T3.7 (major transfer payments) and T3.10
+// (expenditures under statutory authorities). Shares sum to exactly 100.00.
+//
+// Two structural notes a reader of these numbers needs.
+//
+// 1. The taxonomy deliberately mixes two cuts of the accounts. Transfers and debt are
+//    PROGRAM lines — the Canada Health Transfer sits inside the Finance ministry segment,
+//    Old Age Security and Employment Insurance inside Employment and Workforce Development,
+//    the Canada Child Benefit inside National Revenue. The functional categories are
+//    MINISTRY lines. This is only coherent because no ministry appears on both sides:
+//    Finance, Employment and Workforce Development and National Revenue are never counted
+//    as ministries, so their program lines cannot double-count. Ministry figures are taken
+//    net of each ministry's own public debt charges, which are counted once in Debt
+//    Servicing instead.
+//
+// 2. "Other" is a residual, not a plug — it is the denominator less every named category,
+//    and it is what remains genuinely unallocated: Canadian Heritage, Energy and Natural
+//    Resources, Fisheries and Oceans, Global Affairs' diplomatic and consular operations,
+//    the operating costs of Finance, Employment and Workforce Development and National
+//    Revenue, and the negative provision for valuation and other items.
 const CATS = [
-  // Federal % based on 2023-24 Public Accounts actuals + Budget 2025 projections
-  // Key line items: Elderly benefits 14.3%, CHT 10.0% (transfer to provinces),
-  // direct federal health 2.0%, PDC 9.6%, EI+CCB 10.4%,
-  // CST 3.0% (transfer to provinces for social services + post-secondary),
-  // equalization+TFF+fiscal arrangements (~5.8%) folded into Fiscal Transfers & Admin.
-  { key:'cht',          label:'Canada Health Transfer',     fedPct:10, provKey:null          },
-  { key:'health',       label:'Direct Health Spending',      fedPct: 2, provKey:'health'      },
-  { key:'cst',          label:'Canada Social Transfer',      fedPct: 3, provKey:null          },
-  { key:'socialEI',     label:'Social Assistance & EI',     fedPct: 7, provKey:'socialEI'    },
-  { key:'oas',          label:'OAS & Retirement',            fedPct:15, provKey:null          },
-  { key:'debt',         label:'Debt Servicing',              fedPct:10, provKey:'debt'        },
-  { key:'admin',        label:'Fiscal Transfers & Admin',    fedPct:12, provKey:'admin'       },
-  { key:'education',    label:'Education',                   fedPct: 4, provKey:'education'   },
-  { key:'transport',    label:'Transportation & Infra',      fedPct: 2, provKey:'transport'   },
-  { key:'indigenous',   label:'Indigenous Services',         fedPct: 5, provKey:null          },
-  { key:'justice',      label:'Justice & Public Safety',     fedPct: 2, provKey:'justice'     },
-  { key:'defence',      label:'National Defence',            fedPct: 5, provKey:null          },
-  { key:'housing',      label:'Housing & Communities',       fedPct: 2, provKey:'housing'     },
-  { key:'environment',  label:'Environment & Climate',       fedPct: 2, provKey:'environment' },
-  { key:'science',      label:'Science & Innovation',        fedPct: 2, provKey:null          },
-  { key:'intlDev',      label:'International Development',   fedPct: 1, provKey:null          },
-  { key:'immigration',  label:'Immigration & Settlement',    fedPct: 1, provKey:null          },
-  { key:'agriculture',  label:'Agriculture & Food',          fedPct: 1, provKey:null          },
-  { key:'veterans',     label:'Veterans Affairs',            fedPct: 2, provKey:null          },
-  { key:'other',        label:'Other',                       fedPct:12, provKey:'other'       },
+  { key:'cht',          label:'Canada Health Transfer',        fedPct: 9.58, provKey:null          },  // T3.7 $52,070M
+  { key:'health',       label:'Direct Health Spending',        fedPct: 2.59, provKey:'health'      },  // T3.6 Health ministry $14,055M
+  { key:'cst',          label:'Canada Social Transfer',        fedPct: 3.11, provKey:null          },  // T3.7 $16,909M
+  { key:'socialEI',     label:'Social Assistance & EI',        fedPct: 9.84, provKey:'socialEI'    },  // T3.7 EI $24,880M + CCB $28,574M
+  { key:'oas',          label:'OAS & Retirement',              fedPct:14.78, provKey:null          },  // T3.10 OAS $60,648M + GIS $18,910M + Allowance $632M
+  { key:'debt',         label:'Debt Servicing',                fedPct: 9.83, provKey:'debt'        },  // T3.8 $53,410M
+  { key:'fiscalTx',     label:'Fiscal Transfers to Provinces', fedPct: 5.61, provKey:null          },  // T3.10 Equalization $25,253M + Territorial Financing $5,159M
+  { key:'admin',        label:'Government Administration',     fedPct: 3.75, provKey:'admin'       },  // T3.6 Treasury Board, PSPC, Privy Council, Parliament, Gov Gen, Democratic Institutions
+  { key:'education',    label:'Education',                     fedPct: 0.70, provKey:'education'   },  // T3.10 Canada Student Grants $2,584M + Education Savings Grant $1,199M
+  { key:'transport',    label:'Transportation & Infra',        fedPct: 1.10, provKey:'transport'   },  // T3.6 Transport ministry $5,958M
+  { key:'indigenous',   label:'Indigenous Services',           fedPct: 7.24, provKey:null          },  // T3.6 Indigenous Services $26,737M + Crown-Indigenous Relations $12,612M
+  { key:'justice',      label:'Justice & Public Safety',       fedPct: 3.91, provKey:'justice'     },  // T3.6 Justice $2,782M + Public Safety $18,451M
+  { key:'defence',      label:'National Defence',              fedPct: 6.62, provKey:null          },  // T3.6 National Defence $35,963M
+  { key:'housing',      label:'Housing & Communities',         fedPct: 2.58, provKey:'housing'     },  // T3.6 Housing, Infrastructure and Communities $14,042M
+  { key:'environment',  label:'Environment & Climate',         fedPct: 0.57, provKey:'environment' },  // T3.6 Environment and Climate Change $3,102M
+  { key:'carbon',       label:'Carbon Price Rebates',          fedPct: 2.80, provKey:null          },  // T3.10 Climate action incentive $12,664M + fuel charge to small business $2,569M
+  { key:'science',      label:'Science & Innovation',          fedPct: 2.18, provKey:null          },  // T3.6 Innovation, Science and Industry $11,876M
+  { key:'intlDev',      label:'International Development',     fedPct: 1.15, provKey:null          },  // T3.6 Global Affairs transfer payments $6,232M
+  { key:'immigration',  label:'Immigration & Settlement',      fedPct: 1.35, provKey:null          },  // T3.6 Immigration, Refugees and Citizenship $7,326M
+  { key:'agriculture',  label:'Agriculture & Food',            fedPct: 0.73, provKey:null          },  // T3.6 Agriculture and Agri-Food $3,953M
+  { key:'veterans',     label:'Veterans Affairs',              fedPct: 1.33, provKey:null          },  // $7,209M — see note below
+  { key:'other',        label:'Other',                         fedPct: 8.65, provKey:'other'       },  // residual, $46,993M
 ];
+
+// Veterans Affairs is the one row not on the ministry-segment basis. Table 3.6 shows the
+// Veterans Affairs segment at only $546M, because veterans' disability and other future
+// benefits are recognised as personnel expenses government-wide rather than in the
+// department's segment — the Public Accounts say so directly, and the $5,276M of interest
+// on those benefits appears inside public debt charges. Publishing the segment figure would
+// tell readers Canada spends 0.1% of federal expenses on veterans, which is false. The
+// figure used, $7,208,774 thousand, is total expenses from Veterans Affairs' own audited
+// departmental financial statements for 2024-25, and the difference against the segment is
+// taken out of Other so the column still sums to 100.
 
 // ═══════════════════════════════════════════════════════════════
 // TAX CALCULATION
@@ -631,6 +688,21 @@ function ontarioHealthPremium(income) {
   if (income <= 200000) return 750;
   if (income <= 200600) return Math.min(900, 750 + (income - 200000) * 0.25);
   return 900;
+}
+
+// Round exact dollar amounts to whole dollars so they still sum to the stated total.
+// Rounding each category independently left the columns short or over by a few dollars,
+// so the Detailed Breakdown did not foot against the totals above it.
+function apportion(exact, total) {
+  const floors = exact.map(Math.floor);
+  const short  = Math.round(total - floors.reduce((a, b) => a + b, 0));
+  const byRemainder = exact
+    .map((v, i) => [v - Math.floor(v), i])
+    .sort((a, b) => b[0] - a[0])
+    .map(([, i]) => i);
+  const out = floors.slice();
+  for (let k = 0; k < short && byRemainder.length; k++) out[byRemainder[k % byRemainder.length]] += 1;
+  return out;
 }
 
 function calcTax(income, brackets, bpa) {
@@ -689,18 +761,17 @@ function calculate(income, provKey) {
   // them onto education, debt, justice and the rest, inflating each by about 11% of its own
   // value. Distorting nine categories to correct one is worse than leaving the overlap in
   // place and saying so, which is what the Sources note now does.
-  const catData = CATS.map(cat => {
-    const fedAmt  = Math.round((cat.fedPct / 100) * fedTax);
-    const provPct = cat.provKey ? (prov.spending[cat.provKey] || 0) : 0;
-    const provAmt = Math.round((provPct / 100) * provTax);
-    return {
-      label:    cat.label,
-      fedAmt,
-      provAmt,
-      combined: fedAmt + provAmt,
-      pct:      total > 0 ? (fedAmt + provAmt) / total : 0,
-    };
-  }).sort((a, b) => b.combined - a.combined);
+  const fedAmts  = apportion(CATS.map(c => (c.fedPct / 100) * fedTax), fedTax);
+  const provAmts = apportion(
+    CATS.map(c => ((c.provKey ? prov.spending[c.provKey] || 0 : 0) / 100) * provTax), provTax);
+
+  const catData = CATS.map((cat, i) => ({
+    label:    cat.label,
+    fedAmt:   fedAmts[i],
+    provAmt:  provAmts[i],
+    combined: fedAmts[i] + provAmts[i],
+    pct:      total > 0 ? (fedAmts[i] + provAmts[i]) / total : 0,
+  })).sort((a, b) => b.combined - a.combined);
 
   return { fedTax, provTax, total, catData };
 }
