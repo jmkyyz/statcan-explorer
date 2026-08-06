@@ -150,6 +150,12 @@ body {
   color: #4b5563;
 }
 .scope-note strong { color: #1f2937; }
+.cat-marker {
+  color: var(--blue);
+  font-weight: 600;
+  font-size: 0.72em;
+  padding-left: 1px;
+}
 .stat-card {
   background: white;
   border-radius: var(--radius);
@@ -434,6 +440,7 @@ body {
           <tbody id="table-body"></tbody>
         </table>
       </div>
+      <div class="chart-note" id="table-notes" style="margin-top:12px;"></div>
     </div>
 
   </div><!-- /results -->
@@ -676,11 +683,17 @@ const CATS = [
   { key:'cht',          label:'Canada Health Transfer',        fedPct: 9.58, provKey:null          },  // T3.7 $52,070M
   { key:'health',       label:'Direct Health Spending',        fedPct: 2.59, provKey:'health'      },  // T3.6 Health ministry $14,055M
   { key:'cst',          label:'Canada Social Transfer',        fedPct: 3.11, provKey:null          },  // T3.7 $16,909M
-  { key:'socialEI',     label:'Social Assistance & Income Support', fedPct: 9.84, provKey:'socialEI' },  // T3.7 EI $24,880M + CCB $28,574M
+  { key:'socialEI',     label:'Social Assistance & Income Support', fedPct: 9.84, provKey:'socialEI',
+    note:'What sits inside this differs sharply by province, so the totals compare better than the parts. '
+       + 'Childcare is 42% of Quebec’s social protection spending against 22% of Ontario’s, because '
+       + 'Quebec delivers it as a public program; disability support is 51% of Alberta’s.' },  // T3.7 EI $24,880M + CCB $28,574M
   { key:'oas',          label:'OAS & Retirement',              fedPct:14.78, provKey:null          },  // T3.10 OAS $60,648M + GIS $18,910M + Allowance $632M
   { key:'debt',         label:'Debt Servicing',                fedPct: 9.83, provKey:'debt'        },  // T3.8 $53,410M
   { key:'fiscalTx',     label:'Fiscal Transfers to Provinces', fedPct: 5.61, provKey:null          },  // T3.10 Equalization $25,253M + Territorial Financing $5,159M
-  { key:'admin',        label:'Government Administration',     fedPct: 3.75, provKey:'admin'       },  // T3.6 Treasury Board, PSPC, Privy Council, Parliament, Gov Gen, Democratic Institutions
+  { key:'admin',        label:'Government Administration',     fedPct: 3.75, provKey:'admin',
+    note:'On the provincial side this is what remains of general public services once debt charges are '
+       + 'taken out, so it absorbs whatever a province classifies as overhead rather than as a program. '
+       + 'It runs from 2.9% in Ontario to 15.2% in Nunavut.' },  // T3.6 Treasury Board, PSPC, Privy Council, Parliament, Gov Gen, Democratic Institutions
   { key:'education',    label:'Education',                     fedPct: 0.70, provKey:'education'   },  // T3.10 Canada Student Grants $2,584M + Education Savings Grant $1,199M
   { key:'transport',    label:'Transportation & Infra',        fedPct: 1.10, provKey:'transport'   },  // T3.6 Transport ministry $5,958M
   { key:'indigenous',   label:'Indigenous Services',           fedPct: 7.24, provKey:null          },  // T3.6 Indigenous Services $26,737M + Crown-Indigenous Relations $12,612M
@@ -694,7 +707,11 @@ const CATS = [
   { key:'immigration',  label:'Immigration & Settlement',      fedPct: 1.35, provKey:null          },  // T3.6 Immigration, Refugees and Citizenship $7,326M
   { key:'agriculture',  label:'Agriculture & Food',            fedPct: 0.73, provKey:null          },  // T3.6 Agriculture and Agri-Food $3,953M
   { key:'veterans',     label:'Veterans Affairs',              fedPct: 1.33, provKey:null          },  // $7,209M — see note below
-  { key:'other',        label:'Other',                         fedPct: 8.65, provKey:'other'       },  // residual, $46,993M
+  { key:'other',        label:'Other',                         fedPct: 8.65, provKey:'other',
+    note:'A residual on both sides, so its contents differ by jurisdiction and it is the least comparable '
+       + 'row here. Provincially it holds recreation and culture plus economic affairs other than '
+       + 'transport — resource and industry programs, which is why it is largest in Alberta, '
+       + 'Saskatchewan and the territories.' },  // residual, $46,993M
 ];
 
 // Veterans Affairs is the one row not on the ministry-segment basis. Table 3.6 shows the
@@ -837,6 +854,7 @@ function calculate(income, provKey) {
 
   const catData = CATS.map((cat, i) => ({
     label:    cat.label,
+    note:     cat.note || null,
     fedAmt:   fedAmts[i],
     provAmt:  provAmts[i],
     combined: fedAmts[i] + provAmts[i],
@@ -964,10 +982,16 @@ function renderTable(catData, fedTax, provTax, total) {
   const tbody = document.getElementById('table-body');
   tbody.innerHTML = '';
 
+  // Categories whose contents differ structurally between provinces carry a marker, explained
+  // below the table. The markers are numbered in the order the rows happen to be sorted, so
+  // they are assigned here rather than being fixed to a category.
+  const marked = catData.filter(c => c.note);
+  const markerOf = c => marked.indexOf(c) + 1;
+
   catData.forEach(c => {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${c.label}</td>
+      <td>${c.label}${c.note ? `<sup class="cat-marker">${markerOf(c)}</sup>` : ''}</td>
       <td class="fed-amt">${c.fedAmt > 0 ? fmt(c.fedAmt) : '<span class="dim">—</span>'}</td>
       <td class="prov-amt">${c.provAmt > 0 ? fmt(c.provAmt) : '<span class="dim">—</span>'}</td>
       <td><strong>${fmt(c.combined)}</strong></td>
@@ -987,6 +1011,13 @@ function renderTable(catData, fedTax, provTax, total) {
     <td>100%</td>
   `;
   tbody.appendChild(totalRow);
+
+  const notesEl = document.getElementById('table-notes');
+  notesEl.innerHTML = marked.length
+    ? '<strong>Comparing these rows between provinces:</strong> '
+      + marked.map(c => `<sup class="cat-marker">${markerOf(c)}</sup> <em>${c.label}.</em> ${c.note}`)
+              .join('<br>')
+    : '';
 }
 
 // ═══════════════════════════════════════════════════════════════
