@@ -1,0 +1,56 @@
+{
+"denominator": {
+  "coded": 544,
+  "verdict": "MIS-DATED BY ONE YEAR",
+  "note": "$544B is a close match for total federal expenses excluding net actuarial losses in 2024-25 ($543,279M) — which is an ACTUAL, not a projection, and not the year the app cites. The methodology attributes it to 'Public Accounts of Canada 2023-24 — actuals for fiscal year ending March 31, 2024', where total expenses were $521,425M including net actuarial losses or $513,936M excluding them. The citation is wrong by one year and about $22.6B. Separately, 'program and statutory expenditures' is an Estimates concept, not a Public Accounts one — 2024-25 Main Estimates total $449.2B on that basis. The label should read 'total federal expenses'.",
+  "table": [
+    ["2023-24 (the year cited)", 513.9, 521.4, "Actual"],
+    ["2024-25 (matches $544B)", 543.3, 547.3, "Actual"],
+    ["2025-26 per Budget 2025", 580.9, 585.9, "Projection"],
+    ["2025-26 per Spring Update 2026", 566.8, 578.3, "Projection, supersedes Budget 2025"]
+  ],
+  "src": "https://www.tpsgc-pwgsc.gc.ca/recgen/cpc-pac/2025/vol1/s3/charges-expenses-eng.html"
+},
+"verified_share": {
+  "cht":        [9.58,  "CHT $52,070M (2024-25). The coded $54.7B is the 2025-26 preliminary figure; 2023-24 was $49,421M."],
+  "health":     [2.20,  "Health Canada $9,061M + PHAC $2,913M = $11,974M (2024-25 accrual). Roughly right, but these are TOTAL expenses including grants and contributions, not 'operations' as the methodology says."],
+  "cst":        [3.11,  "CST $16,909M (2024-25). The coded $15.9B is the 2022-23 figure — three years stale. The 2025-26 figure is $17.4B."],
+  "socialEI":   [9.84,  "EI $24,880M + CCB $28,574M (2024-25). Every route gives 10-11%: the app's own cited line items are 11.1% of $544B. The coded 7% is understated by about 3 points — the single largest defect in the federal allocation. Note the coded 'EI ~$33B' matches no fiscal year (2023-24 was $23,130M, 2024-25 $24,880M, 2025-26 projected $30.5B)."],
+  "oas":        [14.78, "Elderly benefits $80,294M (2024-25). The total of $83.1B is right for 2025-26, but the OAS/GIS SPLIT of $68.4B/$14.7B is unsupported by any official document — actual 2023-24 was OAS pension $57.4B, GIS $18.0B, Allowance $0.6B. GIS is understated by about $3B and OAS overstated by about $11B."],
+  "debt":       [9.83,  "Public debt charges $53,410M (2024-25). The coded $55.6B is the Budget 2025 projection for 2025-26, since revised down to $54.0B in the Spring Update 2026. The 2023-24 actual was $47,273M."],
+  "admin":      [5.61,  "Fiscal arrangements $30,457M (2024-25) = 5.61%. If 'Admin' instead means operating expenses, that alone is 24.0%. Neither reading produces 12%. This is a residual chosen to make the column sum to 100."],
+  "education":  [2.05,  "CCOFOG federal Education 2024 = $10,635M. The coded 4% is roughly double the measurable figure, and two of its three cited line items are already counted elsewhere — post-secondary via the CST row, granting councils via Science & Innovation."],
+  "transport":  [1.11,  "Transport ministry segment $6,006M (2024-25)."],
+  "indigenous": [7.24,  "ISC $26,737M + CIRNAC $12,612M = $39,349M (2024-25). Four different bases all agree within 0.3 points. Understated by about 2 points. Caveat: these totals swing on Indigenous claims provisions — recognitions of future obligations rather than in-year delivery — which a 'where your dollars go' tool arguably should strip, but should then say so."],
+  "justice":    [3.91,  "Justice $2,782M + Public Safety $18,452M = $21,234M (2024-25). Understated by about 2 points."],
+  "defence":    [null,  "Basis-dependent: DND departmental accrual $28,503M (5.25%), ministry segment $36,026M (6.63%), authorities used $33,925M. DND's own accrual statements exclude CSE and three review bodies. The coded 5% sits at the bottom of the range."],
+  "housing":    [2.59,  "Housing, Infrastructure and Communities $14,088M (2024-25)."],
+  "environment":[null,  "Ambiguous by a wide margin: ECCC alone is $3,102M (0.57%); CCOFOG environmental protection including carbon rebates is 4.61%. The coded 2% sits between two defensible answers that differ fourfold. Related: pollution pricing proceeds returned ($15,595M, 2.87% of the pool) has NO category in the app at all."],
+  "science":    [2.19,  "ISED $11,876M (2024-25)."],
+  "intlDev":    [null,  "1.15% on Global Affairs transfers, 1.74% on its total. Coded 1% is close on the narrower reading."],
+  "immigration":[1.35,  "IRCC $7,326M (2024-25)."],
+  "agriculture":[0.73,  "AAFC $3,953M (2024-25)."],
+  "veterans":   [1.33,  "VAC departmental accrual $7,209M (2024-25). FLAG FOR THE REVIEWER: Public Accounts Vol I shows the VAC segment at only $546M. The likely explanation is that veterans' future-benefit expenses are consolidated centrally rather than in the VAC segment, but this is an inference and should be confirmed with the Receiver General before either figure is published."],
+  "other":      [null,  "No official counterpart exists. This is a pure residual. Together with Fiscal Transfers & Admin it absorbs 24% of the pool against a nearest official analogue — CCOFOG General public services excluding debt — of 17.0%."]
+},
+"line_items": [
+  ["Canada Health Transfer $54.7B", "2025-26 preliminary. 2023-24 was $49,421M; 2024-25 $52,081M.", "MIS-DATED"],
+  ["Canada Social Transfer $15.9B", "2022-23. Three years stale. 2025-26 is $17,416M.", "STALE"],
+  ["OAS $68.4B + GIS $14.7B", "Total of $83.1B is right for 2025-26, but the split matches no official source. Real 2023-24: OAS $57.4B, GIS $18.0B, Allowance $0.6B.", "SPLIT UNSUPPORTED"],
+  ["Public debt charges $55.6B", "Budget 2025 projection for 2025-26, since revised to $54.0B. 2023-24 actual was $47,273M.", "MIS-DATED"],
+  ["EI ~$33B", "Matches no fiscal year. 2023-24 $23,130M; 2024-25 $24,880M; 2025-26 projected $30.5B.", "WRONG"],
+  ["Canada Child Benefit ~$27B", "Closest to 2023-24 ($26,339M). 2024-25 was $28,574M.", "STALE"],
+  ["EI + CCB = $60.6B", "The TOTAL is exactly right for 2025-26 (EI $30.5B + CCB $30.1B) — but the stated 33/27 split is not the official 30.5/30.1 split. Right answer, wrong components.", "COINCIDENTALLY RIGHT"],
+  ["Equalization $21.9B + TFF $4.2B", "Two different years spliced: $21.9B is 2022-23 Equalization, $4.2B is 2020-21 TFF. No official vintage pairs them. 2025-26 is $26,170M + $5,489M.", "WRONG"],
+  ["Equalization and TFF $31.7B (app Sources text)", "CORRECT for 2025-26: $26,170M + $5,489M = $31,659M. The app text is right and the methodology's component pair is wrong — the opposite of what it looks like.", "CORRECT"],
+  ["Health Canada + PHAC ~$11B", "$11,974M for 2024-25. Roughly right but slightly low, and these are total expenses, not operations.", "ROUGHLY RIGHT"]
+],
+"benchmark": {
+  "table": "StatCan Table 10-10-0024-01, Canadian classification of functions of government by general government component — select the Federal government component.",
+  "url": "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010002401",
+  "note": "The only official federal-only table splitting all spending across the ten CCOFOG functions, 2008-2024. Note that Table 10-10-0005-01 — the one the app cites for provincial data — has NO federal row at all.",
+  "values": [["Social protection",187096],["General public services",138596],["  of which public debt transactions",50105],["Health",65219],["Economic affairs",33743],["Defence",28106],["Environmental protection",23957],["Public order and safety",19569],["Education",10635],["Recreation and culture",6657],["Housing",6158],["TOTAL",519736]],
+  "caveats": "Three official sources give three different federal totals for roughly the same period: CCOFOG 2024 $519.7B, Public Accounts FY2024-25 $547.3B, Fiscal Reference Tables GFS 2024 $561.3B. None is wrong — they are different accounting universes, and a tool must say which it uses. CCOFOG also excludes capital acquisition and consumption of fixed capital, which is material for defence and transport. UNVERIFIED: whether CCOFOG 'reference year 2024' maps to FY2024-25 or straddles two fiscal years — its public debt transactions of $50.1B sit between the FY2023-24 actual of $47.3B and the FY2024-25 actual of $53.4B, suggesting a calendar-year convention. Confirm with StatCan before asserting equivalence."
+},
+"structural": "The 20 categories mix two incompatible cuts — PROGRAM lines (CHT, CST, OAS, EI, debt servicing) and MINISTRY lines (Defence, Indigenous Services, Veterans Affairs). That is why the shares sum tidily to 100 while omitting real spending: pollution pricing proceeds returned ($15,595M, 2.87%) has no category at all, and large blocks of Employment and Social Development and National Revenue spending outside OAS, EI and CCB are unassigned. The arithmetic is tidy; the taxonomy is not coherent. This is a larger editorial problem than any individual percentage."
+}

@@ -1,0 +1,107 @@
+{
+"tax_verdicts": {
+  "FED": {"verdict":"CORRECT","note":"All five 2025 brackets and the $16,129 BPA confirmed against CRA. Critically, the rate at which 2025 non-refundable credits are valued is 14.5% — T1 line 114 reads 'Federal non-refundable tax credit rate 14.5%'. The app's use of the lowest bracket rate for the BPA credit is therefore right.","src":"https://www.canada.ca/en/revenue-agency/services/tax/individuals/tax-rates-brackets/last-year.html"},
+  "AB": {"verdict":"CORRECT","note":"All 6 brackets and BPA $22,323 confirmed on Form AB428 (5009-C).","src":"https://www.canada.ca/en/revenue-agency/services/forms-publications/tax-packages-years/general-income-tax-benefit-package/alberta/5009-c.html"},
+  "BC": {"verdict":"CORRECT","note":"All 7 brackets and BPA $12,932 confirmed on Form BC428 (5010-C).","src":"https://www.canada.ca/en/revenue-agency/services/forms-publications/tax-packages-years/general-income-tax-benefit-package/british-columbia/5010-c.html"},
+  "MB": {"verdict":"CORRECT","note":"$47,000 / $100,000 and BPA $15,780 confirmed on Form MB428. IMPORTANT — do not 'correct' this: CRA's own 2025 summary web page wrongly lists Manitoba at $47,564 / $101,200, which are the 2026 thresholds. Manitoba paused indexation effective 2025. The app is right and the CRA summary page is wrong.","src":"https://www.gov.mb.ca/finance/personal/ptaxes.html"},
+  "NB": {"verdict":"CORRECT","note":"All 4 brackets and BPA $13,396 confirmed on Form NB428 (5004-C).","src":"https://www.canada.ca/en/revenue-agency/services/forms-publications/tax-packages-years/general-income-tax-benefit-package/new-brunswick/5004-c.html"},
+  "NL": {"verdict":"CORRECT","note":"All 8 brackets and BPA $11,067 confirmed on Form NL428 (5001-C).","src":"https://www.canada.ca/en/revenue-agency/services/forms-publications/tax-packages-years/general-income-tax-benefit-package/newfoundland-labrador/5001-c.html"},
+  "NS": {"verdict":"CORRECT","note":"All 5 brackets and BPA $11,744 confirmed on Form NS428 (5003-C). Note: Nova Scotia does NOT phase out its BPA in 2025 — Budget 2025 replaced the old base-plus-supplement structure with a flat $11,744 for all filers, so the app's flat value is correct.","src":"https://notices.novascotia.ca/files/ftb-taxation/ftb-tn-personal-income-tax-change-budget-2025-2025-04-04.pdf"},
+  "NT": {"verdict":"CORRECT","note":"All 4 brackets and BPA $17,842 confirmed on Form NT428 (5012-C).","src":"https://www.canada.ca/en/revenue-agency/services/forms-publications/tax-packages-years/general-income-tax-benefit-package/northwest-territories/5012-c.html"},
+  "NU": {"verdict":"CORRECT","note":"All 4 brackets and BPA $19,274 confirmed on Form NU428 (5014-C).","src":"https://www.canada.ca/en/revenue-agency/services/forms-publications/tax-packages-years/general-income-tax-benefit-package/nunavut/5014-c.html"},
+  "ON": {"verdict":"BRACKETS CORRECT / SURTAX WRONG","note":"All 5 brackets and BPA $12,747 confirmed on Form ON428 (5006-C). The surtax thresholds are wrong — see the Credits and Surtax tab and Finding F-01.","src":"https://www.canada.ca/en/revenue-agency/services/forms-publications/tax-packages-years/general-income-tax-benefit-package/ontario/5006-c.html"},
+  "PE": {"verdict":"CORRECT","note":"All 5 brackets and BPA $14,650 confirmed on Form PE428 (5002-C). Surtax confirmed eliminated for 2024 and later — no surtax line appears on the form.","src":"https://www.canada.ca/en/revenue-agency/services/forms-publications/tax-packages-years/general-income-tax-benefit-package/prince-edward-island/5002-c.html"},
+  "QC": {"verdict":"CORRECT","note":"All 4 brackets and BPA $18,571 confirmed. Quebec's credit conversion rate is 14%, which matches the app's use of the lowest bracket rate.","src":"https://www.revenuquebec.ca/en/citizens/income-tax-return/completing-your-income-tax-return/income-tax-rates/"},
+  "SK": {"verdict":"CORRECT","note":"All 3 brackets and BPA $19,491 confirmed on Form SK428 (5008-C).","src":"https://www.canada.ca/en/revenue-agency/services/forms-publications/tax-packages-years/general-income-tax-benefit-package/saskatchewan/5008-c.html"},
+  "YT": {"verdict":"WRONG — extra bracket","note":"Form YT428 (5011-C) has FIVE brackets: 6.4 / 9 / 10.9 / 12.8 to $500,000 / 15 above. The coded 12.93% bracket at $253,414 does not exist. Yukon also uses the FEDERAL BPA, so its BPA phases down over $177,882-$253,414 — which the app does not model. See Finding F-02.","src":"https://www.canada.ca/en/revenue-agency/services/forms-publications/tax-packages-years/general-income-tax-benefit-package/yukon/5011-c.html"}
+},
+"yt_correct_brackets": [[57375,0.064],[114750,0.09],[177882,0.109],[500000,0.128],[99999999,0.15]],
+"on_surtax_correct": {"r1":0.20,"t1":5710,"r2":0.36,"t2":7307,
+  "src":"Form ON428 (5006-C) lines 66-68: 'Complete lines 66 to 68 if the amount on line 65 is more than $5,710' ... '(Line 65 minus $5,710) multiplied by 20%' ... '(Line 65 minus $7,307) multiplied by 36%'",
+  "crosscheck":"2024 thresholds $5,554 / $7,108 indexed by Ontario's 2025 factor of 2.8% give exactly $5,710 / $7,307."},
+"ohp": [[20000,0,0],[25000,0,0.06],[36000,300,0],[38500,300,0.06],[48000,450,0],[48600,450,0.25],[72000,600,0],[72600,600,0.25],[200000,750,0],[200600,750,0.25],[99999999,900,0]],
+
+"cht_correct": {
+  "NL":666,"PE":214,"NS":1303,"NB":1027,"QC":10911,"ON":19266,"MB":1794,"SK":1491,
+  "AB":5771,"BC":6817,"YT":56,"NT":55,"NU":50
+},
+"cht_pct_correct": {"NL":6.9,"PE":7.0,"NS":8.1,"NB":8.2,"QC":6.3,"ON":9.2,"MB":8.1,"SK":6.5,"AB":8.2,"BC":7.9,"YT":2.8,"NT":1.8,"NU":1.7},
+"cht_src":"Finance Canada, Major Federal Transfers — final 2023-24 allocations determined September 2024. https://www.canada.ca/en/department-finance/programs/federal-transfers/major-federal-transfers.html",
+"cht_denominator_src":"StatCan Table 10-10-0017-01, Expense, reference year 2023 (= FY2023-24), matched vintage to the CHT figures.",
+
+"denominator_notes": {
+  "AB":"$62.1B is Alberta's FY2021-22 total PROGRAM expense ($62,131M) — an exact match. Two years stale AND the wrong measure: program expense excludes debt servicing and pension provisions. Alberta's FY2023-24 total expense is $70,447M, so the denominator is understated by $8.3B (11.8%).",
+  "NS":"$13.2B matches no Nova Scotia expense figure in any of the last five years (actuals: $12.28B, $12.63B, $13.71B, $15.47B, $16.38B). FY2023-24 is $16.38B, so the denominator is understated by 19.4%. Origin unexplained.",
+  "ON":"$187.1B is closest to StatCan reference year 2022 ($188.7B). Ontario's FY2023-24 actual total expense is $206.6B.",
+  "QC":"$136.6B matches no recent StatCan year. Quebec's FY2023-24 actual total expense is $151.5B.",
+  "other":"Remaining denominators were not individually traced but follow the same pattern: 2023-24 numerators divided by materially older denominators, biasing every CHT share high."
+},
+
+"prov_actuals": {
+  "ON": {"total":"$206,583M","src":"Public Accounts of Ontario 2023-24, https://www.ontario.ca/page/public-accounts-2023-24-consolidated-financial-statements",
+    "rows":[["health",40,"41.4% ($85,458M)","OK against the province's own accounts"],
+            ["socialEI",11,"9.4%","-1.6 pp"],
+            ["debt",9,"5.5% ($11,376M) per Public Accounts; 6.5% on CCOFOG; 7.1% on StatCan GFS","OVERSTATED — no denominator produces 9%"],
+            ["admin",5,"no comparable line exists","UNVERIFIED"],
+            ["education",18,"18.8% K-12 alone; 25.2% including post-secondary","AMBIGUOUS — 18% matches K-12 only, leaving 6.4% of total expense with no home in a list that must sum to 100"],
+            ["transport",5,"no comparable line exists","UNVERIFIED"],
+            ["justice",5,"2.9%","-2.1 pp"],
+            ["housing",3,"no comparable line exists","UNVERIFIED"],
+            ["environment",3,"no comparable line exists","UNVERIFIED"],
+            ["other",1,"15.6% ($32,191M) — Ontario's second-largest sector after health","WORST ERROR IN THE DATASET (+14.6 pp)"]]},
+  "QC": {"total":"$151,535M","src":"Comptes publics du Quebec 2023-2024, Volume 1, https://cdn-contenu.quebec.ca/cdn-contenu/adm/min/finances/publications-adm/Comptes-publics/FR/CPTFR_vol1-2023-2024.pdf",
+    "rows":[["health",40,"40.3% ($61,000M)","ACCURATE"],
+            ["socialEI",12,"9.7%","-2.3 pp"],
+            ["debt",7,"6.6% ($9,982M)","ACCURATE"],
+            ["admin",4,"inside 'Autres portefeuilles'","UNVERIFIED"],
+            ["education",20,"13.2% K-12; 20.2% combined with post-secondary","OK only on the combined reading"],
+            ["transport",6,"not separately reported","UNVERIFIED"],
+            ["justice",4,"inside 'Autres portefeuilles'","UNVERIFIED"],
+            ["housing",2,"not separately reported","UNVERIFIED"],
+            ["environment",3,"not separately reported","UNVERIFIED"],
+            ["other",2,"11.5%","+9.5 pp"]]},
+  "AB": {"total":"$70,447M","src":"Government of Alberta Annual Report 2023-24, https://open.alberta.ca/dataset/7714457c-7527-443a-a7db-dd8c1c8ead86",
+    "rows":[["health",43,"39.0%","-4.0 pp"],
+            ["socialEI",7,"11.4%","+4.4 pp"],
+            ["debt",3,"4.5% total, or 3.2% taxpayer-supported only","DEFINITION-DEPENDENT"],
+            ["admin",5,"not separately reported","UNVERIFIED"],
+            ["education",18,"23.2% (K-12 13.3% + post-secondary 9.7%)","+5.2 pp — Alberta combines the two into one function"],
+            ["transport",8,"3.1%","-4.9 pp"],
+            ["justice",5,"not separately reported","UNVERIFIED"],
+            ["housing",3,"0.5%","-2.5 pp"],
+            ["environment",4,"0.9%","-3.1 pp"],
+            ["other",4,"7.6%","+3.6 pp"]]},
+  "NS": {"total":"$16,378M","src":"Public Accounts of Nova Scotia 2023-24, Volume 1, https://notices.novascotia.ca/files/public-accounts/2024/pa-volume-1-financial-statements-2024.pdf",
+    "rows":[["health",43,"35.4%, or 43.1% if Seniors and Long-Term Care is counted as health","EDITORIAL CALL — NS charts them as separate wedges"],
+            ["socialEI",8,"not separately comparable","UNVERIFIED"],
+            ["debt",8,"4.8%","OVERSTATED — not supported by any NS figure in five years"],
+            ["admin",4,"not separately reported","UNVERIFIED"],
+            ["education",17,"19.1% (K-12 13.9% + Advanced 5.2%)","+2.1 pp"],
+            ["transport",7,"4.4%","-2.6 pp"],
+            ["justice",5,"2.8%","-2.2 pp"],
+            ["housing",2,"4.8%","+2.8 pp"],
+            ["environment",4,"1.0%","-3.1 pp"],
+            ["other",2,"15.0%","+13.0 pp"]]}
+},
+
+"statcan": {
+  "actual_title":"Canadian Classification of Functions of Government (CCOFOG) by consolidated government component (x 1,000,000)",
+  "cited_title":"Government finance statistics, statement of operations and balance sheet",
+  "universe":"The table has only two components: 'Consolidated Canadian general government' and 'Consolidated provincial-territorial AND LOCAL governments (PTLG)'. There is no provincial-government-only series in this table. PTLG includes municipalities, school boards, hospitals and other health and social service institutions, and universities and colleges.",
+  "prov_only_table":"10-10-0024-01, Canadian classification of functions of government by general government component, does carry a provincial-and-territorial-governments component — but publishes only the 10 top-level COFOG divisions. Probing for 'Public debt transactions' and 'Transport' at that level returns no data.",
+  "latest_year":"Reference year 2024, released 27 November 2025 ('Government spending by function, 2024'). Reference year 2023 corresponds to FY2023-24. The app is one full vintage stale.",
+  "comparability":"StatCan's own documentation warns that inter-provincial comparisons are 'strictly impossible' for divisions where provinces delegate differently to municipalities.",
+  "urls":{
+    "10100005":"https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501",
+    "10100024":"https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010002401",
+    "10100017":"https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010001701",
+    "daily":"https://www150.statcan.gc.ca/n1/daily-quotidien/251127/dq251127b-eng.htm",
+    "quality":"https://www.statcan.gc.ca/en/statistical-programs/document/5218_D3_V4"
+  }
+},
+
+"social_ei": {
+  "note":"Employment Insurance is federal and essentially absent from provincial spending. The CCOFOG 'Unemployment' sub-function at the PTLG level is $262M for Ontario — 0.6% of its social protection and about 0.1% of total expense.",
+  "composition":"Composition also differs structurally between provinces. Of total social protection in 2024: sickness and disability was 33.3% in Ontario, 17.6% in Quebec and 50.7% in Alberta; family and children was 22.2% in Ontario, 42.3% in Quebec and 25.6% in Alberta. Quebec's subsidised childcare makes its social protection a different animal from Alberta's disability-dominated one."
+}
+}

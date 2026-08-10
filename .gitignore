@@ -21,3 +21,10 @@ backups/
 
 # CIMT Trade Explorer — local data store (raw zips + parquet, can be GBs)
 cimt/data/
+
+# Office lock files
+~$*
+
+# Tax tracker review — regenerable intermediates, not sources
+tax-dollar-tracker-review/probe.xlsx
+tax-dollar-tracker-review/solved.json

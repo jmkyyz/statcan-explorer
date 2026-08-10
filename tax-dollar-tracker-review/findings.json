@@ -1,0 +1,437 @@
+[
+ {
+  "id": "F-01",
+  "sev": "HIGH",
+  "area": "Provincial allocation",
+  "loc": "lines 445-553, PROVINCES[*].spending",
+  "what": "The provincial spending shares were assembled to total 100 rather than measured, and the residual absorbed the difference. The naive reading of this is too harsh and reviewers should not be handed it: Ontario 'Other' is coded at 1% against an actual 15.6%, but Ontario does not report transport, housing, environment or general administration separately — all four sit inside Other Programs. The app's four unsourced categories total 16 points against Ontario's residual of 15.6%, so someone appears to have disaggregated the residual deliberately. That intent is reasonable. Three problems survive the charitable reading: (1) the disaggregation is unsourced — nothing states how $32.2B of Other Programs became 5/5/3/3; (2) debt servicing is genuinely overstated by ~3.5 points and justice by ~2.1; (3) post-secondary education's 6.4% has vanished entirely, and in a list forced to sum to 100 that money has no home. Checking four jurisdictions against their 2023-24 public accounts, every one has multiple categories out by 2 points or more (Alberta 7 of 10, Nova Scotia 8 of 10). Quebec mostly holds up.",
+  "evidence": "Ontario total expense $206,583M, of which Other Programs $32,191M (15.6%) is the second-largest sector after health, and interest on debt $11,376M (5.5%). Coded Education (18%) matches K-12 alone (18.8%); post-secondary is a separate 6.4%. Three independent measures of Ontario debt servicing as a share of expense: 5.5% (Ontario Public Accounts 2023-24), 7.16% (Finances of the Nation, Public Accounts basis, 2024), 7.41% (StatCan CCOFOG interest / division total, 2024). Nothing produces the coded 9%. Alberta transport coded at 8% against 3.1%, environment 4% against 0.9%. Nova Scotia debt servicing coded 8% against 4.8% — a figure not supported by any NS document in five years.",
+  "fix": "Rebuild all 130 values from one source at one vintage and publish the mapping. Do not ship the current numbers. See the 'Provincial Sources' tab for what each candidate source can and cannot deliver, and for the one construction that is fully reproducible."
+ },
+ {
+  "id": "F-02",
+  "sev": "HIGH",
+  "area": "Provincial allocation",
+  "loc": "Methodology Part 3; app Sources block",
+  "what": "The cited StatCan table does not describe provincial governments. Table 10-10-0005-01 is real and is a functional (CCOFOG) table, so the table number is right — but its only sub-national component is 'Consolidated provincial-territorial AND LOCAL governments', which bundles in municipalities, school boards, hospitals and other health institutions, and universities and colleges. Presenting that as 'where your provincial tax goes' attributes municipal, school-board, hospital and university spending to the province.",
+  "evidence": "The table's Public sector components dimension has exactly two members: consolidated Canadian general government, and consolidated provincial-territorial and local governments. There is no provincial-only series in it. This matters most for transport, housing and environment, which is precisely where municipal spending concentrates.",
+  "fix": "Either switch to Table 10-10-0024-01, which does have a provincial-and-territorial-governments component, or relabel the provincial column to say what it actually covers. Note the constraint in F-03 before choosing."
+ },
+ {
+  "id": "F-03",
+  "sev": "HIGH",
+  "area": "Provincial allocation",
+  "loc": "lines 445-553",
+  "what": "The app's ten-category provincial taxonomy cannot be produced from any CURRENT StatCan table — but it was produceable until 2009, which reframes this finding. Archived table 10-10-0040-01 (Financial Management System basis, CANSIM 385-0002, 1989-2009) publishes, at provincial and territorial general government level, almost exactly these categories: Transportation and communication, Debt charges, Health, Education split into elementary-secondary and postsecondary, Social services, Environment, Housing, Protection of persons and property, Recreation and culture. StatCan retired FMS in favour of CCOFOG after 2009. The taxonomy is therefore FMS-shaped and inherited, not invented; the defect is that it is being sourced to a CCOFOG table that cannot produce it. Under CCOFOG the only provincial-government-only series publishes the 10 top-level divisions and nothing below, so Debt and Transport have no home.",
+  "evidence": "10-10-0040-01, Ontario, Provincial and territorial general government: Transportation and communication, Debt charges, Hospital care, Medical care, Elementary and secondary education, Postsecondary education and the rest all populated in 21 of 21 years, 1989-2009, then discontinued. In 10-10-0024-01 the Provincial and territorial governments component carries only the 10 CCOFOG divisions, while Municipalities and the Federal government carry all 60 members; coordinate-API calls for ON/P&T/Public debt transactions [7017] and ON/P&T/Transport [7045] both return responseStatusCode 2 (no data), confirming this is a publication boundary and not a query error.",
+  "fix": "State plainly in the methodology that the taxonomy predates CCOFOG. Then either adopt the 10 CCOFOG divisions plus a debt carve-out (11 rows, fully reproducible — see 'Provincial Sources'), or keep the taxonomy and own 13 manual public-accounts mappings. Do not cite a CCOFOG table for FMS-shaped categories."
+ },
+ {
+  "id": "F-04",
+  "sev": "HIGH",
+  "area": "Tax calculation",
+  "loc": "lines 622-626, calculate()",
+  "what": "The Ontario surtax uses the wrong first threshold. The code applies 20% on Ontario tax over $7,307 and a further 36% over $7,446. The correct 2025 thresholds are 20% over $5,710 and 36% over $7,307 — the value coded as the first threshold is in fact the second, and $7,446 is not a 2025 Ontario figure at all.",
+  "evidence": "Confirmed against two independent CRA sources. Form ON428 (5006-C) lines 66-68 read 'Complete lines 66 to 68 if the amount on line 65 is more than $5,710' and '(Line 65 minus $7,307) multiplied by 36%'. CRA's payroll formulas T4127 Table 8.2 lists the same two thresholds. Cross-check: the 2024 thresholds of $5,554 and $7,108, indexed by Ontario's 2025 factor of 2.8%, give exactly $5,710 and $7,307. Effect: surtax begins at $93,137 of income rather than the $109,723 the app implies, and every Ontario filer above about $118,000 is understated by exactly $369.44.",
+  "fix": "FIXED 2026-08-05: thresholds changed to Math.max(0, provTax - 5710) * 0.20 + Math.max(0, provTax - 7307) * 0.36. Verified against Form ON428 at every $5,000 of income from $60,000 to $400,000.",
+  "status": "FIXED"
+ },
+ {
+  "id": "F-05",
+  "sev": "HIGH",
+  "area": "Tax calculation",
+  "loc": "PROVINCES.ON — absent from the code",
+  "what": "The Ontario Health Premium is not modelled. It is not a separate levy: it is collected on Form ON428 at line 89 and flows through to T1 line 42800, provincial and territorial tax. It reaches $900 and applies to most Ontario filers above about $20,000 of taxable income. This is the single largest dollar error in the app for a typical earner.",
+  "evidence": "$600 of premium at $60,000 of taxable income, rising to $750 from $72,600 up. Combined with the surtax error at F-04, the app understates the true Ontario burden for a single filer between roughly $118,000 and $150,000 by about $950 to $1,120.",
+  "fix": "FIXED 2026-08-05: ontarioHealthPremium() added and applied after the surtax, matching the order on Form ON428. All 21 breakpoints in the CRA schedule verified, and the function confirmed monotonic and continuous (largest step over a $25 income increment is $6.25, so there is no cliff). NOTE the related F-21 remains open — the Ontario Tax Reduction is still not modelled, so Ontario tax is still overstated at low incomes.",
+  "status": "FIXED"
+ },
+ {
+  "id": "F-06",
+  "sev": "HIGH",
+  "area": "Provincial allocation",
+  "loc": "lines 501, 508, 550 — chtPct: 0 for NT, NU, YT",
+  "what": "The territories are coded as receiving no Canada Health Transfer, on the stated reasoning that they get health funding through Territorial Formula Financing instead. That is wrong. CHT and TFF are separate programs and the territories receive both.",
+  "evidence": "Finance Canada's 2023-24 allocations: Yukon $56M CHT, Northwest Territories $55M, Nunavut $50M — alongside TFF of $1,252M, $1,611M and $1,971M respectively. Finance Canada's letter to Nunavut names its CHT and CST in one sentence and its TFF in the next, as distinct entitlements. Monthly payment tables show twice-monthly CHT instalments to all three territories throughout 2023-24.",
+  "fix": "Set the territorial CHT shares to their real values (roughly 2.8%, 1.8% and 1.7% of expenditure). Note this also changes the health share shown for every territorial user."
+ },
+ {
+  "id": "F-07",
+  "sev": "HIGH",
+  "area": "Provincial allocation",
+  "loc": "lines 451-542, chtPct comments",
+  "what": "The per-province CHT figures are wrong in a specific and revealing way. The coded national total is right at $49.43B against Finance Canada's $49.421B, but the territories' $161M has been redistributed across the ten provinces. Only British Columbia's figure is correct. Quebec is overstated by $289M and Ontario understated by $266M.",
+  "evidence": "Coded against Finance Canada final 2023-24 allocations: NL 680 vs 666, PE 220 vs 214, NS 1,320 vs 1,303, NB 1,050 vs 1,027, QC 11,200 vs 10,911, ON 19,000 vs 19,266, MB 1,770 vs 1,794, SK 1,540 vs 1,491, AB 5,840 vs 5,771, BC 6,810 vs 6,817.",
+  "fix": "Replace the whole set from the Finance Canada table rather than patching individual values — the error is structural, not a set of typos."
+ },
+ {
+  "id": "F-08",
+  "sev": "HIGH",
+  "area": "Provincial allocation",
+  "loc": "lines 451-542, chtPct denominators",
+  "what": "The denominators underpinning the entire CHT adjustment are stale, and in at least one case measure the wrong thing. Every numerator is 2023-24 while every denominator is materially older, so every coded CHT share is biased high.",
+  "evidence": "Alberta's $62.1B is an exact match for its FY2021-22 total PROGRAM expense — two years stale and the wrong measure, since program expense excludes debt servicing and pension provisions; Alberta's FY2023-24 total expense is $70,447M. Nova Scotia's $13.2B matches no NS expense figure in five years (actuals run $12.28B, $12.63B, $13.71B, $15.47B, $16.38B). Ontario's $187.1B against an FY2023-24 actual of $206.6B. Quebec's $136.6B against $151.5B. On matched vintages the shares fall by roughly 1 to 2 points each.",
+  "fix": "Recompute every share as Finance Canada CHT over StatCan Table 10-10-0017-01 expense at the same reference year, and state that year."
+ },
+ {
+  "id": "F-09",
+  "sev": "HIGH",
+  "area": "Federal allocation",
+  "loc": "line 566, CATS socialEI",
+  "what": "'Social Assistance & EI' is coded at 7% of federal spending, but the line items the methodology itself offers for it — EI benefits of about $33B plus the Canada Child Benefit of about $27B — come to roughly $60B, or 11.1% of the app's own $544B denominator. About $22B of spending is unaccounted for.",
+  "evidence": "The app's code comment at line 560 states 'EI+CCB 10.4%' while the array six lines below sets fedPct to 7. Independently: on consistent 2024-25 actuals (EI $24,880M + CCB $28,574M over $543,279M) the share is 9.84%. Every route — the app's own cited dollars, the 2024-25 actuals, and the 2025-26 projections — gives 10-11%.",
+  "fix": "Raise to about 10%. Note also that the cited 'EI ~$33B' matches no fiscal year: 2023-24 was $23,130M, 2024-25 $24,880M, and the 2025-26 projection $30.5B."
+ },
+ {
+  "id": "F-10",
+  "sev": "HIGH",
+  "area": "Federal allocation",
+  "loc": "line 569, CATS admin",
+  "what": "'Fiscal Transfers & Admin' is coded at 12%, but the quantified line items cited for it — Equalization $21.9B, Territorial Formula Financing $4.2B and other fiscal arrangements of about $5.6B — total $31.7B, which is 5.8% of the stated denominator. The remaining 6.2 points, about $34B, is described only as 'departmental operations', which overlaps categories listed separately such as Justice, Defence and Immigration.",
+  "evidence": "Fiscal arrangements were $30,457M in 2024-25, or 5.61% of the pool — against a coded 12%. If 'Admin' instead means operating expenses, that alone is 24.0%. Neither reading produces 12%.",
+  "fix": "Split unconditional transfers from departmental operations into two rows and state the dollar value of each. As coded this is a residual chosen to make the column sum to 100, not a measured quantity."
+ },
+ {
+  "id": "F-11",
+  "sev": "HIGH",
+  "area": "Federal allocation",
+  "loc": "Methodology Part 2; app Sources block",
+  "what": "The federal denominator is mis-dated by a full year. $544B is a close match for total federal expenses excluding net actuarial losses in 2024-25 ($543,279M) — which is an ACTUAL. The methodology attributes it to Public Accounts 2023-24 'actuals for fiscal year ending March 31, 2024', where total expenses were $521,425M including net actuarial losses, or $513,936M excluding them. The citation is out by one year and about $22.6B.",
+  "evidence": "Total federal expenses excl. net actuarial losses: 2023-24 $513.9B, 2024-25 $543.3B, 2025-26 $580.9B projected. Only 2024-25 matches. Separately, 'program and statutory expenditures' is an Estimates concept, not a Public Accounts one — on that basis 2024-25 Main Estimates total $449.2B, nowhere near $544B.",
+  "fix": "Either re-date the citation to Public Accounts 2024-25, or keep 2023-24 and re-base every line item on $521.4B. Drop the phrase 'program and statutory expenditures' in favour of 'total federal expenses', and say whether net actuarial losses are in or out."
+ },
+ {
+  "id": "F-12",
+  "sev": "HIGH",
+  "area": "Federal allocation",
+  "loc": "lines 563-583",
+  "what": "'Other' at 12% and 'Fiscal Transfers & Admin' at 12% are both plugs, and thirteen of the twenty categories have no dollar derivation anywhere in the app or the methodology. Together the two residual categories absorb 24% of the federal pool, against a nearest official analogue — CCOFOG General public services excluding debt — of 17.0%.",
+  "evidence": "Only seven of twenty categories carry a cited dollar figure. 'Other' has no official counterpart at all. National Defence at 5%, Indigenous Services at 5%, Education at 4% and Veterans at 2% are asserted percentages with no numerator given.",
+  "fix": "Produce a reconciliation in which every dollar of the chosen denominator is assigned to exactly one category and the categories sum to the total. Until that exists the federal split cannot be independently checked."
+ },
+ {
+  "id": "F-36",
+  "sev": "HIGH",
+  "area": "Federal allocation",
+  "loc": "line 567, CATS oas; Methodology Part 2",
+  "what": "The OAS/GIS split of $68.4B and $14.7B is unsupported by any official document. The combined elderly benefits total of $83.1B is right for 2025-26, but no budget document breaks it down that way, and the real split is materially different — GIS is understated by about $3B and OAS overstated by about $11B.",
+  "evidence": "Actual 2023-24: OAS pension $57.4B, GIS $18.0B, Allowance $0.6B. Elderly benefits totalled $76,036M in 2023-24 and $80,294M in 2024-25. The coded category share of 15% is close to right (14.78% on 2024-25 actuals); it is the published breakdown that cannot be sourced.",
+  "fix": "Drop the split and cite the combined elderly benefits line."
+ },
+ {
+  "id": "F-13",
+  "sev": "MEDIUM",
+  "area": "Tax calculation",
+  "loc": "line 548, PROVINCES.YT.brackets",
+  "what": "Yukon is coded with six brackets including one at 12.93% to $253,414, after which the rate falls to 12.80%. A marginal rate that decreases as income rises exists in no Canadian schedule. Form YT428 has five brackets, with 12.8% running from $177,882 to $500,000.",
+  "evidence": "The 12.93% figure is an EFFECTIVE rate with the basic-personal-amount clawback already baked in: Yukon uses the federal BPA, which phases out by $1,591 over the $75,532 band from $177,882 to $253,414, or 2.1064% per dollar; times Yukon's 6.4% credit rate gives 0.1348 points; 12.8% + 0.1348 = 12.9348%. So a statutory rate has been replaced by an effective one — and inconsistently, since the app uses the statutory 29% for the federal bracket over the identical band. Dollar effect is an overstatement of up to $98, only above $177,882.",
+  "fix": "FIXED 2026-08-05: the [253414, .1293] entry was deleted, leaving the five statutory brackets. Yukon tax above $253,414 falls by $98. A code comment now records why 12.93% must not be reinstated. The federal BPA phase-down that Yukon inherits is still not modelled, consistent with the federal treatment (F-23, open).",
+  "status": "FIXED"
+ },
+ {
+  "id": "F-14",
+  "sev": "MEDIUM",
+  "area": "Provincial allocation",
+  "loc": "lines 633-650, calculate()",
+  "what": "The Canada Health Transfer correction does not do what it claims. It subtracts the CHT share from provincial health and then renormalises every category back to 100%, so no dollars leave the provincial column — they are redistributed from health onto every other category. A correction aimed at health silently inflates education, debt, justice and the rest by about 11% of their own value.",
+  "evidence": "Ontario: health falls from 40% to 33.2% of provincial tax while education rises from 18% to 20.0% and debt from 9% to 10.0%. Column F of the demonstration block on the CHT Adjustment tab shows every non-health category rising by an identical relative amount.",
+  "fix": "Either normalise consistently against provincial own-source revenue, correcting for CST, Equalization and TFF as well as CHT, or make no correction and disclose the overlap. The halfway position distorts nine categories to fix one."
+ },
+ {
+  "id": "F-15",
+  "sev": "MEDIUM",
+  "area": "Provincial allocation",
+  "loc": "Methodology Part 3",
+  "what": "The provincial data is a full vintage out of date. Reference year 2024 was released on 27 November 2025; the app uses 2023. StatCan's convention is that reference year 2023 corresponds to fiscal 2023-24, so the app's 'most recent available' claim was true when written but is not now.",
+  "evidence": "Both CCOFOG tables run 2008 to 2024. The Daily, 'Government spending by function, 2024', 27 November 2025.",
+  "fix": "Move to reference year 2024, and add a note recording which vintage is loaded so staleness is visible."
+ },
+ {
+  "id": "F-16",
+  "sev": "MEDIUM",
+  "area": "Provincial allocation",
+  "loc": "Methodology Part 3; app Sources block",
+  "what": "The source is cited by the wrong name. Table 10-10-0005-01 is titled 'Canadian Classification of Functions of Government (CCOFOG) by consolidated government component'. The app calls it 'Government finance statistics, statement of operations and balance sheet', which is the title of a different family of tables — the economic-classification series, closest match 10-10-0147-01.",
+  "evidence": "Confirmed against StatCan cube metadata for product 10100005.",
+  "fix": "Cite the real title. A reader who checks the source will find the citation does not match the table."
+ },
+ {
+  "id": "F-17",
+  "sev": "MEDIUM",
+  "area": "Presentation",
+  "loc": "line 566, CATS socialEI label",
+  "what": "The row labelled 'Social Assistance & EI' shows a provincial dollar amount alongside the federal one. Employment Insurance is federal; provinces do not fund it. A reader sees green provincial dollars in a row whose label names a federal program.",
+  "evidence": "The CCOFOG Unemployment sub-function at the provincial-and-local level is $262M for Ontario — 0.6% of its social protection and about 0.1% of total expense. Provincially, EI is effectively absent.",
+  "fix": "Split into 'Employment Insurance (federal)' and 'Social assistance and family benefits', or rename the shared row so it does not name a federal-only program."
+ },
+ {
+  "id": "F-18",
+  "sev": "MEDIUM",
+  "area": "Provincial allocation",
+  "loc": "lines 445-553",
+  "what": "The provincial rows are not comparable with one another, which undercuts the app's implicit invitation to compare provinces. Provinces delegate different functions to municipalities and classify labour-market programs differently, and the composition of 'social protection' differs structurally between them.",
+  "evidence": "Of total social protection in 2024, sickness and disability was 33.3% in Ontario, 17.6% in Quebec and 50.7% in Alberta; family and children was 22.2% in Ontario against 42.3% in Quebec, reflecting subsidised childcare. StatCan's own quality documentation warns that inter-provincial comparisons are 'strictly impossible' for divisions where delegation differs.",
+  "fix": "Add a caution, and avoid any UI affordance that encourages province-to-province comparison of a single category."
+ },
+ {
+  "id": "F-19",
+  "sev": "MEDIUM",
+  "area": "Provincial allocation",
+  "loc": "Provincial 'education' key",
+  "what": "It is unclear whether Education includes post-secondary, and the answer differs by province. Ontario's coded 18% matches its K-12 sector alone (18.8%); its separately reported Postsecondary Education and Training is a further 6.4%, which then has no home in a list that must sum to 100. Alberta combines the two, so its coded 18% is too low against an actual 23.2% either way.",
+  "evidence": "Ontario reports Education $38,810M and Postsecondary $13,235M as distinct sectors. Quebec's coded 20% works only on the combined reading (13.2% K-12, 20.2% combined).",
+  "fix": "Define the category once, apply it consistently, and say in the label whether post-secondary is included. This also bears on the Canada Social Transfer double-counting question, since CST partly funds post-secondary."
+ },
+ {
+  "id": "F-20",
+  "sev": "MEDIUM",
+  "area": "Double counting",
+  "loc": "line 569, CATS admin",
+  "what": "'Fiscal Transfers & Admin' stacks federal Equalization and Territorial Formula Financing on top of provincial general-administration spending in one bar. Those federal dollars are transferred to provinces and then spent by them across the other categories in the same chart, so the same dollar appears twice.",
+  "evidence": "The methodology acknowledges this as limitation 7 and calls it 'not fully resolved', yet the chart still stacks the two.",
+  "fix": "Make unconditional transfers a federal-only row, as CHT and CST already are, or net them out of the provincial base."
+ },
+ {
+  "id": "F-21",
+  "sev": "MEDIUM",
+  "area": "Tax calculation",
+  "loc": "calcTax()",
+  "what": "No provincial low-income tax reduction is modelled. The Ontario Tax Reduction gives a basic amount of $294 plus $544 per child born 2007 or later, and the mechanism is doubled — the reduction is twice the sum of the amounts, less Ontario tax, floored at zero.",
+  "evidence": "For a single filer it eliminates Ontario tax up to about $18,570 of taxable income and is fully phased out by about $24,390. With two children it still gives partial relief up to roughly $60,900, so it reaches into the income range the app's users are most likely to enter.",
+  "fix": "Model at least the basic amount, or disclose that low-income and family results are overstated."
+ },
+ {
+  "id": "F-22",
+  "sev": "MEDIUM",
+  "area": "Tax calculation",
+  "loc": "calcTax()",
+  "what": "The Canada Employment Amount is not applied. It is a federal non-refundable credit that virtually every employee receives automatically, worth roughly $210 of federal tax at 2025 rates, so every employed user's federal tax is overstated by about that amount. It is not in the methodology's list of excluded credits.",
+  "evidence": "Only the basic personal amount is deducted in calcTax().",
+  "fix": "Apply it — unlike the credits reasonably excluded, it needs no user input — or add it to the disclosed omissions."
+ },
+ {
+  "id": "F-23",
+  "sev": "MEDIUM",
+  "area": "Tax calculation",
+  "loc": "FED_BPA, PROVINCES.MB, PROVINCES.YT",
+  "what": "Basic personal amount phase-outs are handled inconsistently. The federal phase-down from $16,129 to $14,538 is disclosed but not modelled. Manitoba's phase-out — straight-line to zero from $200,000 to $400,000 of net income — is neither modelled nor disclosed. Yukon uses the federal BPA and so inherits the federal phase-down, which is also unmodelled.",
+  "evidence": "All three carry a single flat value with no income test. Note that Nova Scotia does NOT phase out its BPA in 2025 — Budget 2025 replaced the old structure with a flat $11,744 — so the app is correct there.",
+  "fix": "Model all three, or disclose all three. Manitoba keys off net income at line 23600, not taxable income."
+ },
+ {
+  "id": "F-24",
+  "sev": "MEDIUM",
+  "area": "Tax calculation",
+  "loc": "whole model",
+  "what": "Budget 2025 created a Top-up Tax Credit for 2025 through 2030, at new T1 line 34990, which preserves the 15% valuation for non-refundable credits claimed on amounts above the first bracket threshold. It is not modelled.",
+  "evidence": "It affects filers with large one-time tuition or medical claims, so it is second-order for the app's gross-income model, but it is a 2025 change the methodology does not mention.",
+  "fix": "Add to the disclosed list of unmodelled credits."
+ },
+ {
+  "id": "F-28",
+  "sev": "MEDIUM",
+  "area": "Consistency",
+  "loc": "line 404 vs Methodology Part 2",
+  "what": "The two published figures for Equalization and Territorial Formula Financing disagree — and the one that looks like the error is actually the correct one. The app's Sources block says $31.7B, which is right for 2025-26 ($26,170M + $5,489M = $31,659M). The methodology's component pair of $21.9B + $4.2B is wrong: it splices 2022-23 Equalization with 2020-21 Territorial Formula Financing. No official vintage pairs those two numbers.",
+  "evidence": "Equalization was $21,920M in 2022-23 and $26,170M in 2025-26. TFF was $4,180M in 2020-21 and $5,489M in 2025-26.",
+  "fix": "Keep the $31.7B total and replace the component pair with $26.2B + $5.5B, stating the year. Do not 'correct' the $31.7B figure to match the methodology — that would make it wrong."
+ },
+ {
+  "id": "F-31",
+  "sev": "MEDIUM",
+  "area": "Federal allocation",
+  "loc": "line 570, CATS education",
+  "what": "Federal 'Education' at 4% is about $22B of the stated denominator. Federal direct education spending is far smaller: student grants and loans are a few billion, the largest federal contribution to post-secondary flows through the Canada Social Transfer which is already its own row, and granting-council research is already counted under Science & Innovation.",
+  "evidence": "CCOFOG federal Education for reference year 2024 is $10,635M — about 2.05% of the pool, roughly half the coded 4%. Two of the three cited line items are already counted elsewhere: post-secondary flows through the Canada Social Transfer, which is its own row, and granting-council research sits under Science & Innovation.",
+  "fix": "Quantify the line items; if they fall short of 4%, reduce and reallocate."
+ },
+ {
+  "id": "F-37",
+  "sev": "MEDIUM",
+  "area": "Federal allocation",
+  "loc": "line 572, CATS indigenous",
+  "what": "Indigenous Services is coded at 5% against a verified 7.24% — understated by about 2 points, or roughly $12B.",
+  "evidence": "ISC $26,737M + CIRNAC $12,612M = $39,349M for 2024-25. Four different accounting bases (ministry segment, departmental accrual, authorities used) all agree within 0.3 points. For 2023-24 the share was about 8.7%.",
+  "fix": "Raise to about 7%. Carry a caveat: these totals swing on Indigenous claims provisions, which recognise future obligations rather than in-year program delivery. A 'where your dollars go' tool arguably should strip them — but should then say so."
+ },
+ {
+  "id": "F-38",
+  "sev": "MEDIUM",
+  "area": "Federal allocation",
+  "loc": "line 573, CATS justice",
+  "what": "Justice & Public Safety is coded at 2% against a verified 3.91% — understated by about 2 points.",
+  "evidence": "Justice $2,782M + Public Safety $18,452M = $21,234M for 2024-25, against a $543,279M denominator.",
+  "fix": "Raise to about 4%."
+ },
+ {
+  "id": "F-39",
+  "sev": "MEDIUM",
+  "area": "Federal allocation",
+  "loc": "CATS — no category exists",
+  "what": "Pollution pricing proceeds returned to Canadians has no category at all. At $15,595M it is 2.87% of the federal pool — larger than eight of the twenty categories the app does show.",
+  "evidence": "The taxonomy has no home for it. 'Environment & Climate' is coded at 2% and its cited line items are ECCC and carbon pricing ADMINISTRATION, not the rebates themselves.",
+  "fix": "Add a category, or fold the rebates into Environment & Climate and say so. Note this also makes the Environment share ambiguous by a factor of four: ECCC alone is 0.57% of the pool, while CCOFOG environmental protection including rebates is 4.61%. The coded 2% sits between two defensible answers."
+ },
+ {
+  "id": "F-40",
+  "sev": "MEDIUM",
+  "area": "Federal allocation",
+  "loc": "lines 563-583",
+  "what": "The twenty categories mix two incompatible cuts of the accounts — PROGRAM lines (CHT, CST, OAS, EI, debt servicing) and MINISTRY lines (Defence, Indigenous Services, Veterans Affairs). Because the two overlap and neither is exhaustive, the taxonomy cannot be complete, even though the shares sum tidily to 100.",
+  "evidence": "Carbon rebates ($15.6B) have no category. Large blocks of Employment and Social Development and National Revenue spending outside OAS, EI and CCB are unassigned. The arithmetic is tidy; the taxonomy is not coherent.",
+  "fix": "Rebuild on the ten CCOFOG functions from StatCan Table 10-10-0024-01, federal component — the only official federal-only table that splits all spending across exhaustive, non-overlapping functions. This is a larger editorial problem than any individual percentage."
+ },
+ {
+  "id": "F-41",
+  "sev": "MEDIUM",
+  "area": "Federal allocation",
+  "loc": "Methodology Part 2 — CST line item",
+  "what": "The Canada Social Transfer is cited at $15.9B, which is the 2022-23 figure — three years stale. The coded 3% share happens to remain about right (3.11% on 2024-25 actuals) because the denominator is also mis-dated.",
+  "evidence": "CST was $15,938M in 2022-23, $16,416M in 2023-24, $16,909M in 2024-25 and $17,416M in 2025-26.",
+  "fix": "Update to the year chosen under F-11."
+ },
+ {
+  "id": "F-25",
+  "sev": "DESIGN",
+  "area": "Framing",
+  "loc": "whole app",
+  "what": "The tool's central assumption is never stated: that a dollar of personal income tax funds every spending category in the same proportion as total government spending. Personal income tax is roughly half of federal revenue and about a quarter of provincial revenue, so it funds no such uniform slice.",
+  "evidence": "Neither the app's Sources block nor the methodology document contains any statement of the allocation rule.",
+  "fix": "State it in one sentence beside the estimate banner. The method is the one HMRC uses for its Annual Tax Summary and is defensible — but only if disclosed."
+ },
+ {
+  "id": "F-26",
+  "sev": "DESIGN",
+  "area": "Framing",
+  "loc": "whole app",
+  "what": "Deficits are invisible. Both governments spent more than they raised in the reference years, so part of every category shown is funded by borrowing rather than by the user's tax. Presenting all spending as tax-funded overstates what the user's taxes pay for.",
+  "evidence": "No deficit figure appears anywhere in the app or the methodology.",
+  "fix": "Scale the allocation to the tax-funded share of spending, or state what proportion of spending was deficit-financed in the reference year."
+ },
+ {
+  "id": "F-27",
+  "sev": "LOW",
+  "area": "Consistency",
+  "loc": "lines 558-562 vs 563-583",
+  "what": "The code comment block above the category table disagrees with the table itself: elderly benefits at 14.3% against a coded 15, public debt charges at 9.6% against a coded 10, and EI plus CCB at 10.4% against a coded 7. A reader auditing the file cannot tell which is authoritative.",
+  "evidence": "Direct comparison of lines 558-562 with the fedPct values on lines 563-583.",
+  "fix": "Delete the comment or generate it from the data."
+ },
+ {
+  "id": "F-29",
+  "sev": "LOW",
+  "area": "Consistency",
+  "loc": "line 451, PROVINCES.AB",
+  "what": "Alberta's chtPct comment reads '2023-24 CHT allocation ($49.4B equal per-capita) as % of 2022-23 total provincial expenditure ($62.1B)'. $49.4B is the national CHT envelope, not Alberta's share, and $49.4B / $62.1B is 79.5%, not the 9.4% coded. Every other province's comment cites its own CHT dollar figure.",
+  "evidence": "Alberta's implied share is about $5.84B against a true $5,771M, but the figure is never stated.",
+  "fix": "State Alberta's own allocation and cite the Finance Canada table."
+ },
+ {
+  "id": "F-30",
+  "sev": "LOW",
+  "area": "Consistency",
+  "loc": "line 563 vs lines 451-542",
+  "what": "Two vintages of the Canada Health Transfer are used inside one calculation: the federal column values CHT at $54.7B while the provincial adjustment is built on the 2023-24 envelope of about $49.4B.",
+  "evidence": "Code comments name $49.4B; the methodology names $54.7B for the same transfer.",
+  "fix": "Align to one fiscal year and state it."
+ },
+ {
+  "id": "F-32",
+  "sev": "LOW",
+  "area": "Presentation",
+  "loc": "lines 636-658, 794-803",
+  "what": "The Detailed Breakdown table does not foot. Each amount is rounded to the dollar independently, so the Federal and Provincial columns can miss the Total row by a few dollars and the percentage column can sum to slightly more or less than the 100% the Total row asserts.",
+  "evidence": "Across 13 jurisdictions and seven test incomes the federal column was out by up to $4, the provincial by up to $3, and the percentage column by up to 0.104 points.",
+  "fix": "Allocate the largest remainder to the biggest category, or drop the decimal from the percentage column."
+ },
+ {
+  "id": "F-33",
+  "sev": "LOW",
+  "area": "Precision",
+  "loc": "whole model",
+  "what": "Every spending share is rounded to a whole percentage point and then forced to sum to 100. For categories coded at 1-2% that is a relative precision of plus or minus 25-50%, and the rounding residual is absorbed silently by whichever category acts as the remainder.",
+  "evidence": "All 20 federal and all 130 provincial values are integers; every row sums to exactly 100.",
+  "fix": "Carry one decimal and disclose the rounding rule, or state that small categories are indicative only."
+ },
+ {
+  "id": "F-34",
+  "sev": "LOW",
+  "area": "Input validation",
+  "loc": "lines 818-822, 837-839",
+  "what": "An income of zero passes validation, because only negative values are rejected. The Federal and Provincial stat cards then divide by zero and render 'NaN%'.",
+  "evidence": "calculate(0, 'ON') returns zero tax and fmtPct(0/0) produces 'NaN%'.",
+  "fix": "Require income greater than zero, or guard the two subtitles as the effective-rate calculation already is."
+ },
+ {
+  "id": "F-35",
+  "sev": "LOW",
+  "area": "UI",
+  "loc": "lines 852-854",
+  "what": "A keydown listener on the whole document fires handleCalculate on any Enter press anywhere on the page.",
+  "evidence": "document.addEventListener('keydown', ...) with no target check.",
+  "fix": "Scope the listener to the form's inputs."
+ },
+ {
+  "id": "F-42",
+  "sev": "LOW",
+  "area": "Federal allocation",
+  "loc": "line 564, CATS health",
+  "what": "The Health Canada and PHAC figure of about $11B is described as 'operations'. These are total expenses including grants and contributions, and the figure is slightly low: $11,974M on 2024-25 accruals.",
+  "evidence": "Health Canada $9,061M + PHAC $2,913M for 2024-25. The coded 2% share is close to right at 2.20%.",
+  "fix": "Change the word 'operations' to 'total expenses' and update the figure."
+ },
+ {
+  "id": "F-43",
+  "sev": "LOW",
+  "area": "Federal allocation",
+  "loc": "line 574, CATS defence",
+  "what": "National Defence at 5% is defensible but basis-dependent, and the app does not say which basis it uses. The plausible range is 5.25% to 6.63% depending on whether you take DND's departmental accrual statements, the Public Accounts ministry segment, or authorities used.",
+  "evidence": "2024-25: departmental accrual $28,503M (5.25%), ministry segment $36,026M (6.63%), authorities used $33,925M. DND's own accrual statements exclude CSE and three review bodies. The coded 5% sits at the bottom of the range.",
+  "fix": "State the basis. This applies to every ministry-derived category, not just defence."
+ },
+ {
+  "id": "F-44",
+  "sev": "LOW",
+  "area": "Federal allocation",
+  "loc": "line 581, CATS veterans",
+  "what": "Veterans Affairs at 2% against a departmental accrual figure of 1.33%. Flagged mainly because the underlying data has an unexplained discrepancy the reviewer should resolve: Public Accounts Volume I shows the VAC segment at only $546M for 2024-25, against departmental accrual total expenses of $7,209M.",
+  "evidence": "The likely explanation is that veterans' future-benefit expenses are consolidated centrally rather than in the VAC segment, but that is an inference, not a sourced fact.",
+  "fix": "Confirm the treatment with the Receiver General before either figure is published."
+ },
+ {
+  "id": "N-01",
+  "sev": "NOT A BUG",
+  "area": "Tax calculation",
+  "loc": "PROVINCES.MB.brackets",
+  "what": "Manitoba's coded thresholds of $47,000 and $100,000 are CORRECT and should not be 'fixed'. CRA's own 2025 summary web page wrongly lists Manitoba at $47,564 and $101,200, which are the 2026 figures. Manitoba paused bracket indexation effective 2025.",
+  "evidence": "Form MB428 and Manitoba Finance both give $47,000 / $100,000. Anyone re-checking against CRA's summary page will appear to find a bug that does not exist.",
+  "fix": "No change. Add a code comment so a future editor does not 'correct' it."
+ },
+ {
+  "id": "N-02",
+  "sev": "NOT A BUG",
+  "area": "Tax calculation",
+  "loc": "FED_BPA credit rate",
+  "what": "Valuing the basic personal amount credit at 14.5% is CORRECT for 2025. The federal rate cut from 15% to 14% took effect on 1 July 2025, so the full-year 2025 rate is the 14.5% blend, and non-refundable credits are valued at that rate.",
+  "evidence": "T1 2025 line 114 reads 'Federal non-refundable tax credit rate 14.5%'. The 2025 BPA credit is $16,129 x 14.5% = $2,338.71. The 14% rate applies from 2026, so this will need updating.",
+  "fix": "No change for 2025. Diarise the change to 14% for the 2026 tax year."
+ },
+ {
+  "id": "N-03",
+  "sev": "NOT A BUG",
+  "area": "Tax calculation",
+  "loc": "all bracket schedules except Yukon",
+  "what": "Every 2025 bracket threshold, rate and basic personal amount was checked against the filed CRA Form 428 for each jurisdiction, and against Revenu Quebec for Quebec. All are correct apart from Yukon (F-13) and the Ontario surtax (F-04).",
+  "evidence": "Federal, AB, BC, MB, NB, NL, NS, NT, NU, ON, PE, QC and SK all confirmed. Ontario is the only jurisdiction with a personal income tax surtax in 2025; PEI's is confirmed eliminated for 2024 and later.",
+  "fix": "No change. See the Verification Log tab for per-jurisdiction sources."
+ },
+ {
+  "id": "N-04",
+  "sev": "NOT A BUG",
+  "area": "Federal allocation",
+  "loc": "CATS cht, oas, debt, cst, health, science, housing, immigration",
+  "what": "Several coded federal shares hold up well against 2024-25 actuals, even though the dollar figures behind them are mis-dated. Canada Health Transfer 10% against a verified 9.58%; OAS & Retirement 15% against 14.78%; Debt Servicing 10% against 9.83%; Canada Social Transfer 3% against 3.11%; Direct Federal Health 2% against 2.20%; Science & Innovation 2% against 2.19%; Housing 2% against 2.59%; Immigration 1% against 1.35%.",
+  "evidence": "Computed on Public Accounts 2024-25 ministry segments and program lines over a consistent $543,279M denominator.",
+  "fix": "No change to the percentages, but the supporting citations still need re-dating under F-11."
+ }
+]

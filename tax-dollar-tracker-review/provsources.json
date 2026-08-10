@@ -1,0 +1,127 @@
+{
+  "candidates": [
+    {"src": "StatCan 10-10-0024-01 — CCOFOG by general government component",
+     "universe": "Provincial and territorial governments ONLY (also 7 other components separately)",
+     "classif": "CCOFOG functional — but only the 10 top-level divisions at provincial level",
+     "cover": "2008-2024, 13 jurisdictions",
+     "split": "Partly — 10 divisions, no Debt or Transport row",
+     "verdict": "CORE SOURCE",
+     "note": "Matches the money being allocated exactly. NOT consolidated (FN 3): inter-component transfers are not eliminated, so a provincial grant to a hospital is counted in both components. FN 4 advises against comparing provinces on a single component.",
+     "url": "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010002401"},
+
+    {"src": "StatCan 10-10-0005-01 — CCOFOG by CONSOLIDATED government component",
+     "universe": "Consolidated provincial-territorial and local governments (PTLG) — the only sub-national series",
+     "classif": "CCOFOG functional, all 60 members incl. sub-functions",
+     "cover": "2008-2024, 13 jurisdictions",
+     "split": "Yes, in full detail — but for the wrong universe",
+     "verdict": "CITED BY APP — WRONG UNIVERSE",
+     "note": "This is the table the app cites. Its sub-national universe consolidates municipalities, school boards, hospitals and universities, so it answers a different question than 'where does my provincial income tax go'. StatCan nevertheless recommends it for inter-provincial comparison, because delegation to municipalities differs by province. That tension is a product decision, not a data one.",
+     "url": "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010000501"},
+
+    {"src": "StatCan 10-10-0017-01 — CGFS for provincial and territorial governments",
+     "universe": "Provincial and territorial governments only",
+     "classif": "Economic categories, incl. Interest expense",
+     "cover": "2007-2024, 13 jurisdictions",
+     "split": "No — but supplies the debt carve-out",
+     "verdict": "CORE SOURCE",
+     "note": "Same universe, agency and vintage as 10-10-0024-01, so subtracting its Interest expense from CCOFOG division 701 is a same-basis operation. This is the ONE legitimate carve-out available.",
+     "url": "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010001701"},
+
+    {"src": "StatCan 10-10-0040-01 — FMS revenue and expenditures (ARCHIVED)",
+     "universe": "Provincial and territorial general government",
+     "classif": "FMS functional — Transportation and communication, Debt charges, Health, Education (elem-sec vs postsec), Social services, Environment, Housing, Protection of persons and property, Recreation and culture",
+     "cover": "1989-2009 only, then DISCONTINUED",
+     "split": "Yes — this is almost exactly the app's taxonomy",
+     "verdict": "DISCONTINUED 2009",
+     "note": "The single most important finding for framing. The app's ten categories are FMS-shaped and were sourceable at provincial level until StatCan retired FMS for CCOFOG. All lines populated 21 of 21 years for Ontario. The taxonomy was inherited, not invented — but it can no longer be sourced.",
+     "url": "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=1010004001"},
+
+    {"src": "Finances of the Nation (Canadian Tax Foundation)",
+     "universe": "Federal + all 13 provinces/territories; carries an Include_Local flag, so provincial-only AND provincial-plus-local both available",
+     "classif": "Only THREE expenditure lines: Total expenditure, Program expenditure, Debt charges",
+     "cover": "1966-2024",
+     "split": "NO — verified by enumerating every item id in the 35MB CSV",
+     "verdict": "BEST NON-STATCAN SOURCE, BUT CANNOT SPLIT",
+     "note": "Built explicitly for cross-jurisdiction comparability, CC-licensed, and the only source found that bridges the 2009 FMS/CCOFOG discontinuity. Public Accounts basis. Use it as an independent second measure of the debt row and as a long-run sanity check — not for the allocation.",
+     "url": "https://financesofthenation.ca/real-fedprov/"},
+
+    {"src": "CIHI — National Health Expenditure Database (NHEX)",
+     "universe": "By province/territory, broken out by source of finance incl. provincial government specifically",
+     "classif": "40+ health categories",
+     "cover": "1975-present",
+     "split": "No — one row only",
+     "verdict": "BEST CHECK ON THE HEALTH ROW",
+     "note": "Health is ~40% of the provincial pie, so an independent measure of that single row is worth more than an independent measure of most others combined.",
+     "url": "https://www.cihi.ca/en/national-health-expenditure-trends"},
+
+    {"src": "Finance Canada — Fiscal Reference Tables",
+     "universe": "Federal, provincial-territorial and local",
+     "classif": "Economic: transfers to persons, transfers to business, interest on public debt, transfers to other levels of government",
+     "cover": "Long run, both Public Accounts and National Accounts basis",
+     "split": "No",
+     "verdict": "DEBT ROW AND RECONCILIATION ONLY",
+     "note": "Publishing both bases makes it useful for checking whether a Public Accounts figure and a National Accounts figure ought to agree.",
+     "url": "https://www.canada.ca/en/department-finance/services/publications/fiscal-reference-tables.html"},
+
+    {"src": "RBC — Canadian Federal and Provincial Fiscal Tables",
+     "universe": "Federal and provincial",
+     "classif": "Budget-balance oriented, compiled from the 13 public accounts and budgets",
+     "cover": "Updated through the budget cycle",
+     "split": "No",
+     "verdict": "FINDING AID ONLY",
+     "note": "RBC states outright that its figures 'are not strictly comparable between provinces'. Convenient way to locate the underlying public accounts; not an authority.",
+     "url": "https://www.rbc.com/en/economics/wp-content/uploads/sites/23/2025/11/Canadian-Federal-and-Provincial-Fiscal-Tables-Nov-2025.pdf"},
+
+    {"src": "StatCan 36-10-0450-01 — provincial economic accounts",
+     "universe": "General governments, provincial and territorial",
+     "classif": "Economic categories",
+     "cover": "Long run",
+     "split": "No",
+     "verdict": "NOT USABLE FOR THE SPLIT",
+     "note": "Revenue, expenditure and budgetary balance only.",
+     "url": "https://www150.statcan.gc.ca/t1/tbl1/en/tv.action?pid=3610045001"}
+  ],
+
+  "debt": [
+    ["Ontario", 21861, 16139], ["Quebec", 30283, 19451], ["British Columbia", 7608, 4290],
+    ["Alberta", 7872, 3654], ["Manitoba", 2868, 2360], ["Saskatchewan", 2280, 1232],
+    ["Nova Scotia", 2562, 778], ["New Brunswick", 1795, 759],
+    ["Newfoundland and Labrador", 2008, 974], ["Prince Edward Island", 387, 172],
+    ["Yukon", 174, 8], ["Northwest Territories", 377, 53], ["Nunavut", 500, 13]
+  ],
+
+  "consol": [
+    ["Ontario", 31756, 26364, 7491], ["Quebec", 19157, 15636, 5711],
+    ["British Columbia", 8551, 7555, 1279], ["Alberta", 11693, 9164, 3505],
+    ["Manitoba", 1785, 1500, 304], ["Saskatchewan", 3132, 2595, 611],
+    ["Nova Scotia", 1532, 1307, 321], ["New Brunswick", 1465, 1516, 208],
+    ["Newfoundland and Labrador", 905, 755, 166], ["Prince Edward Island", 428, 494, 21],
+    ["Yukon", 333, 321, 22], ["Northwest Territories", 496, 488, 41], ["Nunavut", 574, 537, 45]
+  ],
+
+  "transport": [
+    ["Ontario", 17246, 7085, 26364], ["Quebec", 8763, 5029, 15636],
+    ["British Columbia", 3928, 1268, 7555], ["Alberta", 3766, 3266, 9164],
+    ["Manitoba", 628, 281, 1500], ["Saskatchewan", 715, 403, 2595],
+    ["Nova Scotia", 680, 276, 1307], ["New Brunswick", 851, 175, 1516],
+    ["Newfoundland and Labrador", 415, 161, 755], ["Prince Edward Island", 149, 20, 494],
+    ["Yukon", 171, 22, 321], ["Northwest Territories", 202, 38, 488], ["Nunavut", 153, 41, 537]
+  ],
+
+  "fon": [
+    ["Ontario", 206674, 222400, 14795, 16139], ["Quebec", 168543, 187760, 19896, 19451],
+    ["British Columbia", 86218, 92783, 3325, 4290], ["Alberta", 68970, 74361, 3545, 3654],
+    ["Manitoba", 21324, 23529, 2197, 2360], ["Saskatchewan", 22197, 24005, 1181, 1232],
+    ["Nova Scotia", 16793, 17075, 805, 778], ["New Brunswick", 10974, 13056, 725, 759],
+    ["Newfoundland and Labrador", 9203, 9710, 849, 974], ["Prince Edward Island", 3011, 3326, 166, 172]
+  ],
+
+  "recon": [
+    ["Ontario", 217667, 222400, 4733], ["Quebec", 182808, 187760, 4951],
+    ["British Columbia", 90473, 92783, 2309], ["Alberta", 72098, 74361, 2262],
+    ["Manitoba", 22833, 23529, 696], ["Saskatchewan", 23303, 24005, 702],
+    ["Nova Scotia", 16454, 17075, 620], ["New Brunswick", 12258, 13056, 799],
+    ["Newfoundland and Labrador", 9358, 9710, 352], ["Prince Edward Island", 3195, 3326, 131],
+    ["Yukon", 1890, 2092, 203], ["Northwest Territories", 2631, 2896, 265], ["Nunavut", 3067, 3251, 183]
+  ]
+}

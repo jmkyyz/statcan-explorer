@@ -1,0 +1,169 @@
+{
+ "AB": {
+  "fed": 14719,
+  "prov": 7014,
+  "total": 21733
+ },
+ "BC": {
+  "fed": 14719,
+  "prov": 5785,
+  "total": 20504
+ },
+ "MB": {
+  "fed": 14719,
+  "prov": 10129,
+  "total": 24848
+ },
+ "NB": {
+  "fed": 14719,
+  "prov": 10381,
+  "total": 25100
+ },
+ "NL": {
+  "fed": 14719,
+  "prov": 11125,
+  "total": 25844
+ },
+ "NS": {
+  "fed": 14719,
+  "prov": 12743,
+  "total": 27462
+ },
+ "NT": {
+  "fed": 14719,
+  "prov": 6144,
+  "total": 20863
+ },
+ "NU": {
+  "fed": 14719,
+  "prov": 4588,
+  "total": 19307
+ },
+ "ON": {
+  "fed": 14719,
+  "prov": 7214,
+  "total": 21933
+ },
+ "PE": {
+  "fed": 14719,
+  "prov": 11861,
+  "total": 26580
+ },
+ "QC": {
+  "fed": 12290,
+  "prov": 13737,
+  "total": 26027
+ },
+ "SK": {
+  "fed": 14719,
+  "prov": 9384,
+  "total": 24103
+ },
+ "YT": {
+  "fed": 14719,
+  "prov": 6476,
+  "total": 21195
+ },
+ "_ON_alloc": [
+  [
+   "Direct Health Spending",
+   294,
+   2394
+  ],
+  [
+   "OAS & Retirement",
+   2208,
+   0
+  ],
+  [
+   "Debt Servicing",
+   1472,
+   723
+  ],
+  [
+   "Fiscal Transfers & Admin",
+   1766,
+   402
+  ],
+  [
+   "Education",
+   589,
+   1446
+  ],
+  [
+   "Social Assistance & EI",
+   1030,
+   884
+  ],
+  [
+   "Other",
+   1766,
+   80
+  ],
+  [
+   "Canada Health Transfer",
+   1472,
+   0
+  ],
+  [
+   "Indigenous Services",
+   736,
+   0
+  ],
+  [
+   "National Defence",
+   736,
+   0
+  ],
+  [
+   "Transportation & Infra",
+   294,
+   402
+  ],
+  [
+   "Justice & Public Safety",
+   294,
+   402
+  ],
+  [
+   "Housing & Communities",
+   294,
+   241
+  ],
+  [
+   "Environment & Climate",
+   294,
+   241
+  ],
+  [
+   "Canada Social Transfer",
+   442,
+   0
+  ],
+  [
+   "Science & Innovation",
+   294,
+   0
+  ],
+  [
+   "Veterans Affairs",
+   294,
+   0
+  ],
+  [
+   "International Development",
+   147,
+   0
+  ],
+  [
+   "Immigration & Settlement",
+   147,
+   0
+  ],
+  [
+   "Agriculture & Food",
+   147,
+   0
+  ]
+ ]
+}
