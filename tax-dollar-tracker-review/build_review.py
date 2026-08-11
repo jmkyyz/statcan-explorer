@@ -27,15 +27,18 @@ PROV = json.load(open(os.path.join(HERE, 'provincial_shares_2024.json')))
 OUT = os.path.join(os.path.dirname(HERE), 'tax-dollar-tracker-review.xlsx')
 
 F = 'Aptos Narrow'
-H1 = Font(name=F, size=15, bold=True, color='FFFFFF')
-SUB = Font(name=F, size=10, color='D6E4FF')
-H2 = Font(name=F, size=11, bold=True, color='FFFFFF')
-BOLD = Font(name=F, size=10, bold=True)
-BASE = Font(name=F, size=10)
-SMALL = Font(name=F, size=9, color='595959')
-ITAL = Font(name=F, size=10, italic=True, color='404040')
-LEDE = Font(name=F, size=11, bold=True, color='1F3864')
-LINK = Font(name=F, size=10, color='0563C1', underline='single')
+# Every size below is +2pt over the original draft, which read too small at 10pt body text.
+# Sizes move together rather than just the 10s, so headers stay larger than body and footnotes
+# stay smaller than body instead of the hierarchy inverting.
+H1 = Font(name=F, size=17, bold=True, color='FFFFFF')
+SUB = Font(name=F, size=12, color='D6E4FF')
+H2 = Font(name=F, size=13, bold=True, color='FFFFFF')
+BOLD = Font(name=F, size=12, bold=True)
+BASE = Font(name=F, size=12)
+SMALL = Font(name=F, size=11, color='595959')
+ITAL = Font(name=F, size=12, italic=True, color='404040')
+LEDE = Font(name=F, size=13, bold=True, color='1F3864')
+LINK = Font(name=F, size=12, color='0563C1', underline='single')
 
 NAVY = PatternFill('solid', fgColor='1F3864')
 HDR = PatternFill('solid', fgColor='2563EB')
@@ -97,11 +100,11 @@ def title(ws, text, sub, ncols):
     ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=ncols)
     c = ws.cell(1, 1, text)
     c.font, c.fill, c.alignment = H1, NAVY, Alignment(vertical='center', indent=1)
-    ws.row_dimensions[1].height = 30
+    ws.row_dimensions[1].height = 36
     ws.merge_cells(start_row=2, start_column=1, end_row=2, end_column=ncols)
     c = ws.cell(2, 1, sub)
     c.font, c.fill, c.alignment = SUB, NAVY, Alignment(vertical='center', indent=1, wrap_text=True)
-    ws.row_dimensions[2].height = 26
+    ws.row_dimensions[2].height = 31
 
 
 def put(ws, r, c, v, font=BASE, fmt=None, fill=None, align=TOP, border=True):
@@ -121,7 +124,7 @@ def put(ws, r, c, v, font=BASE, fmt=None, fill=None, align=TOP, border=True):
 def header(ws, r, labels):
     for i, lab in enumerate(labels, start=1):
         c = put(ws, r, i, lab, font=H2, fill=HDR, align=Alignment(wrap_text=True, vertical='center'))
-    ws.row_dimensions[r].height = 28
+    ws.row_dimensions[r].height = 34
     return r + 1
 
 
@@ -151,7 +154,7 @@ r = para(ws, r,
          'You enter an annual income and a province. It calculates your 2025 federal and provincial '
          'income tax, then divides that tax across 22 spending categories in proportion to what the two '
          'levels of government actually spent. Federal spending comes from the 2024–25 Public Accounts; '
-         'provincial from Statistics Canada\'s 2024 functional (CCOFOG) estimates.', 4, height=48)
+         'provincial from Statistics Canada\'s 2024 functional (CCOFOG) estimates.', 4, height=58)
 r += 1
 
 r = para(ws, r, 'The four things worth your time', 4, font=LEDE)
@@ -172,7 +175,7 @@ for n, q in [
     ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=4)
     for i in (3, 4):
         ws.cell(r, i).border = BOX
-    ws.row_dimensions[r].height = 42
+    ws.row_dimensions[r].height = 50
     r += 1
 r += 1
 
@@ -180,7 +183,7 @@ r = para(ws, r, 'How to use this workbook', 4, font=LEDE)
 r = para(ws, r,
          'Every computed cell is a live formula, so you can change an input and watch the result move. '
          'Cream-shaded columns headed "Your view" are for you — write anything, they feed nothing. '
-         'If a formula disagrees with what you expect, that is the finding: say so in the row.', 4, height=44)
+         'If a formula disagrees with what you expect, that is the finding: say so in the row.', 4, height=53)
 r += 1
 
 r = para(ws, r, 'What is deliberately NOT modelled', 4, font=LEDE)
@@ -189,7 +192,7 @@ r = para(ws, r,
          'back, not taxes. The credits they generate, the Canada Employment Amount, and provincial '
          'low-income reductions are also not applied, so the tax figure runs high — by about 3% at '
          '$200,000 and over 20% at $30,000. None of that changes the spending split, which is what the '
-         'tool exists to show. Tab 6 has the full list.', 4, height=58)
+         'tool exists to show. Tab 6 has the full list.', 4, height=70)
 r += 1
 
 r = para(ws, r, 'Key figures, so you know roughly what to expect', 4, font=LEDE)
@@ -237,7 +240,7 @@ INC_ROW = r
 anchors_txt = ', '.join(f'${a:,}' for a in ANCHORS)
 put(ws, r, 1, 'Income to test:', font=BOLD)
 inc_cell = put(ws, r, 2, 130000, fmt=MONEY,
-               font=Font(name=F, size=10, bold=True, color='0000FF'), fill=YOURS)
+               font=Font(name=F, size=12, bold=True, color='0000FF'), fill=YOURS)
 put(ws, r, 3, f'← recalculates every row at any amount you enter. Only four incomes can be checked '
               f'against the app itself, because that is all it was sampled at: {anchors_txt}. At any '
               f'other income the "App says" and "Marginal rate" columns show an em dash, not an error.',
@@ -259,7 +262,7 @@ for i, (lim, rate) in enumerate(APP['fedBrackets']):
 for i in range(NFED, NB):
     put(ws, r, 3 + 2 * i, None, fill=GREY)
     put(ws, r, 4 + 2 * i, None, fill=GREY)
-ws.row_dimensions[r].height = 20
+ws.row_dimensions[r].height = 24
 r += 2
 
 r = para(ws, r,
@@ -269,7 +272,7 @@ r = para(ws, r,
          'tax the same way, from the shared federal row above. Ontario\'s provincial tax also carries a '
          'surtax of 20% over $5,710 and a further 36% over $7,307, plus the Ontario Health Premium; '
          'Quebec\'s federal tax is cut 16.5% by the abatement. A blank threshold means the top bracket, '
-         'with no upper limit.', NCOL, height=58)
+         'with no upper limit.', NCOL, height=70)
 r += 1
 
 hdr = ['Jurisdiction', 'BPA']
@@ -389,7 +392,7 @@ r = para(ws, r,
          "combined marginal rates were checked separately, during development, against TaxTips.ca's "
          "published 2025 rates at each jurisdiction's own top bracket and matched exactly — including "
          'Newfoundland at 54.80%, which only applies above $1,128,858, and PEI at 52.00% for 2025 '
-         "(53.00% is next year's rate, not this one's).", NCOL, height=62, fill=GOOD)
+         "(53.00% is next year's rate, not this one's).", NCOL, height=74, fill=GOOD)
 
 # ══════════════════════════════════════════════════════════════════════
 # 3. Federal allocation
@@ -404,7 +407,7 @@ r = para(ws, r,
          'Denominator is total expenses excluding net actuarial losses, $543,279M. Transfers and debt are '
          'taken as program lines; the functional categories are ministry totals net of each ministry\'s own '
          'public debt charges. No ministry appears on both sides, so the two cuts cannot double-count. '
-         '"Other" is the denominator less every named category — a residual, not a plug.', 6, height=52)
+         '"Other" is the denominator less every named category — a residual, not a plug.', 6, height=62)
 r += 1
 
 r = header(ws, r, ['Category', 'Amount ($M)', 'Share', 'Check', 'Source line', 'Your view'])
@@ -419,7 +422,7 @@ for key in order:
     put(ws, r, 4, f'=B{r}/{FED["_denominator"]}*100', fmt=PCT2, font=SMALL)
     put(ws, r, 5, note, font=SMALL, align=WRAP)
     put(ws, r, 6, '', fill=YOURS)
-    ws.row_dimensions[r].height = 26
+    ws.row_dimensions[r].height = 31
     r += 1
 bot = r - 1
 
@@ -438,7 +441,7 @@ r = para(ws, r,
          'expenses government-wide — publishing it would say Canada spends 0.1% of federal expenses on '
          'veterans. The figure used is total expenses from Veterans Affairs\' own audited departmental '
          'financial statements, $7,209M, with the difference taken out of Other. Please sanity-check that '
-         'this is the right call.', 6, height=62, fill=WARN)
+         'this is the right call.', 6, height=74, fill=WARN)
 
 # ══════════════════════════════════════════════════════════════════════
 # 4. Provincial allocation
@@ -473,7 +476,7 @@ r = para(ws, r,
          'province. That is wider than "the provincial government", and it is the basis Statistics Canada '
          'publishes for comparing jurisdictions, because provinces delegate different functions to '
          'municipalities. CCOFOG excludes capital acquisition and consumption of fixed capital, so these '
-         'are operating expenses — which understates transport most.', 13, height=52)
+         'are operating expenses — which understates transport most.', 13, height=62)
 r += 1
 
 r = header(ws, r, ['Jurisdiction'] + [LABEL10[c] for c in CATS10] + ['Sum', 'Total exp. ($M)'])
@@ -511,7 +514,7 @@ r = para(ws, r,
          'and Public debt transactions [7017] do not exist there. The consolidated component of 10-10-0005-01 '
          'carries all 60 CCOFOG members, so every category comes from one table at one vintage on one '
          'universe. Its footnote 5 also states this series can be compared across jurisdictions.',
-         13, height=60, fill=GOOD)
+         13, height=72, fill=GOOD)
 
 # ══════════════════════════════════════════════════════════════════════
 # 5. Judgment calls
@@ -568,7 +571,7 @@ for i, (name, did, against) in enumerate(CALLS, start=1):
     put(ws, r, 3, did, align=WRAP)
     put(ws, r, 4, against, align=WRAP)
     put(ws, r, 5, '', fill=YOURS)
-    ws.row_dimensions[r].height = 74
+    ws.row_dimensions[r].height = 89
     r += 1
 
 # ══════════════════════════════════════════════════════════════════════
@@ -609,7 +612,7 @@ for name, what, status in GAPS:
     put(ws, r, 2, what, align=WRAP)
     put(ws, r, 3, status, font=ITAL, align=WRAP)
     put(ws, r, 4, '', fill=YOURS)
-    ws.row_dimensions[r].height = 34
+    ws.row_dimensions[r].height = 41
     r += 1
 
 wb.save(OUT)
