@@ -191,7 +191,7 @@ r = para(ws, r,
          'CPP and EI are excluded from the tax total because they are contributions to benefits you get '
          'back, not taxes. The credits they generate, the Canada Employment Amount, and provincial '
          'low-income reductions are also not applied, so the tax figure runs high — by about 3% at '
-         '$200,000 and over 20% at $30,000. None of that changes the spending split, which is what the '
+         '$200,000 and roughly 19% at $30,000. None of that changes the spending split, which is what the '
          'tool exists to show. Tab 6 has the full list.', 4, height=70)
 
 # A "key figures" table used to sit here — federal total expenses, revenues, the deficit,
@@ -341,7 +341,9 @@ for code in sorted(APP['provinces']):
     put(ws, r, C_FED, f'={fed_expr}', fmt=MONEY)
     put(ws, r, C_COMB,
         f'={get_column_letter(C_PROV)}{r}+{get_column_letter(C_FED)}{r}', fmt=MONEY, font=BOLD)
-    put(ws, r, C_EFF, f'={get_column_letter(C_COMB)}{r}/{INC}', fmt='0.0%')
+    # Guarded against income=0: a reviewer testing the low end of the range will eventually
+    # type it, and an unguarded division would throw #DIV/0! across all 13 rows at once.
+    put(ws, r, C_EFF, f'=IF({INC}=0,"—",{get_column_letter(C_COMB)}{r}/{INC})', fmt='0.0%')
 
     for j, inc in enumerate(ANCHORS):
         put(ws, r, MARG_REF0 + j, APP['samples'][code][str(inc)]['marginal'], fmt=PCT2,
@@ -425,6 +427,16 @@ put(ws, r, 5, f'=IF(ABS(SUM(C{top}:C{bot})-100)<0.005,"Shares sum to 100.00 — 
               f'"SHARES DO NOT SUM TO 100")', font=BOLD, fill=GOOD)
 put(ws, r, 6, '', fill=YOURS)
 r += 2
+
+r = para(ws, r,
+         'One expected side effect of forcing 22 independently-rounded shares to sum to exactly 100.00: '
+         'a share and its own Check column (amount ÷ denominator, recomputed independently) can differ by '
+         'up to 0.01 point without anything being wrong — the largest-remainder method that apportions the '
+         'rounding gives some categories their floor and others their ceiling so the total lands exactly on '
+         '100, rather than 99.98 or 100.03. Only Science & Innovation shows it at this vintage (2.18% '
+         'stored, 2.19% recomputed); every other row matches at 2 decimals. Treat a gap larger than 0.01 '
+         'point as a real finding.', 6, height=68)
+r += 1
 
 r = para(ws, r,
          'Veterans Affairs is the one category not on the ministry basis. The Public Accounts show that '
@@ -548,7 +560,7 @@ CALLS = [
      'tool say so, model it, or leave it to the accompanying article?'),
     ('Employment credits and low-income reductions are not applied',
      'Only the basic personal amount is applied, so the tax figure runs high — about 3% at $200,000 and '
-     'over 20% at $30,000.',
+     'roughly 19% at $30,000.',
      'Applying them properly means CPP and EI credits, the Canada Employment Amount, and low-income '
      'reductions in at least six provinces, re-verified annually. None of it changes the spending split. '
      'Is disclosure enough?'),
