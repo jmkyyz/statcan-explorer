@@ -211,17 +211,26 @@ for lab, val, src in [
 # 2. Tax calculation
 # ══════════════════════════════════════════════════════════════════════
 NB = 8  # widest schedule is Newfoundland's eight brackets
+NFED = len(APP['fedBrackets'])     # federal has 5 brackets — fewer than the widest province
 # Incomes at which the workbook can compare its own formula against the app. app_current.json
 # carries the app's output at exactly these, so anything else is exploration, not a mismatch.
 ANCHORS = [40000, 75000, 130000, 250000]
-REF0 = 2 + 2 * NB + 8            # first column of the app-reference block
+# Column layout for the single unified table — one row per province, both tax figures on it.
+PROV_END = 2 + 2 * NB              # last column of the provincial threshold/rate pairs
+C_PBRK, C_PCR, C_SUR = PROV_END + 1, PROV_END + 2, PROV_END + 3
+C_PROV, C_FED, C_COMB = PROV_END + 4, PROV_END + 5, PROV_END + 6
+C_EFF, C_MARG = PROV_END + 7, PROV_END + 8
+C_APP, C_DIFF, C_YOURS = PROV_END + 9, PROV_END + 10, PROV_END + 11
+REF0 = C_YOURS + 1                 # first column of the app-reference block (off to the right)
+NCOL = C_YOURS
+
 ws = sheet('2. Tax calculation',
-           [22, 11] + [10, 7] * NB + [12, 11, 12, 12, 11, 10, 26] + [11] * len(ANCHORS))
-NCOL = 2 + 2 * NB + 7
+           [22, 11] + [10, 7] * NB + [11, 11, 10, 11, 11, 12, 10, 10, 11, 9, 26]
+           + [11] * (2 * len(ANCHORS)))
 title(ws, 'Tax calculation — 2025',
-      'Every tax figure here is a live formula reading the bracket cells beside it. Change a threshold, '
-      'a rate, the basic personal amount or the income, and the tax recalculates at whatever you enter.',
-      NCOL)
+      'One row per jurisdiction: federal tax, provincial tax and the combined total, each a live '
+      'formula reading the bracket cells beside it. Change a threshold, a rate, the basic personal '
+      'amount or the income below, and every row recalculates at whatever you enter.', NCOL)
 
 r = 4
 INC_ROW = r
@@ -229,44 +238,74 @@ anchors_txt = ', '.join(f'${a:,}' for a in ANCHORS)
 put(ws, r, 1, 'Income to test:', font=BOLD)
 inc_cell = put(ws, r, 2, 130000, fmt=MONEY,
                font=Font(name=F, size=10, bold=True, color='0000FF'), fill=YOURS)
-put(ws, r, 3, f'← recalculates at any amount. To check the formula against the app itself, '
-              f'use one of its four preset incomes: {anchors_txt}.', font=ITAL)
+put(ws, r, 3, f'← recalculates every row at any amount you enter. Only four incomes can be checked '
+              f'against the app itself, because that is all it was sampled at: {anchors_txt}. At any '
+              f'other income the "App says" and "Marginal rate" columns show an em dash, not an error.',
+    font=ITAL)
 ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=NCOL)
 INC = f'$B${INC_ROW}'
 r += 2
 
+# Federal brackets do not vary by province, so they live in one small block that every row
+# below references by absolute cell address — change a federal rate once, all 13 rows move.
+# This is a genuinely separate schedule from any one province's own bracket columns; it cannot
+# share cells with a province's row, which is what an earlier draft of this tab tried to do.
+FED_ROW = r
+put(ws, r, 1, 'Federal (shared by every row below):', font=BOLD, fill=GREY)
+put(ws, r, 2, APP['fedBpa'], fmt=MONEY, fill=GREY)
+for i, (lim, rate) in enumerate(APP['fedBrackets']):
+    put(ws, r, 3 + 2 * i, lim if lim else None, fmt='#,##0', fill=GREY)
+    put(ws, r, 4 + 2 * i, rate, fmt='0.0000', fill=GREY)
+for i in range(NFED, NB):
+    put(ws, r, 3 + 2 * i, None, fill=GREY)
+    put(ws, r, 4 + 2 * i, None, fill=GREY)
+ws.row_dimensions[r].height = 20
+r += 2
+
 r = para(ws, r,
          'Bracket tax is the sum over brackets of (income capped at this threshold, less the previous '
-         'threshold, floored at zero) times the rate. The basic personal amount is then credited at the '
-         'lowest rate. Ontario adds a surtax of 20% of Ontario tax over $5,710 plus a further 36% over '
-         '$7,307, then the Ontario Health Premium. Quebec\'s federal tax is reduced 16.5% by the '
-         'abatement. A blank threshold means the top bracket, with no upper limit.', NCOL, height=54)
+         'threshold, floored at zero) times the rate. The basic personal amount is then credited at '
+         'the lowest rate. Provincial tax is computed from each row\'s own threshold columns; federal '
+         'tax the same way, from the shared federal row above. Ontario\'s provincial tax also carries a '
+         'surtax of 20% over $5,710 and a further 36% over $7,307, plus the Ontario Health Premium; '
+         'Quebec\'s federal tax is cut 16.5% by the abatement. A blank threshold means the top bracket, '
+         'with no upper limit.', NCOL, height=58)
 r += 1
 
 hdr = ['Jurisdiction', 'BPA']
 for i in range(NB):
     hdr += [f'Threshold {i+1}', 'Rate']
-hdr += ['Bracket tax', 'BPA credit', 'Surtax + OHP', 'Tax (formula)', 'App says', 'Diff', 'Your view']
-hdr += [f'app @ ${a:,}' for a in ANCHORS]
+hdr += ['Prov. bracket tax', 'Prov. BPA credit', 'Surtax + OHP', 'Provincial tax', 'Federal tax',
+        'Combined tax', 'Effective rate', 'Marginal rate', 'App says (combined)', 'Diff', 'Your view']
+hdr += [f'marg @ ${a:,}' for a in ANCHORS] + [f'total @ ${a:,}' for a in ANCHORS]
 r = header(ws, r, hdr)
 HDR_ROW = r - 1
-REF_HDR = (f'${get_column_letter(REF0)}${HDR_ROW}:'
-           f'${get_column_letter(REF0 + len(ANCHORS) - 1)}${HDR_ROW}')
-# The header cells double as the lookup key, so they must be the numbers themselves.
+MARG_REF0, APP_REF0 = REF0, REF0 + len(ANCHORS)
+MARG_HDR = f'${get_column_letter(MARG_REF0)}${HDR_ROW}:${get_column_letter(MARG_REF0 + len(ANCHORS) - 1)}${HDR_ROW}'
+APP_HDR = f'${get_column_letter(APP_REF0)}${HDR_ROW}:${get_column_letter(APP_REF0 + len(ANCHORS) - 1)}${HDR_ROW}'
 for j, a in enumerate(ANCHORS):
-    put(ws, r - 1, REF0 + j, a, font=H2, fill=HDR, fmt='#,##0',
+    put(ws, r - 1, MARG_REF0 + j, a, font=H2, fill=HDR, fmt='#,##0',
+        align=Alignment(horizontal='center', vertical='center'))
+    put(ws, r - 1, APP_REF0 + j, a, font=H2, fill=HDR, fmt='#,##0',
         align=Alignment(horizontal='center', vertical='center'))
 top = r
 
-for code in ['FED'] + sorted(APP['provinces']):
-    if code == 'FED':
-        name, bpa, brackets = 'Federal', APP['fedBpa'], APP['fedBrackets']
-    else:
-        p = APP['provinces'][code]
-        name, bpa, brackets = f"{p['name']} ({code})", p['bpa'], p['brackets']
+# Federal-tax formula, shared by every row: reads the FED_ROW block above via absolute
+# references, so it is identical arithmetic to the provincial calculation just applied to a
+# different schedule, not a special case.
+fterms = []
+for i, (lim, rate) in enumerate(APP['fedBrackets']):
+    T = f'${get_column_letter(3 + 2 * i)}${FED_ROW}'
+    prev = '0' if i == 0 else f'${get_column_letter(3 + 2 * (i - 1))}${FED_ROW}'
+    fterms.append(f'MAX(0,IF({T}="",{INC},MIN({INC},{T}))-{prev})*{rate}')
+fed_bracket_tax = '+'.join(fterms)
+fed_bpa_credit = f'-${get_column_letter(2)}${FED_ROW}*{APP["fedBrackets"][0][1]}'
 
-    put(ws, r, 1, name, font=BOLD)
-    put(ws, r, 2, bpa, fmt=MONEY)
+for code in sorted(APP['provinces']):
+    p = APP['provinces'][code]
+    brackets = p['brackets']
+    put(ws, r, 1, f"{p['name']} ({code})", font=BOLD)
+    put(ws, r, 2, p['bpa'], fmt=MONEY)
     for i in range(NB):
         tcol, rcol = 3 + 2 * i, 4 + 2 * i
         if i < len(brackets):
@@ -277,134 +316,80 @@ for code in ['FED'] + sorted(APP['provinces']):
             put(ws, r, tcol, None)
             put(ws, r, rcol, None)
 
-    # Bracket tax: one MAX/MIN term per bracket, referencing the cells to the left.
+    # Provincial bracket tax: one MAX/MIN term per bracket, this row's own threshold cells.
     terms = []
     for i in range(len(brackets)):
         T = f'{get_column_letter(3 + 2 * i)}{r}'
         R = f'{get_column_letter(4 + 2 * i)}{r}'
         prev = '0' if i == 0 else f'{get_column_letter(3 + 2 * (i - 1))}{r}'
         terms.append(f'MAX(0,IF({T}="",{INC},MIN({INC},{T}))-{prev})*{R}')
-    cBrk = get_column_letter(3 + 2 * NB)
-    cCr = get_column_letter(4 + 2 * NB)
-    cSur = get_column_letter(5 + 2 * NB)
-    cTax = get_column_letter(6 + 2 * NB)
-    cApp = get_column_letter(7 + 2 * NB)
-    cDif = get_column_letter(8 + 2 * NB)
-
-    put(ws, r, 3 + 2 * NB, '=' + '+'.join(terms), fmt=MONEY)
-    put(ws, r, 4 + 2 * NB, f'=-B{r}*{get_column_letter(4)}{r}', fmt=MONEY)
+    put(ws, r, C_PBRK, '=' + '+'.join(terms), fmt=MONEY)
+    put(ws, r, C_PCR, f'=-B{r}*D{r}', fmt=MONEY)
 
     if code == 'ON':
-        base = f'MAX(0,ROUND({cBrk}{r}+{cCr}{r},0))'
+        base = f'MAX(0,ROUND({get_column_letter(C_PBRK)}{r}+{get_column_letter(C_PCR)}{r},0))'
         surtax = f'MAX(0,{base}-5710)*0.2+MAX(0,{base}-7307)*0.36'
         ohp = ontario_health_premium_formula(INC)
-        put(ws, r, 5 + 2 * NB, f'={surtax}+{ohp}', fmt=MONEY)
-        put(ws, r, 6 + 2 * NB, f'=ROUND({base}+{cSur}{r},0)', fmt=MONEY, font=BOLD)
-    elif code == 'FED':
-        put(ws, r, 5 + 2 * NB, 0, fmt=MONEY)
-        put(ws, r, 6 + 2 * NB, f'=MAX(0,ROUND({cBrk}{r}+{cCr}{r},0))', fmt=MONEY, font=BOLD)
-    elif code == 'QC':
-        put(ws, r, 5 + 2 * NB, 0, fmt=MONEY)
-        put(ws, r, 6 + 2 * NB, f'=MAX(0,ROUND({cBrk}{r}+{cCr}{r},0))', fmt=MONEY, font=BOLD)
+        put(ws, r, C_SUR, f'={surtax}+{ohp}', fmt=MONEY)
     else:
-        put(ws, r, 5 + 2 * NB, 0, fmt=MONEY)
-        put(ws, r, 6 + 2 * NB, f'=MAX(0,ROUND({cBrk}{r}+{cCr}{r},0))', fmt=MONEY, font=BOLD)
+        put(ws, r, C_SUR, 0, fmt=MONEY)
+    # The app rounds base+surtax to a whole dollar BEFORE adding the (already-integer, outside
+    # its narrow ramp bands) Health Premium — an outer ROUND around the full sum matches that
+    # for every income this tab is used at. Dropping it, as an earlier draft of this rewrite
+    # did, understated Ontario by a fraction of a dollar at every income with a live surtax.
+    put(ws, r, C_PROV,
+        f'=ROUND(MAX(0,ROUND({get_column_letter(C_PBRK)}{r}+{get_column_letter(C_PCR)}{r},0))'
+        f'+{get_column_letter(C_SUR)}{r},0)', fmt=MONEY, font=BOLD)
 
-    # Reference values the app produces at each anchor income, off to the right. "App says"
-    # looks up whichever anchor the income cell currently matches, so a reviewer can move the
-    # income freely without the comparison turning into a false alarm.
+    fed_expr = f'MAX(0,ROUND({fed_bracket_tax}{fed_bpa_credit},0))'
+    if code == 'QC':
+        fed_expr = f'ROUND({fed_expr}*(1-0.165),0)'
+    put(ws, r, C_FED, f'={fed_expr}', fmt=MONEY)
+    put(ws, r, C_COMB,
+        f'={get_column_letter(C_PROV)}{r}+{get_column_letter(C_FED)}{r}', fmt=MONEY, font=BOLD)
+    put(ws, r, C_EFF, f'={get_column_letter(C_COMB)}{r}/{INC}', fmt='0.0%')
+
     for j, inc in enumerate(ANCHORS):
-        v = (APP['samples']['ON'][str(inc)]['fed'] if code == 'FED'
-             else APP['samples'][code][str(inc)]['prov'])
-        put(ws, r, REF0 + j, v, fmt=MONEY, font=SMALL, fill=GREY)
-    ref = f'{get_column_letter(REF0)}{r}:{get_column_letter(REF0 + len(ANCHORS) - 1)}{r}'
-    put(ws, r, 7 + 2 * NB,
-        f'=IFERROR(INDEX({ref},MATCH({INC},{REF_HDR},0)),"—")', fmt=MONEY)
-    put(ws, r, 8 + 2 * NB,
-        f'=IF(ISNUMBER({cApp}{r}),{cTax}{r}-{cApp}{r},"")', fmt=MONEY, font=SMALL)
-    put(ws, r, 9 + 2 * NB, '', fill=YOURS)
+        put(ws, r, MARG_REF0 + j, APP['samples'][code][str(inc)]['marginal'], fmt=PCT2,
+            font=SMALL, fill=GREY)
+    mref = f'{get_column_letter(MARG_REF0)}{r}:{get_column_letter(MARG_REF0 + len(ANCHORS) - 1)}{r}'
+    put(ws, r, C_MARG, f'=IFERROR(INDEX({mref},MATCH({INC},{MARG_HDR},0)),"—")', fmt=PCT2)
+
+    for j, inc in enumerate(ANCHORS):
+        put(ws, r, APP_REF0 + j, APP['samples'][code][str(inc)]['total'], fmt=MONEY,
+            font=SMALL, fill=GREY)
+    aref = f'{get_column_letter(APP_REF0)}{r}:{get_column_letter(APP_REF0 + len(ANCHORS) - 1)}{r}'
+    put(ws, r, C_APP, f'=IFERROR(INDEX({aref},MATCH({INC},{APP_HDR},0)),"—")', fmt=MONEY)
+    put(ws, r, C_DIFF,
+        f'=IF(ISNUMBER({get_column_letter(C_APP)}{r}),'
+        f'{get_column_letter(C_COMB)}{r}-{get_column_letter(C_APP)}{r},"")', fmt=MONEY, font=SMALL)
+    put(ws, r, C_YOURS, '', fill=YOURS)
     r += 1
 bot = r - 1
 
-cDif = get_column_letter(8 + 2 * NB)
 put(ws, r, 1, 'Check', font=BOLD, fill=GREY)
-# Three states, not two. The old version only knew "matches" and "disagrees", so exploring at
-# any income other than the single anchor raised a false alarm — which teaches a reviewer to
-# ignore the check exactly when it might matter. anchors_txt was set above, by the income cell.
-# MAX(MAX(range),-MIN(range)) is the largest absolute value without needing array entry.
+cDiff = get_column_letter(C_DIFF)
+# Three states, not two: exploring at an income the app was not sampled at is not the same as
+# a genuine disagreement, and the wording says so instead of raising a false alarm either way.
 put(ws, r, 2,
-    f'=IF(COUNT({cDif}{top}:{cDif}{bot})=0,'
+    f'=IF(COUNT({cDiff}{top}:{cDiff}{bot})=0,'
     f'"Exploring at an income the app was not sampled at — set the income cell to '
     f'{anchors_txt} to compare against the app.",'
-    f'IF(MAX(MAX({cDif}{top}:{cDif}{bot}),-MIN({cDif}{top}:{cDif}{bot}))<=1,'
-    f'"Every formula matches the app at this income (within $1 of rounding) — OK",'
-    f'"A FORMULA DISAGREES WITH THE APP — see the Diff column"))', font=BOLD, fill=GOOD)
+    f'IF(MAX(MAX({cDiff}{top}:{cDiff}{bot}),-MIN({cDiff}{top}:{cDiff}{bot}))<=1,'
+    f"\"Every jurisdiction's combined tax matches the app at this income (within $1 of rounding) — OK\","
+    f'"A JURISDICTION DISAGREES WITH THE APP — see the Diff column"))', font=BOLD, fill=GOOD)
 ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=NCOL)
 r += 2
 
 r = para(ws, r,
-         '"App says" is what the tool itself reports — provincial tax, or federal tax on the first row. '
-         'It shows "—" at any income outside the four presets, because there is nothing to compare it '
-         'against there, not because the formula is wrong.', NCOL, height=30)
-r += 1
-
-# The abatement is the one piece of the tax structure not visible in the grid above, because it
-# reduces federal rather than provincial tax. Shown separately so a reviewer can check it.
-r = para(ws, r, 'Quebec federal abatement', NCOL, font=LEDE)
-put(ws, r, 1, 'Federal tax before abatement', font=BOLD)
-put(ws, r, 2, f'={cTax}{top}', fmt=MONEY)
-put(ws, r, 3, 'less 16.5%, Quebec only', font=ITAL)
-ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=5)
-r += 1
-put(ws, r, 1, 'Federal tax after abatement', font=BOLD)
-put(ws, r, 2, f'=ROUND(B{r-1}*(1-0.165),0)', fmt=MONEY, font=BOLD)
-# Same anchor lookup as the grid above — this check had the identical fixed-income flaw.
-for j, inc in enumerate(ANCHORS):
-    put(ws, r, REF0 + j, APP['samples']['QC'][str(inc)]['fed'],
-        fmt=MONEY, font=SMALL, fill=GREY)
-qref = f'{get_column_letter(REF0)}{r}:{get_column_letter(REF0 + len(ANCHORS) - 1)}{r}'
-put(ws, r, 3, f'=IFERROR(INDEX({qref},MATCH({INC},{REF_HDR},0)),"—")', fmt=MONEY)
-put(ws, r, 4,
-    f'=IF(NOT(ISNUMBER(C{r})),"Set the income to an anchor value to compare.",'
-    f'IF(B{r}=C{r},"matches the app — OK","DISAGREES WITH THE APP"))',
-    font=BOLD, fill=GOOD)
-ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=8)
-r += 1
-r = para(ws, r,
-         'Quebec operates its own tax system, and Ottawa returns 16.5% of net federal tax to compensate '
-         'for the tax room Quebec occupies. It reduces federal tax, not provincial, which is why it does '
-         'not appear in the grid above. Like the grid, the comparison here only resolves at the four '
-         'preset incomes.', NCOL, height=40)
-r += 1
-
-r = para(ws, r,
-         'A fixed reference table, independent of the income cell above — always at $130,000, for all 13 '
-         'jurisdictions side by side.', NCOL, font=LEDE)
-r = header(ws, r, ['Jurisdiction', 'Total tax @ $130,000', 'Effective rate', 'Marginal rate',
-                   'Published marginal', 'Match?'] + [''] * (NCOL - 6))
-PUBLISHED = {'ON': 43.41, 'BC': 40.70, 'QC': 45.71, 'AB': 36.00, 'NS': 43.50, 'NL': 42.30,
-             'MB': 43.40, 'SK': 38.50, 'NB': 42.00, 'PE': 43.62, 'YT': 36.90, 'NT': 38.20,
-             'NU': 35.00}
-for code in sorted(APP['provinces']):
-    s = APP['samples'][code]['130000']
-    put(ws, r, 1, f"{APP['provinces'][code]['name']} ({code})")
-    put(ws, r, 2, s['total'], fmt=MONEY)
-    # Divide by the literal $130,000 this row is anchored to — NOT by the income cell above,
-    # which the reviewer is explicitly invited to change. An earlier version divided by that
-    # cell, so it read correctly only by coincidence, while the income cell held $130,000.
-    put(ws, r, 3, f'=B{r}/130000', fmt='0.0%')
-    put(ws, r, 4, s['marginal'], fmt=PCT2)
-    put(ws, r, 5, '', fill=YOURS)
-    put(ws, r, 6, '', fill=YOURS)
-    for i in range(7, NCOL + 1):
-        ws.cell(r, i).border = BOX
-    r += 1
-r += 1
-r = para(ws, r,
-         'Columns E and F are left blank on purpose — if you have a marginal rate table to hand, that is '
-         'the fastest independent check in this workbook. For reference, all 13 top combined rates were '
-         'checked against published 2025 figures and matched, including Newfoundland at 54.80% (which '
-         'applies only above $1,128,858) and PEI at 52.00% for 2025.', NCOL, height=46, fill=GOOD)
+         '"App says" and the check above compare COMBINED tax — federal plus provincial together — '
+         'against the total the app itself reports, matching the number on its own results page. '
+         'Marginal rate and the app comparison are both reference lookups from the app\'s own output '
+         'at the four incomes it was sampled at, and both show an em dash outside those four. All 13 '
+         "combined marginal rates were checked separately, during development, against TaxTips.ca's "
+         "published 2025 rates at each jurisdiction's own top bracket and matched exactly — including "
+         'Newfoundland at 54.80%, which only applies above $1,128,858, and PEI at 52.00% for 2025 '
+         "(53.00% is next year's rate, not this one's).", NCOL, height=62, fill=GOOD)
 
 # ══════════════════════════════════════════════════════════════════════
 # 3. Federal allocation
