@@ -220,14 +220,17 @@ ws = sheet('2. Tax calculation',
 NCOL = 2 + 2 * NB + 7
 title(ws, 'Tax calculation — 2025',
       'Every tax figure here is a live formula reading the bracket cells beside it. Change a threshold, '
-      'a rate, the basic personal amount or the income, and the tax recalculates.', NCOL)
+      'a rate, the basic personal amount or the income, and the tax recalculates at whatever you enter.',
+      NCOL)
 
 r = 4
 INC_ROW = r
+anchors_txt = ', '.join(f'${a:,}' for a in ANCHORS)
 put(ws, r, 1, 'Income to test:', font=BOLD)
 inc_cell = put(ws, r, 2, 130000, fmt=MONEY,
                font=Font(name=F, size=10, bold=True, color='0000FF'), fill=YOURS)
-put(ws, r, 3, '← change this and every row below recalculates', font=ITAL)
+put(ws, r, 3, f'← recalculates at any amount. To check the formula against the app itself, '
+              f'use one of its four preset incomes: {anchors_txt}.', font=ITAL)
 ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=NCOL)
 INC = f'$B${INC_ROW}'
 r += 2
@@ -327,9 +330,8 @@ cDif = get_column_letter(8 + 2 * NB)
 put(ws, r, 1, 'Check', font=BOLD, fill=GREY)
 # Three states, not two. The old version only knew "matches" and "disagrees", so exploring at
 # any income other than the single anchor raised a false alarm — which teaches a reviewer to
-# ignore the check exactly when it might matter.
+# ignore the check exactly when it might matter. anchors_txt was set above, by the income cell.
 # MAX(MAX(range),-MIN(range)) is the largest absolute value without needing array entry.
-anchors_txt = ', '.join(f'${a:,}' for a in ANCHORS)
 put(ws, r, 2,
     f'=IF(COUNT({cDif}{top}:{cDif}{bot})=0,'
     f'"Exploring at an income the app was not sampled at — set the income cell to '
@@ -341,11 +343,9 @@ ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=NCOL)
 r += 2
 
 r = para(ws, r,
-         f'"App says" is what the tool itself reports — provincial tax, or federal tax on the first row. '
-         f'The app was sampled at {anchors_txt}, so the comparison fills in whenever the income cell is '
-         f'set to one of those and shows "—" at any other income. Move the income freely: the check line '
-         f'above says which of the three states you are in, and only shouts when a formula and the app '
-         f'genuinely disagree at an income where both are defined.', NCOL, height=44)
+         '"App says" is what the tool itself reports — provincial tax, or federal tax on the first row. '
+         'It shows "—" at any income outside the four presets, because there is nothing to compare it '
+         'against there, not because the formula is wrong.', NCOL, height=30)
 r += 1
 
 # The abatement is the one piece of the tax structure not visible in the grid above, because it
@@ -373,12 +373,14 @@ r += 1
 r = para(ws, r,
          'Quebec operates its own tax system, and Ottawa returns 16.5% of net federal tax to compensate '
          'for the tax room Quebec occupies. It reduces federal tax, not provincial, which is why it does '
-         'not appear in the grid above. The comparison holds only when the income cell is $130,000.',
-         NCOL, height=40)
+         'not appear in the grid above. Like the grid, the comparison here only resolves at the four '
+         'preset incomes.', NCOL, height=40)
 r += 1
 
-r = para(ws, r, 'Rates the tool produces, against published 2025 figures', NCOL, font=LEDE)
-r = header(ws, r, ['Jurisdiction', 'Total tax @ $130k', 'Effective rate', 'Marginal rate',
+r = para(ws, r,
+         'A fixed reference table, independent of the income cell above — always at $130,000, for all 13 '
+         'jurisdictions side by side.', NCOL, font=LEDE)
+r = header(ws, r, ['Jurisdiction', 'Total tax @ $130,000', 'Effective rate', 'Marginal rate',
                    'Published marginal', 'Match?'] + [''] * (NCOL - 6))
 PUBLISHED = {'ON': 43.41, 'BC': 40.70, 'QC': 45.71, 'AB': 36.00, 'NS': 43.50, 'NL': 42.30,
              'MB': 43.40, 'SK': 38.50, 'NB': 42.00, 'PE': 43.62, 'YT': 36.90, 'NT': 38.20,
@@ -387,7 +389,10 @@ for code in sorted(APP['provinces']):
     s = APP['samples'][code]['130000']
     put(ws, r, 1, f"{APP['provinces'][code]['name']} ({code})")
     put(ws, r, 2, s['total'], fmt=MONEY)
-    put(ws, r, 3, f'=B{r}/{INC.replace("$B$", "$B$")}', fmt='0.0%')
+    # Divide by the literal $130,000 this row is anchored to — NOT by the income cell above,
+    # which the reviewer is explicitly invited to change. An earlier version divided by that
+    # cell, so it read correctly only by coincidence, while the income cell held $130,000.
+    put(ws, r, 3, f'=B{r}/130000', fmt='0.0%')
     put(ws, r, 4, s['marginal'], fmt=PCT2)
     put(ws, r, 5, '', fill=YOURS)
     put(ws, r, 6, '', fill=YOURS)
