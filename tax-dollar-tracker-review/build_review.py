@@ -193,22 +193,13 @@ r = para(ws, r,
          'low-income reductions are also not applied, so the tax figure runs high — by about 3% at '
          '$200,000 and over 20% at $30,000. None of that changes the spending split, which is what the '
          'tool exists to show. Tab 6 has the full list.', 4, height=70)
-r += 1
 
-r = para(ws, r, 'Key figures, so you know roughly what to expect', 4, font=LEDE)
-r = header(ws, r, ['', 'Figure', 'Value', 'Source'])
-for lab, val, src in [
-    ('Federal total expenses 2024–25, excl. net actuarial losses', FED['_denominator'] * 1e6,
-     'Public Accounts 2025, Vol I, Table 3.6'),
-    ('Federal revenues 2024–25', 510951e6, 'Public Accounts 2025, Vol I, Section 2'),
-    ('Federal annual deficit 2024–25', 36348e6, 'derived: 547,299 − 510,951'),
-    ('Ontario provincial-territorial-local expenditure 2024',
-     PROV['shares']['ON']['_totalExpenditureM'] * 1e6, 'StatCan 10-10-0005-01'),
-]:
-    put(ws, r, 2, lab)
-    put(ws, r, 3, val, fmt=MILL, font=BOLD)
-    put(ws, r, 4, src, font=SMALL, align=WRAP)
-    r += 1
+# A "key figures" table used to sit here — federal total expenses, revenues, the deficit,
+# Ontario's expenditure. Cut because every figure in it was already stated elsewhere with
+# better context: the federal denominator is on tab 3, the deficit is its own judgment call on
+# tab 5 (framed as "6.6 cents of every dollar borrowed", not a bare number), and Ontario's total
+# is one row of tab 4's 13-jurisdiction table. Showing only Ontario here, after two federal
+# lines, also made the table read as arbitrary rather than as a genuine orientation aid.
 
 # ══════════════════════════════════════════════════════════════════════
 # 2. Tax calculation
