@@ -175,7 +175,9 @@ def probe_ckan() -> dict:
 
     if errors:
         print(f"  ({errors} of {len(CKAN_QUERIES)} queries failed — results may be partial)")
-    print(f"  {len(found)} candidate dataset(s):\n")
+    print(f"  {len(found)} candidate dataset(s) — most are keyword noise;")
+    print(f"  what matters is where the two bulk ZIPs resolve.\n")
+    targets = []
     portal_hosted = 0
     for name, pkg in found.items():
         title = (pkg.get("title") or "")
@@ -196,8 +198,14 @@ def probe_ckan() -> dict:
         for r in pkg.get("resources", []):
             url = r.get("url", "")
             host = urllib.parse.urlparse(url).netloc
-            # THE decisive check: portal storage is usable, a link back to
-            # lobbycanada.gc.ca hits the same Cloudflare wall.
+            # Only the bulk ZIPs the pipeline actually reads count. A keyword
+            # search drags in briefing PDFs, other jurisdictions' registers and
+            # unrelated "registry" datasets; counting those as a bypass would
+            # be a false positive dressed up as a verdict.
+            is_target = any(url.split("?")[0] == t.split("?")[0]
+                            for t in BULK.values())
+            if is_target:
+                targets.append((title, url, host, pkg.get("frequency", "?")))
             if "lobbycanada.gc.ca" in host:
                 verdict = "<< points back at lobbycanada — same wall"
             elif host:
@@ -205,13 +213,27 @@ def probe_ckan() -> dict:
                 portal_hosted += 1
             else:
                 verdict = ""
+            if is_target:
+                verdict += "   *** THIS IS A BULK SOURCE THE PIPELINE USES ***"
             print(f"      - {r.get('format','?'):<6} {host or '(no url)'} {verdict}")
             print(f"        last_modified={r.get('last_modified') or r.get('created')}"
                   f"  size={r.get('size')}")
             print(f"        {url}")
         print()
+    print("  " + "-" * 68)
+    if targets:
+        print("  BULK SOURCES THE PIPELINE READS:")
+        for title, url, host, freq in targets:
+            state = ("BLOCKED (lobbycanada)" if "lobbycanada.gc.ca" in host
+                     else f"portal-hosted ({host})")
+            print(f"    {state}  declared update frequency={freq}")
+            print(f"      {title}\n      {url}")
+    else:
+        print("  Neither bulk ZIP appears as a catalogue resource.")
     return {"datasets": len(found), "portal_hosted": portal_hosted,
-            "unreachable": False}
+            "unreachable": False, "targets": targets,
+            "targets_usable": [t for t in targets
+                               if "lobbycanada.gc.ca" not in t[2]]}
 
 
 def main():
@@ -239,9 +261,16 @@ def main():
             print("  A. This IP is blocked too. Relocating the job cannot fix it;")
             print("     you need a different source (B) or a real browser.")
     if ckan is not None:
-        if ckan["portal_hosted"]:
-            print(f"  B. {ckan['portal_hosted']} portal-hosted resource(s) found — a")
-            print("     Cloudflare-free path to the bulk data. Worth switching to.")
+        if ckan.get("targets_usable"):
+            print(f"  B. {len(ckan['targets_usable'])} bulk source(s) are portal-hosted —")
+            print("     a Cloudflare-free path to the data. Worth switching to.")
+        elif ckan.get("targets"):
+            print("  B. The catalogue lists the bulk data but every resource URL")
+            print("     points back at lobbycanada.gc.ca — the same wall. CKAN")
+            print("     does NOT give you a download path; it only confirms the")
+            print("     dataset is still published and how often it should update.")
+            print(f"     ({ckan['portal_hosted']} other portal-hosted resources were")
+            print("     found, but they belong to unrelated datasets.)")
         elif ckan["datasets"]:
             print("  B. Datasets exist but resources link back to lobbycanada.gc.ca.")
             print("     Useful for change detection, not for the download itself.")

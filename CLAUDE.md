@@ -85,13 +85,33 @@ an exemption from the OCL will. To re-check the wall later:
 Or just run `python3 lobbyist/check_sources.py`, which probes this and the
 open-data catalogue together and prints a verdict.
 
-Prefer changing source over escalating the arms race. The Office of the
-Commissioner of Lobbying publishes to the federal open-data portal, and this
-repo already has working CKAN patterns against it — `proxy.py:102` (`ckan_proxy`,
-which notes it "strips WAF-triggering headers") and `ev_change_detector.py:28`.
-A CKAN resource for the registry would be the same data on different
-infrastructure. Verify that first; browser automation against lobbycanada.gc.ca
-is the fallback, not the plan.
+**The open-data portal is not a way around it** (checked 2026-09-11). The OCL
+does publish both datasets on open.canada.ca — "Lobbying Registrations"
+(`70ef2117-1095-4d77-80eb-b87f2bada2a4`) and "Monthly Communication Reports"
+(`a34eb330-7136-4f5e-9f5f-3ba41df58b06`) — but their resource URLs are the very
+same `lobbycanada.gc.ca/media/...` ZIPs the pipeline already fetches. The
+catalogue entry is a pointer, not a copy, so it lands on the same wall. CKAN
+is still worth polling as a *signal* (see below); it is not a download path.
+
+Two useful facts did come out of that check:
+
+- Both datasets declare **`frequency=P1W`** — the OCL considers this weekly
+  data. A weekly bulk refresh is ample for the alert's 14-day window, so
+  losing `patch_recent.py`'s daily top-up costs little once access is restored.
+- Both records show `metadata_modified` of 2026-09-07, so the OCL is still
+  actively publishing. Only our access is broken. (Their resource-level
+  `last_modified` still reads 2016-11-02 — stale since registration, and a
+  reminder not to trust CKAN timestamps for change detection.)
+
+That makes **asking the OCL the primary route, not a courtesy**: they publish
+these files on the federal open-data portal for reuse, and the portal's own
+links now return 403 to every programmatic client. That reads as a WAF rule
+with an unintended blast radius rather than a deliberate policy, and it is
+concrete enough to report — name the two dataset IDs and the 403.
+
+Browser automation against lobbycanada.gc.ca is the fallback if that goes
+nowhere. Check their terms of use first, and expect it to break whenever the
+rule is retuned.
 
 Fixing the fetch is not enough on its own. Three layers each convert this
 outage into a silent success, and any fix should close them:
