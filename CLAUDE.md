@@ -85,8 +85,9 @@ an exemption from the OCL will. To re-check the wall later:
 Or just run `python3 lobbyist/check_sources.py`, which probes this and the
 open-data catalogue together and prints a verdict.
 
-**The open-data portal is not a way around it** (checked 2026-09-11). The OCL
-does publish both datasets on open.canada.ca — "Lobbying Registrations"
+**The open-data portal is not a way around it — this is settled, do not
+re-investigate** (checked 2026-09-11). The OCL does publish both datasets on
+open.canada.ca — "Lobbying Registrations"
 (`70ef2117-1095-4d77-80eb-b87f2bada2a4`) and "Monthly Communication Reports"
 (`a34eb330-7136-4f5e-9f5f-3ba41df58b06`) — but their resource URLs are the very
 same `lobbycanada.gc.ca/media/...` ZIPs the pipeline already fetches. The
@@ -102,6 +103,11 @@ Two useful facts did come out of that check:
   actively publishing. Only our access is broken. (Their resource-level
   `last_modified` still reads 2016-11-02 — stale since registration, and a
   reminder not to trust CKAN timestamps for change detection.)
+- Neither resource is DataStore-backed (`datastore_active=False` on both), so
+  the portal holds no queryable copy of the rows either. That was the last
+  remaining CKAN angle and it is closed.
+- Both records publish `maintainer_email=info@lobbycanada.gc.ca` — the contact
+  for the access request in `lobbyist/OCL-access-request.md`.
 
 That makes **asking the OCL the primary route, not a courtesy**: they publish
 these files on the federal open-data portal for reuse, and the portal's own

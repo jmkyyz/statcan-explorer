@@ -1,22 +1,30 @@
 # Access request — OCL open-data bulk files behind a bot challenge
 
-**Status:** draft, not sent. Send only if `check_sources.py` reports
-`datastore_active=False` on both bulk resources (if either is DataStore-backed,
-query the portal instead and no request is needed).
+**Status: ready to send.** The condition for sending is met — `check_sources.py`
+confirmed on 2026-09-11 that neither bulk resource is DataStore-backed
+(`datastore_active=False` on both), so there is no way to pull this data from
+the open-data portal and no technical route left that does not involve either
+the OCL or a browser.
 
-**Where to send it:** use the `maintainer_email` / `author_email` that
-`check_sources.py` now prints for the two datasets — that is the contact the OCL
-publishes on the dataset records themselves. Do not guess a generic inbox.
+**Send to:** `info@lobbycanada.gc.ca` — the `maintainer_email` published on both
+affected dataset records, so it is the contact the Office itself nominates for
+them.
 
-**Before sending, decide two things:**
+If that gets no response, the most recently maintained OCL open-data record
+(`b10e0c62-4a10-4670-bc8a-e4b842f2c89b`, May 2026) lists a named analyst as
+maintainer, who likely administers the Office's open-data publishing directly.
+Their address is in that record. Try `info@` first — going straight to a named
+individual on a first contact tends to get forwarded back to the general inbox
+anyway.
 
-1. *Affiliation.* The draft is written as an ordinary open-data user. Adding an
-   employer may get a faster reply, but it turns a bug report into a media
-   inquiry and will likely be routed to communications rather than to whoever
-   administers the WAF. The technical route is usually quicker. Your call.
-2. *Attachment.* The appendix is enough for a web administrator to reproduce it
-   in one command. Keep it — a report that can be reproduced gets fixed; one
-   that cannot gets closed.
+**Before sending, decide one thing:** the draft is written as an ordinary
+open-data user. Adding an employer may get a faster reply, but it turns a bug
+report into a media inquiry and will likely be routed to communications rather
+than to whoever administers the WAF. The technical route is usually quicker.
+Your call.
+
+Keep the appendix. A report an administrator can reproduce in one command gets
+fixed; one that cannot gets closed.
 
 ---
 
