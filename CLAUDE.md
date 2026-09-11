@@ -41,9 +41,34 @@ came from the Mac's `update_lobby_db.sh`, which was retired when the GitHub
 Actions workflow replaced it on 2026-07-18.
 
 **The Actions workflow has never published successfully.** `lobbycanada.gc.ca`
-returns **HTTP 403** to GitHub-hosted runners; `curl_cffi`'s Chrome TLS
-impersonation defeats JA3 fingerprinting but not a datacenter-IP block. The
-registry is reachable from a residential IP — this is not a dead data source.
+returns **HTTP 403** to GitHub-hosted runners. The block began between the
+2026-07-19 run (reached the registry, patch step ran) and the 2026-07-20 run
+(check step returned in 0s, everything downstream skipped), and has been
+continuous since.
+
+The site is behind bot protection that appears to have rolled out in stages,
+challenging low-reputation IP ranges first:
+
+- **Datacenter IPs: blocked since 2026-07-20** (first-hand, from the run logs
+  above). The Mac still published fine from a residential IP the next day.
+- **Ordinary machines: reportedly challenged too, as of 2026-09.** A colleague
+  running a separate fork reports the site now shows a Cloudflare "are you a
+  human" interstitial, breaking his daily and weekly downloads. Second-hand and
+  not yet reproduced here — confirm before betting a fix on it.
+
+This matters for what a fix can be. `curl_cffi`'s Chrome impersonation defeats
+JA3/TLS fingerprinting, but **no TLS-impersonating HTTP client can clear a
+managed challenge** — that needs JS execution and a solved Turnstile. If the
+interstitial now applies to residential IPs, simply moving the job back to the
+Mac (or onto a self-hosted runner) will not fix it.
+
+Prefer changing source over escalating the arms race. The Office of the
+Commissioner of Lobbying publishes to the federal open-data portal, and this
+repo already has working CKAN patterns against it — `proxy.py:102` (`ckan_proxy`,
+which notes it "strips WAF-triggering headers") and `ev_change_detector.py:28`.
+A CKAN resource for the registry would be the same data on different
+infrastructure. Verify that first; browser automation against lobbycanada.gc.ca
+is the fallback, not the plan.
 
 Fixing the fetch is not enough on its own. Three layers each convert this
 outage into a silent success, and any fix should close them:
