@@ -59,12 +59,13 @@ not appear to be limited to a particular address range or reputation class. The
 same applies to the recent-communications export at
 `/app/secure/ocl/lrs/do/rcntCmLgs`.
 
-The reason I am raising it rather than simply working around it: these files are
-published on the federal open-data portal under terms that contemplate
-programmatic reuse, and the portal's own listings now point at URLs that no
-automated consumer can retrieve. A challenge intended to deter scraping or
-abusive traffic appears to be catching the routine open-data use case as well. I
-suspect that was not the intent.
+The reason I am raising it rather than simply working around it: the portal's
+listings for these datasets point at URLs that no automated client can now
+retrieve, and both records declare an update frequency of `P1W` — weekly. A
+dataset published on a weekly cycle is one meant to be collected repeatedly
+rather than fetched once by hand, and that is exactly the use the challenge now
+blocks. I assume a rule aimed at scraping or abusive traffic has caught the
+routine open-data case as a side-effect.
 
 Two possible remedies, whichever suits your configuration:
 

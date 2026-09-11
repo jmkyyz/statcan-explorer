@@ -194,7 +194,8 @@ def probe_ckan() -> dict:
             if pkg.get(key):
                 print(f"    {key}={pkg[key]}")
         print(f"    metadata_modified={pkg.get('metadata_modified')}")
-        for key in ("maintainer_email", "author_email", "maintainer", "author"):
+        for key in ("license_title", "license_id", "license_url",
+                    "maintainer_email", "author_email", "maintainer", "author"):
             v = pkg.get(key)
             if isinstance(v, dict):
                 v = v.get("en") or v.get("fr")
