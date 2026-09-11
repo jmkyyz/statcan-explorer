@@ -107,13 +107,34 @@ def probe_registry() -> dict:
     return {"ok": all(results.values()) if results else False, "detail": results}
 
 
+CKAN_HEADERS = {
+    "User-Agent": BROWSER_UA,                    # the GC WAF rejects python-urllib
+    "Accept": "application/json, text/plain, */*",
+    "Accept-Language": "en-CA,en-US;q=0.9,en;q=0.8",
+}
+
+
 def _ckan(action: str, **params):
+    """Query the CKAN API, preferring curl_cffi over stdlib urllib.
+
+    urllib validates against Python's own CA bundle, which on a python.org
+    macOS build is empty until `Install Certificates.command` has been run —
+    that surfaces as CERTIFICATE_VERIFY_FAILED / "self-signed certificate in
+    certificate chain" and looks exactly like the catalogue being down. Any
+    TLS-inspecting proxy produces the same error. curl_cffi carries its own
+    trust store, so if it is installed (it is a production dependency here)
+    it sidesteps the whole question.
+    """
     url = f"{CKAN}/{action}?" + urllib.parse.urlencode(params)
-    req = urllib.request.Request(url, headers={
-        "User-Agent": BROWSER_UA,                # the GC WAF rejects python-urllib
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "en-CA,en-US;q=0.9,en;q=0.8",
-    })
+    try:
+        from curl_cffi import requests as cc
+    except ImportError:
+        cc = None
+    if cc is not None:
+        r = cc.get(url, headers=CKAN_HEADERS, impersonate="chrome", timeout=30)
+        r.raise_for_status()
+        return r.json().get("result")
+    req = urllib.request.Request(url, headers=CKAN_HEADERS)
     with urllib.request.urlopen(req, timeout=30) as resp:
         return json.load(resp).get("result")
 
@@ -133,6 +154,10 @@ def probe_ckan() -> dict:
         except Exception as e:            # noqa: BLE001
             errors += 1
             print(f"  query {q!r} failed: {type(e).__name__}: {e}")
+            if "CERTIFICATE_VERIFY_FAILED" in str(e):
+                print("    ^ a local TLS trust problem, NOT the catalogue being down.")
+                print("      Fix: run  /Applications/Python\\ 3.x/Install\\ Certificates.command")
+                print("      or:   pip install curl_cffi   (this script prefers it)")
             continue
         for pkg in (res or {}).get("results", []):
             found.setdefault(pkg.get("name"), pkg)

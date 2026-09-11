@@ -54,16 +54,26 @@ challenging low-reputation IP ranges first:
   his employer's servers, now hits a Cloudflare "are you a human" interstitial
   that breaks its daily and weekly downloads. Both data points are
   datacenter-class egress.
-- **Residential IPs: unknown.** The last confirmed success from one was the
-  Mac's 2026-07-21 publish, the day after the datacenter block began. Nothing
-  since has tested it, in either direction. Do not assume either way — test it
-  before designing around it (see below).
+- **Residential IPs: blocked as well, confirmed 2026-09-11.** Probed from the
+  Mac with `lobbyist/check_sources.py`: all three endpoints — both bulk ZIPs
+  *and* the live recent-comms endpoint — return `HTTP 403` with
+  `cf-mitigated: challenge` and `server: cloudflare` (edge YYZ). The wall is
+  now universal, so relocating the job to the Mac or a self-hosted runner
+  cannot work. Note this kills `patch_recent.py` too, not just the bulk
+  rebuild: the entire lobbycanada.gc.ca surface is unreachable programmatically.
 
-This matters for what a fix can be. `curl_cffi`'s Chrome impersonation defeats
-JA3/TLS fingerprinting, but **no TLS-impersonating HTTP client can clear a
-managed challenge** — that needs JS execution and a solved Turnstile. So a
-self-hosted runner on the Mac is worth trying only if a residential IP still
-passes. Settle that first, from the Mac, before building anything:
+`cf-mitigated: challenge` means a *challenge*, not a block — a human in a real
+browser still downloads these files fine. The data has not been withdrawn; it
+has become machine-inaccessible. Since the OCL publishes these exports
+expressly for reuse, that is plausibly an unintended side-effect of a WAF
+rule, which makes asking them to fix or exempt it a real option rather than a
+last resort.
+
+`curl_cffi`'s Chrome impersonation defeats JA3/TLS fingerprinting, but **no
+TLS-impersonating HTTP client can clear a managed challenge** — that needs JS
+execution and a solved Turnstile. With residential now blocked too, no
+relocation of the job fixes this; only a different source, a real browser, or
+an exemption from the OCL will. To re-check the wall later:
 
     python3 -c "
     from curl_cffi import requests
@@ -72,9 +82,8 @@ passes. Settle that first, from the Mac, before building anything:
     print(r.status_code, r.headers.get('Content-Length'), r.headers.get('cf-mitigated'))
     r.close()"
 
-200 with a Content-Length in the hundreds of MB means residential still works.
-403 — especially with a `cf-mitigated: challenge` header — means it does not,
-and only a real browser or a different source will do.
+Or just run `python3 lobbyist/check_sources.py`, which probes this and the
+open-data catalogue together and prints a verdict.
 
 Prefer changing source over escalating the arms race. The Office of the
 Commissioner of Lobbying publishes to the federal open-data portal, and this
