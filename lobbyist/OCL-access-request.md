@@ -38,8 +38,10 @@ the lobbycanada.gc.ca web infrastructure.
 The Office publishes two datasets on the Government of Canada's open-data
 portal:
 
-- **Lobbying Registrations** — `70ef2117-1095-4d77-80eb-b87f2bada2a4`
-- **Monthly Communication Reports** — `a34eb330-7136-4f5e-9f5f-3ba41df58b06`
+- **Lobbying Registrations**
+  https://open.canada.ca/data/en/dataset/70ef2117-1095-4d77-80eb-b87f2bada2a4
+- **Monthly Communication Reports**
+  https://open.canada.ca/data/en/dataset/a34eb330-7136-4f5e-9f5f-3ba41df58b06
 
 Both records list their bulk files as resources hosted on your own server:
 
