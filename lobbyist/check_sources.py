@@ -194,6 +194,12 @@ def probe_ckan() -> dict:
             if pkg.get(key):
                 print(f"    {key}={pkg[key]}")
         print(f"    metadata_modified={pkg.get('metadata_modified')}")
+        for key in ("maintainer_email", "author_email", "maintainer", "author"):
+            v = pkg.get(key)
+            if isinstance(v, dict):
+                v = v.get("en") or v.get("fr")
+            if v:
+                print(f"    {key}={v}")
 
         for r in pkg.get("resources", []):
             url = r.get("url", "")
@@ -205,7 +211,10 @@ def probe_ckan() -> dict:
             is_target = any(url.split("?")[0] == t.split("?")[0]
                             for t in BULK.values())
             if is_target:
-                targets.append((title, url, host, pkg.get("frequency", "?")))
+                targets.append({"title": title, "url": url, "host": host,
+                                "freq": pkg.get("frequency", "?"),
+                                "datastore": bool(r.get("datastore_active")),
+                                "id": r.get("id", "")})
             if "lobbycanada.gc.ca" in host:
                 verdict = "<< points back at lobbycanada — same wall"
             elif host:
@@ -214,7 +223,8 @@ def probe_ckan() -> dict:
             else:
                 verdict = ""
             if is_target:
-                verdict += "   *** THIS IS A BULK SOURCE THE PIPELINE USES ***"
+                verdict += ("   *** BULK SOURCE THE PIPELINE USES — datastore_active="
+                            f"{bool(r.get('datastore_active'))} ***")
             print(f"      - {r.get('format','?'):<6} {host or '(no url)'} {verdict}")
             print(f"        last_modified={r.get('last_modified') or r.get('created')}"
                   f"  size={r.get('size')}")
@@ -223,17 +233,30 @@ def probe_ckan() -> dict:
     print("  " + "-" * 68)
     if targets:
         print("  BULK SOURCES THE PIPELINE READS:")
-        for title, url, host, freq in targets:
-            state = ("BLOCKED (lobbycanada)" if "lobbycanada.gc.ca" in host
-                     else f"portal-hosted ({host})")
-            print(f"    {state}  declared update frequency={freq}")
-            print(f"      {title}\n      {url}")
+        for t in targets:
+            state = ("BLOCKED (lobbycanada)" if "lobbycanada.gc.ca" in t["host"]
+                     else f"portal-hosted ({t['host']})")
+            print(f"    {state}  frequency={t['freq']}  "
+                  f"datastore_active={t['datastore']}")
+            print(f"      {t['title']}\n      {t['url']}")
+            if t["datastore"]:
+                # A DataStore-backed resource is queryable from the portal
+                # regardless of where the original file lives — a real bypass.
+                print(f"      -> QUERYABLE FROM THE PORTAL. Try:")
+                print(f"         {CKAN}/datastore_search?resource_id={t['id']}&limit=5")
+                try:
+                    probe = _ckan("datastore_search", resource_id=t["id"], limit=1)
+                    n = (probe or {}).get("total")
+                    print(f"      -> datastore_search works: {n} rows available.")
+                except Exception as e:      # noqa: BLE001
+                    print(f"      -> datastore_search failed: {type(e).__name__}: {e}")
     else:
         print("  Neither bulk ZIP appears as a catalogue resource.")
     return {"datasets": len(found), "portal_hosted": portal_hosted,
             "unreachable": False, "targets": targets,
+            "datastore_any": [t for t in targets if t["datastore"]],
             "targets_usable": [t for t in targets
-                               if "lobbycanada.gc.ca" not in t[2]]}
+                               if "lobbycanada.gc.ca" not in t["host"]]}
 
 
 def main():
@@ -264,11 +287,16 @@ def main():
         if ckan.get("targets_usable"):
             print(f"  B. {len(ckan['targets_usable'])} bulk source(s) are portal-hosted —")
             print("     a Cloudflare-free path to the data. Worth switching to.")
+        elif ckan.get("datastore_any"):
+            print(f"  B. {len(ckan['datastore_any'])} bulk resource(s) are DataStore-backed —")
+            print("     queryable straight from the portal via datastore_search,")
+            print("     regardless of where the file is hosted. That IS a bypass.")
         elif ckan.get("targets"):
             print("  B. The catalogue lists the bulk data but every resource URL")
             print("     points back at lobbycanada.gc.ca — the same wall. CKAN")
-            print("     does NOT give you a download path; it only confirms the")
-            print("     dataset is still published and how often it should update.")
+            print("     does NOT give you a download path, and neither resource is")
+            print("     DataStore-backed. It only confirms the dataset is still")
+            print("     published and how often it should update.")
             print(f"     ({ckan['portal_hosted']} other portal-hosted resources were")
             print("     found, but they belong to unrelated datasets.)")
         elif ckan["datasets"]:
