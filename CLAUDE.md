@@ -50,17 +50,31 @@ The site is behind bot protection that appears to have rolled out in stages,
 challenging low-reputation IP ranges first:
 
 - **Datacenter IPs: blocked since 2026-07-20** (first-hand, from the run logs
-  above). The Mac still published fine from a residential IP the next day.
-- **Ordinary machines: reportedly challenged too, as of 2026-09.** A colleague
-  running a separate fork reports the site now shows a Cloudflare "are you a
-  human" interstitial, breaking his daily and weekly downloads. Second-hand and
-  not yet reproduced here — confirm before betting a fix on it.
+  above). Corroborated independently: a colleague's separate fork, running on
+  his employer's servers, now hits a Cloudflare "are you a human" interstitial
+  that breaks its daily and weekly downloads. Both data points are
+  datacenter-class egress.
+- **Residential IPs: unknown.** The last confirmed success from one was the
+  Mac's 2026-07-21 publish, the day after the datacenter block began. Nothing
+  since has tested it, in either direction. Do not assume either way — test it
+  before designing around it (see below).
 
 This matters for what a fix can be. `curl_cffi`'s Chrome impersonation defeats
 JA3/TLS fingerprinting, but **no TLS-impersonating HTTP client can clear a
-managed challenge** — that needs JS execution and a solved Turnstile. If the
-interstitial now applies to residential IPs, simply moving the job back to the
-Mac (or onto a self-hosted runner) will not fix it.
+managed challenge** — that needs JS execution and a solved Turnstile. So a
+self-hosted runner on the Mac is worth trying only if a residential IP still
+passes. Settle that first, from the Mac, before building anything:
+
+    python3 -c "
+    from curl_cffi import requests
+    r = requests.get('https://lobbycanada.gc.ca/media/mqbbmaqk/communications_ocl_cal.zip',
+                     impersonate='chrome', stream=True, timeout=30)
+    print(r.status_code, r.headers.get('Content-Length'), r.headers.get('cf-mitigated'))
+    r.close()"
+
+200 with a Content-Length in the hundreds of MB means residential still works.
+403 — especially with a `cf-mitigated: challenge` header — means it does not,
+and only a real browser or a different source will do.
 
 Prefer changing source over escalating the arms race. The Office of the
 Commissioner of Lobbying publishes to the federal open-data portal, and this
