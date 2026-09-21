@@ -31,7 +31,7 @@ from email.utils import formatdate, parsedate_to_datetime
 import requests
 from dotenv import load_dotenv
 load_dotenv()
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, abort, jsonify, request, send_from_directory
 from flask_cors import CORS
 
 app = Flask(__name__)
@@ -68,8 +68,12 @@ def lab():
 
 @app.route("/tax")
 def tax_tracker():
-    here = os.path.dirname(os.path.abspath(__file__))
-    return send_from_directory(here, "tax-dollar-tracker.html")
+    # Tax Dollar Tracker is deliberately offline (a new version is being
+    # prepared elsewhere). tax-dollar-tracker.html stays in the repo untouched;
+    # to bring /tax back, restore the send_from_directory return below.
+    #   here = os.path.dirname(os.path.abspath(__file__))
+    #   return send_from_directory(here, "tax-dollar-tracker.html")
+    abort(404)
 
 @app.route("/trade")
 def trade_explorer():
