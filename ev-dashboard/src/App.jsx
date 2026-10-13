@@ -16,12 +16,15 @@ function useDebounced(value, delay = 300) {
   return debounced
 }
 
-// "Apr, 26" → "2026-04"
+// "Apr-26" / "Apr, 26" / "April 2026" → "2026-04"
+// EVAP switched the separator from ", " to "-" with the June 2026 resource, so accept
+// either (plus a 4-digit year) rather than silently failing back to the calendar month.
 function parseLatestToYYYYMM(str) {
   if (!str) return null
-  const match = str.trim().match(/^([A-Za-z]+),?\s*(\d+)$/)
+  const match = str.trim().match(/^([A-Za-z]+)[,\s-]*(\d+)$/)
   if (!match) return null
-  const yr = parseInt(match[2]) + (parseInt(match[2]) < 50 ? 2000 : 1900)
+  const rawYr = parseInt(match[2], 10)
+  const yr = rawYr >= 100 ? rawYr : rawYr + (rawYr < 50 ? 2000 : 1900)
   const mo = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec']
     .indexOf(match[1].toLowerCase().slice(0, 3)) + 1
   if (mo === 0) return null

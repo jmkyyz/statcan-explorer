@@ -1,16 +1,27 @@
 import { useQuery } from '@tanstack/react-query'
 import { useMemo } from 'react'
-import { parse, isAfter, isBefore } from 'date-fns'
+import { parse, isAfter, isBefore, isValid } from 'date-fns'
 import {
   fetchResourceMeta, fetchLatestMonthYear,
   fetchDistinct, fetchDistinctModels,
   fetchAllRecords, fetchEVTypeCounts,
 } from '../lib/api'
 
-// "Apr, 26" → Date
+// "Apr-26" / "Apr, 26" → Date
+// EVAP has shipped this column both ways: "Apr, 26" up to the May 2026 resource, then
+// "Apr-26" from the June 2026 one on. date-fns parse returns an Invalid Date (truthy,
+// not a throw) on a format mismatch, which silently no-ops every date comparison below —
+// so try each known shape and fall back to null, which callers do handle.
+const MONTH_YEAR_FORMATS = ['MMM-yy', 'MMM, yy', 'MMM yy', 'MMMM yyyy']
+
 function parseMonthYear(str) {
   if (!str) return null
-  try { return parse(str.trim(), 'MMM, yy', new Date()) } catch { return null }
+  const trimmed = str.trim()
+  for (const fmt of MONTH_YEAR_FORMATS) {
+    const d = parse(trimmed, fmt, new Date())
+    if (isValid(d)) return d
+  }
+  return null
 }
 
 // "yyyy-MM" → Date

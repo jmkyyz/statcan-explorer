@@ -138,7 +138,7 @@ export default function EVChart({ filters }) {
             />
             {keys.map((key, i) =>
               chartType === 'bar' ? (
-                <Bar key={key} dataKey={key} stackId="a" fill={PALETTE[i % PALETTE.length]} />
+                <Bar key={key} dataKey={key} stackId="a" fill={PALETTE[i % PALETTE.length]} isAnimationActive={false} />
               ) : (
                 <Line
                   key={key}
