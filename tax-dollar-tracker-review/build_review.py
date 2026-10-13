@@ -211,7 +211,12 @@ for lab, val, src in [
 # 2. Tax calculation
 # ══════════════════════════════════════════════════════════════════════
 NB = 8  # widest schedule is Newfoundland's eight brackets
-ws = sheet('2. Tax calculation', [22, 11] + [10, 7] * NB + [12, 11, 12, 12, 11, 10, 26])
+# Incomes at which the workbook can compare its own formula against the app. app_current.json
+# carries the app's output at exactly these, so anything else is exploration, not a mismatch.
+ANCHORS = [40000, 75000, 130000, 250000]
+REF0 = 2 + 2 * NB + 8            # first column of the app-reference block
+ws = sheet('2. Tax calculation',
+           [22, 11] + [10, 7] * NB + [12, 11, 12, 12, 11, 10, 26] + [11] * len(ANCHORS))
 NCOL = 2 + 2 * NB + 7
 title(ws, 'Tax calculation — 2025',
       'Every tax figure here is a live formula reading the bracket cells beside it. Change a threshold, '
@@ -239,7 +244,15 @@ hdr = ['Jurisdiction', 'BPA']
 for i in range(NB):
     hdr += [f'Threshold {i+1}', 'Rate']
 hdr += ['Bracket tax', 'BPA credit', 'Surtax + OHP', 'Tax (formula)', 'App says', 'Diff', 'Your view']
+hdr += [f'app @ ${a:,}' for a in ANCHORS]
 r = header(ws, r, hdr)
+HDR_ROW = r - 1
+REF_HDR = (f'${get_column_letter(REF0)}${HDR_ROW}:'
+           f'${get_column_letter(REF0 + len(ANCHORS) - 1)}${HDR_ROW}')
+# The header cells double as the lookup key, so they must be the numbers themselves.
+for j, a in enumerate(ANCHORS):
+    put(ws, r - 1, REF0 + j, a, font=H2, fill=HDR, fmt='#,##0',
+        align=Alignment(horizontal='center', vertical='center'))
 top = r
 
 for code in ['FED'] + sorted(APP['provinces']):
@@ -294,29 +307,45 @@ for code in ['FED'] + sorted(APP['provinces']):
         put(ws, r, 5 + 2 * NB, 0, fmt=MONEY)
         put(ws, r, 6 + 2 * NB, f'=MAX(0,ROUND({cBrk}{r}+{cCr}{r},0))', fmt=MONEY, font=BOLD)
 
-    app_val = (APP['samples']['ON']['130000']['fed'] if code == 'FED'
-               else APP['samples'][code]['130000']['prov'])
-    put(ws, r, 7 + 2 * NB, app_val, fmt=MONEY)
-    put(ws, r, 8 + 2 * NB, f'={cTax}{r}-{cApp}{r}', fmt=MONEY, font=SMALL)
+    # Reference values the app produces at each anchor income, off to the right. "App says"
+    # looks up whichever anchor the income cell currently matches, so a reviewer can move the
+    # income freely without the comparison turning into a false alarm.
+    for j, inc in enumerate(ANCHORS):
+        v = (APP['samples']['ON'][str(inc)]['fed'] if code == 'FED'
+             else APP['samples'][code][str(inc)]['prov'])
+        put(ws, r, REF0 + j, v, fmt=MONEY, font=SMALL, fill=GREY)
+    ref = f'{get_column_letter(REF0)}{r}:{get_column_letter(REF0 + len(ANCHORS) - 1)}{r}'
+    put(ws, r, 7 + 2 * NB,
+        f'=IFERROR(INDEX({ref},MATCH({INC},{REF_HDR},0)),"—")', fmt=MONEY)
+    put(ws, r, 8 + 2 * NB,
+        f'=IF(ISNUMBER({cApp}{r}),{cTax}{r}-{cApp}{r},"")', fmt=MONEY, font=SMALL)
     put(ws, r, 9 + 2 * NB, '', fill=YOURS)
     r += 1
 bot = r - 1
 
 cDif = get_column_letter(8 + 2 * NB)
 put(ws, r, 1, 'Check', font=BOLD, fill=GREY)
+# Three states, not two. The old version only knew "matches" and "disagrees", so exploring at
+# any income other than the single anchor raised a false alarm — which teaches a reviewer to
+# ignore the check exactly when it might matter.
 # MAX(MAX(range),-MIN(range)) is the largest absolute value without needing array entry.
+anchors_txt = ', '.join(f'${a:,}' for a in ANCHORS)
 put(ws, r, 2,
-    f'=IF(MAX(MAX({cDif}{top}:{cDif}{bot}),-MIN({cDif}{top}:{cDif}{bot}))<=1,'
-    f'"Every formula matches the app at $130,000 (within $1 of rounding) — OK",'
-    f'"A FORMULA DISAGREES WITH THE APP — see the Diff column")', font=BOLD, fill=GOOD)
+    f'=IF(COUNT({cDif}{top}:{cDif}{bot})=0,'
+    f'"Exploring at an income the app was not sampled at — set the income cell to '
+    f'{anchors_txt} to compare against the app.",'
+    f'IF(MAX(MAX({cDif}{top}:{cDif}{bot}),-MIN({cDif}{top}:{cDif}{bot}))<=1,'
+    f'"Every formula matches the app at this income (within $1 of rounding) — OK",'
+    f'"A FORMULA DISAGREES WITH THE APP — see the Diff column"))', font=BOLD, fill=GOOD)
 ws.merge_cells(start_row=r, start_column=2, end_row=r, end_column=NCOL)
 r += 2
 
 r = para(ws, r,
-         'The "App says" column is the provincial tax the tool reports at $130,000 — or federal tax, on '
-         'the first row. It is fixed at that income, so it only lines up with the formula when the income '
-         'cell above is set to $130,000. Change the income to explore; change it back to compare.',
-         NCOL, height=40)
+         f'"App says" is what the tool itself reports — provincial tax, or federal tax on the first row. '
+         f'The app was sampled at {anchors_txt}, so the comparison fills in whenever the income cell is '
+         f'set to one of those and shows "—" at any other income. Move the income freely: the check line '
+         f'above says which of the three states you are in, and only shouts when a formula and the app '
+         f'genuinely disagree at an income where both are defined.', NCOL, height=44)
 r += 1
 
 # The abatement is the one piece of the tax structure not visible in the grid above, because it
@@ -329,8 +358,15 @@ ws.merge_cells(start_row=r, start_column=3, end_row=r, end_column=5)
 r += 1
 put(ws, r, 1, 'Federal tax after abatement', font=BOLD)
 put(ws, r, 2, f'=ROUND(B{r-1}*(1-0.165),0)', fmt=MONEY, font=BOLD)
-put(ws, r, 3, APP['samples']['QC']['130000']['fed'], fmt=MONEY)
-put(ws, r, 4, f'=IF(B{r}=C{r},"matches the app — OK","DISAGREES WITH THE APP")',
+# Same anchor lookup as the grid above — this check had the identical fixed-income flaw.
+for j, inc in enumerate(ANCHORS):
+    put(ws, r, REF0 + j, APP['samples']['QC'][str(inc)]['fed'],
+        fmt=MONEY, font=SMALL, fill=GREY)
+qref = f'{get_column_letter(REF0)}{r}:{get_column_letter(REF0 + len(ANCHORS) - 1)}{r}'
+put(ws, r, 3, f'=IFERROR(INDEX({qref},MATCH({INC},{REF_HDR},0)),"—")', fmt=MONEY)
+put(ws, r, 4,
+    f'=IF(NOT(ISNUMBER(C{r})),"Set the income to an anchor value to compare.",'
+    f'IF(B{r}=C{r},"matches the app — OK","DISAGREES WITH THE APP"))',
     font=BOLD, fill=GOOD)
 ws.merge_cells(start_row=r, start_column=4, end_row=r, end_column=8)
 r += 1
